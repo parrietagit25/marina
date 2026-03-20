@@ -196,7 +196,17 @@ require_once __DIR__ . '/../includes/layout.php';
                 </tr>
             <?php endforeach; ?>
             <?php if (empty($filas)): ?>
-                <tr><td colspan="9" class="text-muted">No hay registros con los filtros indicados.</td></tr>
+                <tr>
+                    <td class="text-muted">No hay registros con los filtros indicados.</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                </tr>
             <?php endif; ?>
             </tbody>
         </table>
