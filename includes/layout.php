@@ -19,6 +19,9 @@ $seccionReportes = in_array($p, ['reporte-cuotas', 'reporte-proveedores-estado-c
   <meta name='viewport' content='width=device-width, initial-scale=1.0'>
   <title><?= isset($titulo) ? e($titulo) . ' - ' : '' ?>Marina</title>
 
+  <link rel='preconnect' href='https://fonts.googleapis.com'>
+  <link rel='preconnect' href='https://fonts.gstatic.com' crossorigin>
+  <link href='https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap' rel='stylesheet'>
   <link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css' rel='stylesheet' crossorigin='anonymous'>
   <link href='https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css' rel='stylesheet'>
   <link rel='stylesheet' href='<?= MARINA_URL ?>/assets/css/estilos.css'>
@@ -33,41 +36,41 @@ $seccionReportes = in_array($p, ['reporte-cuotas', 'reporte-proveedores-estado-c
     </div>
 
     <div class='sidebar-menu list-group list-group-flush'>
-      <a class='list-group-item list-group-item-action <?= ($p === 'dashboard') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php'>Inicio</a>
+      <a class='list-group-item list-group-item-action <?= ($p === 'dashboard') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php'><i data-lucide='layout-dashboard' class='menu-ico'></i>Inicio</a>
 
       <div class="sidebar-accordion mt-2" id="sidebarAccordionDesktop">
         <button class="menu-section-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#menuMantDesktop" aria-expanded="<?= $seccionMantenimiento ? 'true' : 'false' ?>">
           Mantenimiento
         </button>
         <div id="menuMantDesktop" class="collapse <?= $seccionMantenimiento ? 'show' : '' ?>" data-bs-parent="#sidebarAccordionDesktop">
-          <a class='list-group-item list-group-item-action <?= ($p === 'usuarios') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=usuarios'>Usuarios</a>
-          <a class='list-group-item list-group-item-action <?= ($p === 'bancos') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=bancos'>Bancos</a>
-          <a class='list-group-item list-group-item-action <?= ($p === 'cuentas') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=cuentas'>Cuentas</a>
+          <a class='list-group-item list-group-item-action <?= ($p === 'usuarios') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=usuarios'><i data-lucide='users' class='menu-ico'></i>Usuarios</a>
+          <a class='list-group-item list-group-item-action <?= ($p === 'bancos') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=bancos'><i data-lucide='landmark' class='menu-ico'></i>Bancos</a>
+          <a class='list-group-item list-group-item-action <?= ($p === 'cuentas') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=cuentas'><i data-lucide='wallet-cards' class='menu-ico'></i>Cuentas</a>
         </div>
 
         <button class="menu-section-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#menuTransDesktop" aria-expanded="<?= $seccionTransacciones ? 'true' : 'false' ?>">
           Transacciones
         </button>
         <div id="menuTransDesktop" class="collapse <?= $seccionTransacciones ? 'show' : '' ?>" data-bs-parent="#sidebarAccordionDesktop">
-          <a class='list-group-item list-group-item-action <?= ($p === 'formas-pago') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=formas-pago'>Tipo de movimientos</a>
-          <a class='list-group-item list-group-item-action <?= ($p === 'movimiento-bancario') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=movimiento-bancario'>Movimiento bancario</a>
-          <a class='list-group-item list-group-item-action <?= ($p === 'partidas') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=partidas'>Partidas</a>
-          <a class='list-group-item list-group-item-action <?= ($p === 'proveedores') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=proveedores'>Proveedores</a>
-          <a class='list-group-item list-group-item-action <?= ($p === 'gastos') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=gastos'>Gastos</a>
-          <a class='list-group-item list-group-item-action <?= ($p === 'reportes') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reportes'>Ingresos / Costos</a>
+          <a class='list-group-item list-group-item-action <?= ($p === 'formas-pago') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=formas-pago'><i data-lucide='arrow-right-left' class='menu-ico'></i>Tipo de movimientos</a>
+          <a class='list-group-item list-group-item-action <?= ($p === 'movimiento-bancario') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=movimiento-bancario'><i data-lucide='banknote' class='menu-ico'></i>Movimiento bancario</a>
+          <a class='list-group-item list-group-item-action <?= ($p === 'partidas') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=partidas'><i data-lucide='network' class='menu-ico'></i>Partidas</a>
+          <a class='list-group-item list-group-item-action <?= ($p === 'proveedores') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=proveedores'><i data-lucide='truck' class='menu-ico'></i>Proveedores</a>
+          <a class='list-group-item list-group-item-action <?= ($p === 'gastos') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=gastos'><i data-lucide='receipt' class='menu-ico'></i>Gastos</a>
+          <a class='list-group-item list-group-item-action <?= ($p === 'reportes') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reportes'><i data-lucide='bar-chart-3' class='menu-ico'></i>Ingresos / Costos</a>
         </div>
 
         <button class="menu-section-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#menuMarinaDesktop" aria-expanded="<?= $seccionMarina ? 'true' : 'false' ?>">
           Marina
         </button>
         <div id="menuMarinaDesktop" class="collapse <?= $seccionMarina ? 'show' : '' ?>" data-bs-parent="#sidebarAccordionDesktop">
-          <a class='list-group-item list-group-item-action <?= ($p === 'clientes') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=clientes'>Clientes</a>
+          <a class='list-group-item list-group-item-action <?= ($p === 'clientes') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=clientes'><i data-lucide='user-round' class='menu-ico'></i>Clientes</a>
           <a class='list-group-item list-group-item-action <?= ($p === 'muelles') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=muelles'>Muelles</a>
           <a class='list-group-item list-group-item-action <?= ($p === 'slips') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=slips'>Slips</a>
           <a class='list-group-item list-group-item-action <?= ($p === 'grupos') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=grupos'>Grupos</a>
           <a class='list-group-item list-group-item-action <?= ($p === 'inmuebles') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=inmuebles'>Inmuebles</a>
-          <a class='list-group-item list-group-item-action <?= ($p === 'mapa-marina') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=mapa-marina'>Mapa Marina</a>
-          <a class='list-group-item list-group-item-action <?= ($p === 'mapa-grupos') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=mapa-grupos'>Mapa Grupos</a>
+          <a class='list-group-item list-group-item-action <?= ($p === 'mapa-marina') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=mapa-marina'><i data-lucide='anchor' class='menu-ico'></i>Mapa Marina</a>
+          <a class='list-group-item list-group-item-action <?= ($p === 'mapa-grupos') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=mapa-grupos'><i data-lucide='building-2' class='menu-ico'></i>Mapa Grupos</a>
           <a class='list-group-item list-group-item-action <?= ($p === 'contratos') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=contratos'>Contratos</a>
         </div>
 
@@ -117,7 +120,7 @@ $seccionReportes = in_array($p, ['reporte-cuotas', 'reporte-proveedores-estado-c
             <div class='sidebar-user'><?= $nombre_usuario ?></div>
           </div>
           <div class='sidebar-menu list-group list-group-flush'>
-            <a class='list-group-item list-group-item-action <?= ($p === 'dashboard') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php'>Inicio</a>
+            <a class='list-group-item list-group-item-action <?= ($p === 'dashboard') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php'><i data-lucide='layout-dashboard' class='menu-ico'></i>Inicio</a>
             <div class="sidebar-accordion mt-2" id="sidebarAccordionMobile">
               <button class="menu-section-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#menuMantMobile" aria-expanded="<?= $seccionMantenimiento ? 'true' : 'false' ?>">
                 Mantenimiento

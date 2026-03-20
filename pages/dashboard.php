@@ -198,32 +198,32 @@ require_once __DIR__ . '/../includes/layout.php';
 
 <div class="kpi-grid mb-4">
     <div class="kpi-card">
-        <div class="kpi-title">Ingresos total</div>
+        <div class="kpi-title"><i data-lucide="trending-up" class="menu-ico"></i>Ingresos total</div>
         <div class="kpi-value"><?= dinero((float) $ingresos_total) ?></div>
     </div>
     <div class="kpi-card">
-        <div class="kpi-title">Costos total</div>
+        <div class="kpi-title"><i data-lucide="trending-down" class="menu-ico"></i>Costos total</div>
         <div class="kpi-value"><?= dinero((float) $costos_total) ?></div>
     </div>
     <div class="kpi-card">
-        <div class="kpi-title">Diferencia</div>
+        <div class="kpi-title"><i data-lucide="sigma" class="menu-ico"></i>Diferencia</div>
         <?php $diff = (float)$ingresos_total - (float)$costos_total; ?>
         <div class="kpi-value" style="color:<?= $diff >= 0 ? '#137333' : '#b42318' ?>"><?= dinero($diff) ?></div>
     </div>
     <div class="kpi-card">
-        <div class="kpi-title">Cuotas pagadas (mes)</div>
+        <div class="kpi-title"><i data-lucide="badge-check" class="menu-ico"></i>Cuotas pagadas (mes)</div>
         <div class="kpi-value"><?= (int)$cuotas_pagadas_mes ?></div>
     </div>
     <div class="kpi-card">
-        <div class="kpi-title">Cuotas vencidas (mes)</div>
+        <div class="kpi-title"><i data-lucide="clock-3" class="menu-ico"></i>Cuotas vencidas (mes)</div>
         <div class="kpi-value"><?= (int)$cuotas_vencidas_mes ?></div>
     </div>
     <div class="kpi-card">
-        <div class="kpi-title">Contratos por vencer (mes)</div>
+        <div class="kpi-title"><i data-lucide="file-warning" class="menu-ico"></i>Contratos por vencer (mes)</div>
         <div class="kpi-value"><?= (int)$contratos_vencer_mes ?></div>
     </div>
     <div class="kpi-card">
-        <div class="kpi-title">Gasto mensual (partidas)</div>
+        <div class="kpi-title"><i data-lucide="wallet" class="menu-ico"></i>Gasto mensual (partidas)</div>
         <div class="kpi-value"><?= dinero((float)$costos_total) ?></div>
     </div>
 </div>

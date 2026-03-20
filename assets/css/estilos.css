@@ -430,3 +430,157 @@ form select {
   cursor: pointer;
 }
 
+/* ===== Refactor visual premium marina ===== */
+:root {
+  --bg-main: #f3f7fb;
+  --surface: #ffffff;
+  --surface-soft: #f8fbff;
+  --text-main: #0f172a;
+  --text-soft: #64748b;
+  --brand-1: #0a3d62;
+  --brand-2: #0ea5a6;
+  --ok: #0f9f64;
+  --danger: #d14343;
+  --radius-lg: 16px;
+  --radius-md: 12px;
+  --shadow-soft: 0 10px 30px rgba(15, 23, 42, 0.08);
+}
+
+body {
+  font-family: "Inter", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  color: var(--text-main);
+  background:
+    radial-gradient(1200px 600px at -10% -10%, rgba(14, 165, 166, 0.16), transparent 40%),
+    radial-gradient(900px 500px at 120% -20%, rgba(10, 61, 98, 0.2), transparent 35%),
+    var(--bg-main);
+}
+
+.content-main {
+  padding-top: 1.25rem !important;
+}
+
+.card {
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+}
+
+.btn {
+  border-radius: 12px;
+  font-weight: 600;
+  transition: transform .16s ease, box-shadow .16s ease, opacity .16s ease;
+}
+.btn:hover { transform: translateY(-1px); }
+.btn-primary {
+  background: linear-gradient(135deg, var(--brand-1), #125c8f);
+  border-color: transparent;
+  box-shadow: 0 8px 18px rgba(10, 61, 98, .25);
+}
+.btn-success {
+  background: linear-gradient(135deg, #0d8d63, #14b889);
+  border-color: transparent;
+}
+.btn-danger {
+  background: linear-gradient(135deg, #d14343, #ef4444);
+  border-color: transparent;
+}
+
+.sidebar {
+  background: linear-gradient(180deg, #07172b 0%, #0a2038 55%, #08213a 100%);
+  border-right: 1px solid rgba(148, 163, 184, 0.22);
+}
+.sidebar-logo {
+  letter-spacing: .02em;
+}
+.sidebar .list-group-item {
+  border-radius: 10px !important;
+  margin: 2px 10px;
+  border: 0 !important;
+  transition: all .16s ease;
+}
+.sidebar .list-group-item.active,
+.sidebar .list-group-item.active:hover {
+  background: linear-gradient(135deg, rgba(14, 165, 166, 0.26), rgba(14, 116, 144, 0.32)) !important;
+  box-shadow: inset 2px 0 0 rgba(45, 212, 191, .95);
+}
+.menu-ico {
+  width: 16px;
+  height: 16px;
+  margin-right: .5rem;
+  vertical-align: -3px;
+}
+
+.menu-section-toggle {
+  color: rgba(191, 214, 240, 0.8);
+}
+
+.kpi-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+.kpi-card {
+  position: relative;
+  background: linear-gradient(180deg, #fff 0%, #f9fcff 100%);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 18px;
+  box-shadow: var(--shadow-soft);
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+.kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.12);
+}
+.kpi-title {
+  color: var(--text-soft);
+  text-transform: uppercase;
+  font-size: .76rem;
+  letter-spacing: .06em;
+}
+.kpi-value {
+  font-size: 1.72rem;
+}
+
+.charts-grid .card h2 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0b3558;
+}
+
+.dataTables_wrapper .dataTables_filter input,
+.dataTables_wrapper .dataTables_length select {
+  border-radius: 10px !important;
+  border: 1px solid #cdd8e5 !important;
+  background: #fff !important;
+}
+
+.dataTables_wrapper table.dataTable thead th {
+  background: #f3f8fd !important;
+  color: #0a2f4e;
+}
+.dataTables_wrapper table.dataTable tbody tr:hover {
+  background: #eef8ff !important;
+}
+
+.mapa-grid {
+  gap: 1.2rem;
+}
+.mapa-muelle {
+  background: linear-gradient(180deg, #fff, #f7fbff);
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, .22);
+  box-shadow: var(--shadow-soft);
+}
+.mapa-muelle h2 {
+  color: #0b3558;
+  font-weight: 700;
+}
+.mapa-slip-item {
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  padding: .5rem .75rem;
+  transition: all .15s ease;
+}
+.mapa-slip-item:hover {
+  transform: translateY(-1px);
+}
+
+
