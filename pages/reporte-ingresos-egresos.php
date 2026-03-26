@@ -180,7 +180,13 @@ if (obtener('export') === 'excel') {
             (float) ($L['acumulado'] ?? 0),
         ];
     }
-    exportarExcel('reporte_ingresos_egresos', ['Fecha', 'Naturaleza', 'Concepto', 'Cliente/Proveedor', 'Cuenta', 'Forma pago', 'Referencia', 'Monto', 'Acumulado'], $rows);
+    $pie = [
+        ['Totales ingresos', '', '', '', '', '', '', $totIng, ''],
+        ['Totales egresos', '', '', '', '', '', '', $totEgr, ''],
+        ['Neto del período (ingresos − egresos)', '', '', '', '', '', '', $totIng - $totEgr, ''],
+        ['Saldo acumulado final', '', '', '', '', '', '', '', $acum],
+    ];
+    exportarExcel('reporte_ingresos_egresos', ['Fecha', 'Naturaleza', 'Concepto', 'Cliente/Proveedor', 'Cuenta', 'Forma pago', 'Referencia', 'Monto', 'Acumulado'], $rows, $pie);
 }
 
 $cuentasOpts = $pdo->query("

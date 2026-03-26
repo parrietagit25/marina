@@ -10,8 +10,16 @@ $id = (int) obtener('id');
 $mensaje = '';
 
 if ($accion === 'eliminar' && $id > 0 && enviado()) {
-    $pdo->prepare('DELETE FROM grupos WHERE id = ?')->execute([$id]);
-    redirigir(MARINA_URL . '/index.php?p=grupos&ok=Grupo+eliminado');
+    $bloqueo = marinaBloqueoEliminarGrupo($pdo, $id);
+    if ($bloqueo !== null) {
+        redirigir(MARINA_URL . '/index.php?p=grupos&err=' . rawurlencode($bloqueo));
+    }
+    try {
+        $pdo->prepare('DELETE FROM grupos WHERE id = ?')->execute([$id]);
+        redirigir(MARINA_URL . '/index.php?p=grupos&ok=' . rawurlencode('Grupo eliminado'));
+    } catch (Throwable $e) {
+        redirigir(MARINA_URL . '/index.php?p=grupos&err=' . rawurlencode(marinaMensajeErrorIntegridad($e)));
+    }
 }
 
 if (enviado() && ($accion === 'crear' || $accion === 'editar')) {
@@ -39,6 +47,7 @@ if ($accion === 'editar' && $id > 0) {
 }
 
 $ok = obtener('ok');
+$err = obtener('err');
 $mostrarModal = enviado() && ($accion === 'crear' || $accion === 'editar') && $mensaje !== '';
 $modalDatos = ['id' => $id, 'nombre' => $registro['nombre'] ?? ($_POST['nombre'] ?? '')];
 ?>
@@ -46,6 +55,7 @@ $modalDatos = ['id' => $id, 'nombre' => $registro['nombre'] ?? ($_POST['nombre']
 
 <h1>Grupos</h1>
 <?php if ($ok): ?><p class="success"><?= e($ok) ?></p><?php endif; ?>
+<?php if ($err): ?><p class="error"><?= e($err) ?></p><?php endif; ?>
 <?php if ($mensaje && !$mostrarModal): ?><p class="error"><?= e($mensaje) ?></p><?php endif; ?>
 
 <div class="toolbar d-flex gap-2">

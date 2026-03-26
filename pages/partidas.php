@@ -23,19 +23,15 @@ $pagoDatos = [
 ];
 
 if ($accion === 'eliminar' && $id > 0 && enviado()) {
-    $st = $pdo->prepare('SELECT id FROM partidas WHERE parent_id = ?');
-    $st->execute([$id]);
-    if ($st->fetch()) {
-        $mensaje = 'No se puede eliminar: tiene subpartidas.';
-    } else {
-        $st = $pdo->prepare('SELECT id FROM gastos WHERE partida_id = ?');
-        $st->execute([$id]);
-        if ($st->fetch()) {
-            $mensaje = 'No se puede eliminar: tiene gastos registrados.';
-        } else {
-            $pdo->prepare('DELETE FROM partidas WHERE id = ?')->execute([$id]);
-            redirigir(MARINA_URL . '/index.php?p=partidas&ok=Eliminada');
-        }
+    $bloqueo = marinaBloqueoEliminarPartida($pdo, $id);
+    if ($bloqueo !== null) {
+        redirigir(MARINA_URL . '/index.php?p=partidas&err=' . rawurlencode($bloqueo));
+    }
+    try {
+        $pdo->prepare('DELETE FROM partidas WHERE id = ?')->execute([$id]);
+        redirigir(MARINA_URL . '/index.php?p=partidas&ok=' . rawurlencode('Partida eliminada'));
+    } catch (Throwable $e) {
+        redirigir(MARINA_URL . '/index.php?p=partidas&err=' . rawurlencode(marinaMensajeErrorIntegridad($e)));
     }
 }
 
@@ -240,6 +236,7 @@ function arbolPartidas(array $map, array $pagosCount, array $pagosByPartida, str
 }
 
 $ok = obtener('ok');
+$err = obtener('err');
 $mostrarModal = enviado() && ($accion === 'crear' || $accion === 'editar') && $mensaje !== '';
 $modalDatos = [
     'id' => $id,
@@ -251,6 +248,7 @@ $modalDatos = [
 
 <h1>Partidas</h1>
 <?php if ($ok): ?><p class="success"><?= e($ok) ?></p><?php endif; ?>
+<?php if ($err): ?><p class="error"><?= e($err) ?></p><?php endif; ?>
 <?php if ($mensaje && !$mostrarModal): ?><p class="error"><?= e($mensaje) ?></p><?php endif; ?>
 
 <p class="text-muted">Estructura jerárquica. Los gastos se registran en partidas hoja (sin subpartidas).</p>

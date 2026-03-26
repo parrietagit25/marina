@@ -14,13 +14,13 @@ function reportesSqlIngresosDetalle(string $cuentaCond = '', string $extraWhereM
         SELECT mo.fecha_pago AS fecha,
                mo.monto AS monto,
                'Ingreso' AS tipo_linea,
-               CONCAT('Cuota #', cu.numero_cuota, ' — Contrato #', co.id) AS concepto,
+               COALESCE(NULLIF(TRIM(mo.concepto), ''), CONCAT('Cuota #', cu.numero_cuota, ' — Contrato #', co.id)) AS concepto,
                CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre,
                co.cuenta_id,
                cl.nombre AS cliente_nombre,
                co.id AS contrato_id,
                cu.numero_cuota,
-               COALESCE(mo.referencia, '') AS referencia,
+               TRIM(COALESCE(NULLIF(co.numero_recibo, ''), NULLIF(mo.referencia, ''), '')) AS referencia,
                fp.nombre AS forma_pago_nombre
         FROM cuotas_movimientos mo
         JOIN cuotas cu ON mo.cuota_id = cu.id
@@ -45,7 +45,7 @@ function reportesSqlIngresosDetalle(string $cuentaCond = '', string $extraWhereM
                cl.nombre AS cliente_nombre,
                co.id AS contrato_id,
                cu.numero_cuota,
-               COALESCE(cu.referencia, '') AS referencia,
+               TRIM(COALESCE(NULLIF(co.numero_recibo, ''), NULLIF(cu.referencia, ''), '')) AS referencia,
                fp.nombre AS forma_pago_nombre
         FROM cuotas cu
         JOIN contratos co ON cu.contrato_id = co.id

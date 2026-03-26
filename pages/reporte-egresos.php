@@ -106,7 +106,8 @@ if (obtener('export') === 'excel') {
             (float) ($r['monto'] ?? 0),
         ];
     }
-    exportarExcel('reporte_egresos', ['Fecha', 'Origen', 'Concepto', 'Proveedor', 'Cuenta', 'Forma pago', 'Referencia', 'Monto'], $rows);
+    $pie = [['Total', '', '', '', '', '', '', $total]];
+    exportarExcel('reporte_egresos', ['Fecha', 'Origen', 'Concepto', 'Proveedor', 'Cuenta', 'Forma pago', 'Referencia', 'Monto'], $rows, $pie);
 }
 
 require_once __DIR__ . '/../includes/layout.php';

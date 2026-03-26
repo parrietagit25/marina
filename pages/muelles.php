@@ -10,8 +10,30 @@ $id = (int) obtener('id');
 $mensaje = '';
 
 if ($accion === 'eliminar' && $id > 0 && enviado()) {
-    $pdo->prepare('DELETE FROM muelles WHERE id = ?')->execute([$id]);
-    redirigir(MARINA_URL . '/index.php?p=muelles&ok=Muelle+eliminado');
+    $stC = $pdo->prepare('
+        SELECT COUNT(*) FROM contratos
+        WHERE muelle_id = ?
+           OR slip_id IN (SELECT id FROM slips WHERE muelle_id = ?)
+    ');
+    $stC->execute([$id, $id]);
+    $numContratos = (int) $stC->fetchColumn();
+    if ($numContratos > 0) {
+        redirigir(MARINA_URL . '/index.php?p=muelles&err=' . rawurlencode(
+            'No se puede eliminar: hay contratos vinculados a este muelle o a sus slips. Revise o reasigne los contratos primero.'
+        ));
+    }
+    try {
+        $pdo->beginTransaction();
+        $pdo->prepare('DELETE FROM slips WHERE muelle_id = ?')->execute([$id]);
+        $pdo->prepare('DELETE FROM muelles WHERE id = ?')->execute([$id]);
+        $pdo->commit();
+        redirigir(MARINA_URL . '/index.php?p=muelles&ok=' . rawurlencode('Muelle eliminado'));
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        redirigir(MARINA_URL . '/index.php?p=muelles&err=' . rawurlencode(marinaMensajeErrorIntegridad($e)));
+    }
 }
 
 if (enviado() && ($accion === 'crear' || $accion === 'editar')) {
@@ -39,6 +61,7 @@ if ($accion === 'editar' && $id > 0) {
 }
 
 $ok = obtener('ok');
+$err = obtener('err');
 $mostrarModal = enviado() && ($accion === 'crear' || $accion === 'editar') && $mensaje !== '';
 $modalDatos = ['id' => $id, 'nombre' => $registro['nombre'] ?? ($_POST['nombre'] ?? '')];
 ?>
@@ -46,6 +69,7 @@ $modalDatos = ['id' => $id, 'nombre' => $registro['nombre'] ?? ($_POST['nombre']
 
 <h1>Muelles</h1>
 <?php if ($ok): ?><p class="success"><?= e($ok) ?></p><?php endif; ?>
+<?php if ($err): ?><p class="error"><?= e($err) ?></p><?php endif; ?>
 <?php if ($mensaje && !$mostrarModal): ?><p class="error"><?= e($mensaje) ?></p><?php endif; ?>
 
 <div class="toolbar d-flex gap-2"><button type="button" class="btn btn-primary" id="btnNuevoMuelle">Nuevo muelle</button></div>

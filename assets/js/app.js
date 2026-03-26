@@ -466,21 +466,21 @@ document.addEventListener('DOMContentLoaded', function () {
         var modal = new bootstrap.Modal(el);
         var msg = document.getElementById('contratoModalMensaje');
         var ids = ['ClienteId','CuentaId','MuelleId','SlipId','GrupoId','InmuebleId'];
-        var fields = ['FechaInicio','FechaFin','MontoTotal','Observaciones'];
+        var fields = ['FechaInicio','FechaFin','MontoTotal','Observaciones','NumeroRecibo'];
         function setErr(m) { if (msg) { msg.textContent = m || ''; msg.classList.toggle('d-none', !m); } }
         function get(id) { var e = document.getElementById('contrato' + id); return e ? e.value : ''; }
         function set(id, v) { var e = document.getElementById('contrato' + id); if (e) e.value = v !== undefined && v !== null ? v : ''; }
         function setActivo(v) { var e = document.getElementById('contratoActivo'); if (e) e.checked = !!v; }
         document.getElementById('btnNuevoContrato') && document.getElementById('btnNuevoContrato').addEventListener('click', function() {
             title.textContent = 'Nuevo contrato'; accion.value = 'crear'; fid.value = '';
-            ids.forEach(function(i){ set(i, ''); }); set('FechaInicio', ''); set('FechaFin', ''); set('MontoTotal', ''); set('Observaciones', ''); setActivo(1); setErr(''); modal.show();
+            ids.forEach(function(i){ set(i, ''); }); set('FechaInicio', ''); set('FechaFin', ''); set('MontoTotal', ''); set('Observaciones', ''); set('NumeroRecibo', ''); setActivo(1); setErr(''); modal.show();
         });
         document.querySelectorAll('.btn-editar-contrato').forEach(function(b) {
             b.addEventListener('click', function() {
                 title.textContent = 'Editar contrato'; accion.value = 'editar';
                 fid.value = b.getAttribute('data-id') || '';
                 set('ClienteId', b.getAttribute('data-cliente-id')); set('CuentaId', b.getAttribute('data-cuenta-id')); set('MuelleId', b.getAttribute('data-muelle-id')); set('SlipId', b.getAttribute('data-slip-id')); set('GrupoId', b.getAttribute('data-grupo-id')); set('InmuebleId', b.getAttribute('data-inmueble-id'));
-                set('FechaInicio', b.getAttribute('data-fecha-inicio')); set('FechaFin', b.getAttribute('data-fecha-fin')); set('MontoTotal', b.getAttribute('data-monto-total')); set('Observaciones', b.getAttribute('data-observaciones')); setActivo(b.getAttribute('data-activo') === '1'); setErr(''); modal.show();
+                set('FechaInicio', b.getAttribute('data-fecha-inicio')); set('FechaFin', b.getAttribute('data-fecha-fin')); set('MontoTotal', b.getAttribute('data-monto-total')); set('Observaciones', b.getAttribute('data-observaciones')); set('NumeroRecibo', b.getAttribute('data-numero-recibo')); setActivo(b.getAttribute('data-activo') === '1'); setErr(''); modal.show();
             });
         });
         var delEl = document.getElementById('confirmEliminarContratoModal');
@@ -498,7 +498,7 @@ document.addEventListener('DOMContentLoaded', function () {
             var d = w.datos;
             title.textContent = (d.id && d.id !== '') ? 'Editar contrato' : 'Nuevo contrato'; accion.value = (d.id && d.id !== '') ? 'editar' : 'crear'; fid.value = d.id || '';
             set('ClienteId', d.cliente_id); set('CuentaId', d.cuenta_id); set('MuelleId', d.muelle_id); set('SlipId', d.slip_id); set('GrupoId', d.grupo_id); set('InmuebleId', d.inmueble_id);
-            set('FechaInicio', d.fecha_inicio); set('FechaFin', d.fecha_fin); set('MontoTotal', d.monto_total); set('Observaciones', d.observaciones); setActivo(d.activo); setErr(w.error || ''); modal.show();
+            set('FechaInicio', d.fecha_inicio); set('FechaFin', d.fecha_fin); set('MontoTotal', d.monto_total); set('Observaciones', d.observaciones); set('NumeroRecibo', d.numero_recibo); setActivo(d.activo); setErr(w.error || ''); modal.show();
         }
     })();
 
@@ -597,6 +597,7 @@ document.addEventListener('DOMContentLoaded', function () {
             var pagarFecha = document.getElementById('pagarFechaPago');
             var pagarForma = document.getElementById('pagarFormaPagoId');
             var pagarRef = document.getElementById('pagarReferencia');
+            var pagarConcepto = document.getElementById('pagarConceptoMovimiento');
             function setErrPagar(m) { if (msgPagar) { msgPagar.textContent = m || ''; msgPagar.classList.toggle('d-none', !m); } }
             document.querySelectorAll('.btn-pagar-cuota').forEach(function(b) {
                 b.addEventListener('click', function() {
@@ -609,7 +610,11 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (pagarCuotaInfo) pagarCuotaInfo.textContent = 'Cuota Nº ' + num + ' (saldo completo: ' + (saldo ? formatMoney(saldo) : '') + ')';
                     if (pagarFecha) pagarFecha.value = new Date().toISOString().slice(0, 10);
                     if (pagarForma) pagarForma.value = '';
-                    if (pagarRef) pagarRef.value = '';
+                    if (pagarConcepto) pagarConcepto.value = '';
+                    if (pagarRef) {
+                        var nr = (typeof window.__contratoNumeroRecibo === 'string') ? window.__contratoNumeroRecibo : '';
+                        pagarRef.value = nr || '';
+                    }
                     setErrPagar('');
                     mPagar.show();
                 });
@@ -621,7 +626,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (pagarMontoPreview && w.datos) pagarMontoPreview.value = w.datos.monto_movimiento ? formatMoney(w.datos.monto_movimiento) : '';
                 if (pagarFecha && w.datos) pagarFecha.value = w.datos.fecha_pago || new Date().toISOString().slice(0, 10);
                 if (pagarForma && w.datos) pagarForma.value = w.datos.forma_pago_id || '';
-                if (pagarRef && w.datos) pagarRef.value = w.datos.referencia_pago || '';
+                if (pagarConcepto && w.datos) pagarConcepto.value = w.datos.concepto_movimiento || '';
+                if (pagarRef && w.datos) pagarRef.value = (w.datos.referencia_pago !== undefined && w.datos.referencia_pago !== null) ? w.datos.referencia_pago : '';
                 if (pagarCuotaInfo && w.datos) {
                     var s = w.datos.saldo_disponible || '';
                     pagarCuotaInfo.textContent = 'Cuota Nº ' + (w.datos.numero_cuota || '') + ' (saldo: ' + (s ? formatMoney(s) : '') + ')';
@@ -641,6 +647,7 @@ document.addEventListener('DOMContentLoaded', function () {
             var abonarFecha = document.getElementById('abonarFechaPago');
             var abonarForma = document.getElementById('abonarFormaPagoId');
             var abonarRef = document.getElementById('abonarReferencia');
+            var abonarConcepto = document.getElementById('abonarConceptoMovimiento');
             function setErrAbonar(m) { if (msgAbonar) { msgAbonar.textContent = m || ''; msgAbonar.classList.toggle('d-none', !m); } }
             document.querySelectorAll('.btn-abonar-cuota').forEach(function(b) {
                 b.addEventListener('click', function() {
@@ -652,7 +659,11 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (abonarCuotaInfo) abonarCuotaInfo.textContent = 'Cuota Nº ' + num + ' (saldo disponible: ' + (saldo ? formatMoney(saldo) : '') + ')';
                     if (abonarFecha) abonarFecha.value = new Date().toISOString().slice(0, 10);
                     if (abonarForma) abonarForma.value = '';
-                    if (abonarRef) abonarRef.value = '';
+                    if (abonarConcepto) abonarConcepto.value = '';
+                    if (abonarRef) {
+                        var nr2 = (typeof window.__contratoNumeroRecibo === 'string') ? window.__contratoNumeroRecibo : '';
+                        abonarRef.value = nr2 || '';
+                    }
                     setErrAbonar('');
                     mAbonar.show();
                 });
@@ -663,7 +674,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (abonarMonto && w.datos) abonarMonto.value = w.datos.monto_movimiento || '';
                 if (abonarFecha && w.datos) abonarFecha.value = w.datos.fecha_pago || new Date().toISOString().slice(0, 10);
                 if (abonarForma && w.datos) abonarForma.value = w.datos.forma_pago_id || '';
-                if (abonarRef && w.datos) abonarRef.value = w.datos.referencia_pago || '';
+                if (abonarConcepto && w.datos) abonarConcepto.value = w.datos.concepto_movimiento || '';
+                if (abonarRef && w.datos) abonarRef.value = (w.datos.referencia_pago !== undefined && w.datos.referencia_pago !== null) ? w.datos.referencia_pago : '';
                 if (abonarCuotaInfo && w.datos) {
                     var s = w.datos.saldo_disponible || '';
                     abonarCuotaInfo.textContent = 'Cuota Nº ' + (w.datos.numero_cuota || '') + ' (saldo disponible: ' + (s ? formatMoney(s) : '') + ')';
@@ -686,7 +698,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (!window.__cuotasMovimientos || !verCuotaActual) return;
                 var data = window.__cuotasMovimientos[verCuotaActual];
                 if (!data) {
-                    tablaBody.innerHTML = '<tr><td colspan="4">No hay datos.</td></tr>';
+                    tablaBody.innerHTML = '<tr><td class="text-muted">No hay datos.</td><td></td><td></td><td></td></tr>';
                     return;
                 }
                 var tipo = (tipoFiltro && tipoFiltro.value) ? tipoFiltro.value : 'todos';
@@ -694,7 +706,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (tipo !== 'todos') movimientos = movimientos.filter(function(m) { return (m.tipo || '') === tipo; });
 
                 if (!movimientos.length) {
-                    tablaBody.innerHTML = '<tr><td colspan="4">No hay movimientos.</td></tr>';
+                    tablaBody.innerHTML = '<tr><td class="text-muted">No hay movimientos.</td><td></td><td></td><td></td></tr>';
                     return;
                 }
 

@@ -1,6 +1,7 @@
 <?php
 /**
  * Reporte Estado de cuenta — cuentas bancarias (movimientos del período).
+ * Cuenta: solo en cabecera. Referencia en ingresos por cuota: recibo del contrato (con respaldo en movimiento).
  */
 $titulo = 'Reporte — Estado de cuenta bancarias';
 $pdo = getDb();
@@ -16,6 +17,11 @@ $cuentasOpts = $pdo->query("
     ORDER BY b.nombre, c.nombre
 ")->fetchAll(PDO::FETCH_KEY_PAIR);
 
+$cuentaTitulo = '';
+if ($cuenta_id > 0) {
+    $cuentaTitulo = $cuentasOpts[$cuenta_id] ?? '';
+}
+
 $params = [$desde, $hasta];
 $cuentaFiltro = '';
 if ($cuenta_id > 0) {
@@ -27,16 +33,12 @@ $ing = $pdo->prepare("
     SELECT mo.fecha_pago AS fecha,
            'Ingreso' AS tipo,
            mo.monto AS monto,
-           CONCAT('Cuota #', cu.numero_cuota, ' — Contrato #', co.id) AS concepto,
-           CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre,
-           co.cuenta_id,
-           COALESCE(mo.referencia, '') AS referencia,
+           COALESCE(NULLIF(TRIM(mo.concepto), ''), CONCAT('Cuota #', cu.numero_cuota, ' — Contrato #', co.id)) AS concepto,
+           TRIM(COALESCE(NULLIF(co.numero_recibo, ''), NULLIF(mo.referencia, ''), '')) AS referencia,
            '' AS descripcion_extra
     FROM cuotas_movimientos mo
     JOIN cuotas cu ON mo.cuota_id = cu.id
     JOIN contratos co ON cu.contrato_id = co.id
-    JOIN cuentas c ON co.cuenta_id = c.id
-    JOIN bancos b ON c.banco_id = b.id
     WHERE mo.fecha_pago BETWEEN ? AND ?
       AND mo.tipo IN ('pago','abono')
       $cuentaFiltro
@@ -55,14 +57,10 @@ $cos = $pdo->prepare("
            'Egreso' AS tipo,
            g.monto AS monto,
            CONCAT('Gasto — ', p.nombre) AS concepto,
-           CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre,
-           g.cuenta_id,
            COALESCE(g.referencia, '') AS referencia,
            COALESCE(g.observaciones, '') AS descripcion_extra
     FROM gastos g
     JOIN partidas p ON p.id = g.partida_id
-    LEFT JOIN cuentas c ON c.id = g.cuenta_id
-    LEFT JOIN bancos b ON b.id = c.banco_id
     WHERE g.fecha_gasto BETWEEN ? AND ?
       $gFiltro
 ");
@@ -82,13 +80,9 @@ try {
                CASE WHEN mb.tipo_movimiento = 'costo' THEN 'Egreso' ELSE 'Ingreso' END AS tipo,
                mb.monto AS monto,
                CONCAT('Mov. manual — ', fp.nombre) AS concepto,
-               CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre,
-               mb.cuenta_id,
                COALESCE(mb.referencia, '') AS referencia,
                COALESCE(mb.descripcion, '') AS descripcion_extra
         FROM movimientos_bancarios mb
-        JOIN cuentas c ON c.id = mb.cuenta_id
-        JOIN bancos b ON b.id = c.banco_id
         JOIN formas_pago fp ON fp.id = mb.forma_pago_id
         WHERE mb.fecha_movimiento BETWEEN ? AND ?
           $mFiltro
@@ -139,15 +133,24 @@ if (obtener('export') === 'excel') {
             $m['fecha'] ?? '',
             $m['tipo'] ?? '',
             $m['concepto'] ?? '',
-            $m['cuenta_nombre'] ?? '',
             $m['referencia'] ?? '',
             $m['descripcion_extra'] ?? '',
             (float) ($m['monto'] ?? 0),
             (float) ($m['acumulado'] ?? 0),
         ];
     }
-    exportarExcel('reporte_estado_cuenta_bancaria', ['Fecha', 'Tipo', 'Concepto', 'Cuenta', 'Referencia', 'Notas', 'Monto', 'Acumulado'], $rows);
+    $neto = $totIng - $totEgr;
+    $acumFinal = $movs === [] ? 0.0 : (float) ($movs[array_key_last($movs)]['acumulado'] ?? 0);
+    $pie = [
+        ['Total ingresos del período', '', '', '', '', $totIng, ''],
+        ['Total egresos del período', '', '', '', '', $totEgr, ''],
+        ['Neto del período', '', '', '', '', $neto, $acumFinal],
+    ];
+    exportarExcel('reporte_estado_cuenta_bancaria', ['Fecha', 'Tipo', 'Concepto', 'Referencia', 'Notas', 'Monto', 'Acumulado'], $rows, $pie);
 }
+
+$netoPeriodo = $totIng - $totEgr;
+$acumFinal = $movs === [] ? 0.0 : (float) ($movs[array_key_last($movs)]['acumulado'] ?? 0);
 
 require_once __DIR__ . '/../includes/layout.php';
 ?>
@@ -184,22 +187,29 @@ require_once __DIR__ . '/../includes/layout.php';
 
 <div class="card p-3 mb-3">
     <div class="row g-2 small">
+        <div class="col-md-12">
+            <strong>Cuenta del reporte:</strong>
+            <?php if ($cuenta_id > 0 && $cuentaTitulo !== ''): ?>
+                <?= e($cuentaTitulo) ?>
+            <?php else: ?>
+                <span class="text-muted">Todas las cuentas (los movimientos pueden corresponder a distintas cuentas según su origen).</span>
+            <?php endif; ?>
+        </div>
         <div class="col-md-4"><strong>Total ingresos:</strong> <?= dinero($totIng) ?></div>
         <div class="col-md-4"><strong>Total egresos:</strong> <?= dinero($totEgr) ?></div>
         <div class="col-md-4"><strong>Neto período:</strong> <span class="<?= ($totIng - $totEgr) >= 0 ? 'text-success' : 'text-danger' ?>"><?= dinero($totIng - $totEgr) ?></span></div>
     </div>
-    <p class="text-muted small mb-0 mt-2">El acumulado es dentro del período filtrado (no incluye saldo anterior).</p>
+    <p class="text-muted small mb-0 mt-2">El acumulado es dentro del período filtrado (no incluye saldo anterior). En ingresos por cuota, la <strong>referencia</strong> muestra el <strong>número de recibo del contrato</strong> cuando está cargado en el contrato.</p>
 </div>
 
 <div class="card p-3">
     <div class="table-responsive">
-        <table class="table table-hover align-middle">
+        <table class="table table-hover align-middle no-datatable">
             <thead>
                 <tr>
                     <th>Fecha</th>
                     <th>Tipo</th>
-                    <th>Concepto</th>
-                    <th>Cuenta</th>
+                    <th style="min-width:200px">Concepto</th>
                     <th>Referencia</th>
                     <th>Notas</th>
                     <th class="text-end">Monto</th>
@@ -216,7 +226,6 @@ require_once __DIR__ . '/../includes/layout.php';
                     <td><?= fechaFormato($m['fecha']) ?></td>
                     <td><span class="fw-semibold" style="color:<?= $color ?>"><?= e($tipo) ?></span></td>
                     <td><?= e($m['concepto'] ?? '') ?></td>
-                    <td><?= e($m['cuenta_nombre'] ?? '—') ?></td>
                     <td><?= e($m['referencia'] ?? '') ?></td>
                     <td><?= e($m['descripcion_extra'] ?? '') ?></td>
                     <td class="text-end"><?= dinero((float) ($m['monto'] ?? 0)) ?></td>
@@ -224,7 +233,31 @@ require_once __DIR__ . '/../includes/layout.php';
                 </tr>
             <?php endforeach; ?>
             <?php if (empty($movs)): ?>
-                <tr><td colspan="8" class="text-muted">No hay movimientos en el período.</td></tr>
+                <tr>
+                    <td class="text-muted">No hay movimientos en el período.</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                </tr>
+            <?php else: ?>
+                <tr class="table-light fw-semibold border-top border-2">
+                    <td colspan="5" class="text-end">Total ingresos del período</td>
+                    <td class="text-end text-success"><?= dinero($totIng) ?></td>
+                    <td class="text-end text-muted">—</td>
+                </tr>
+                <tr class="table-light fw-semibold">
+                    <td colspan="5" class="text-end">Total egresos del período</td>
+                    <td class="text-end text-danger"><?= dinero($totEgr) ?></td>
+                    <td class="text-end text-muted">—</td>
+                </tr>
+                <tr class="table-secondary fw-bold">
+                    <td colspan="5" class="text-end">Neto del período</td>
+                    <td class="text-end <?= $netoPeriodo >= 0 ? 'text-success' : 'text-danger' ?>"><?= dinero($netoPeriodo) ?></td>
+                    <td class="text-end"><?= dinero($acumFinal) ?></td>
+                </tr>
             <?php endif; ?>
             </tbody>
         </table>

@@ -11,8 +11,12 @@ $id = (int) obtener('id');
 $mensaje = '';
 
 if ($accion === 'eliminar' && $id > 0 && enviado()) {
-    $pdo->prepare('DELETE FROM contratos WHERE id = ?')->execute([$id]);
-    redirigir(MARINA_URL . '/index.php?p=contratos&ok=Contrato+eliminado');
+    try {
+        $pdo->prepare('DELETE FROM contratos WHERE id = ?')->execute([$id]);
+        redirigir(MARINA_URL . '/index.php?p=contratos&ok=' . rawurlencode('Contrato eliminado'));
+    } catch (Throwable $e) {
+        redirigir(MARINA_URL . '/index.php?p=contratos&err=' . rawurlencode(marinaMensajeErrorIntegridad($e)));
+    }
 }
 
 if (enviado() && ($accion === 'crear' || $accion === 'editar')) {
@@ -27,6 +31,7 @@ if (enviado() && ($accion === 'crear' || $accion === 'editar')) {
     $fecha_fin = trim($_POST['fecha_fin'] ?? '');
     $monto_total = (float) str_replace(',', '.', $_POST['monto_total'] ?? 0);
     $observaciones = trim($_POST['observaciones'] ?? '');
+    $numero_recibo = trim($_POST['numero_recibo'] ?? '');
     $activo = isset($_POST['activo']) ? 1 : 0;
 
     $tieneUnidadMuelleSlip = ($muelle_id > 0 && $slip_id > 0);
@@ -35,7 +40,7 @@ if (enviado() && ($accion === 'crear' || $accion === 'editar')) {
         $mensaje = 'Complete campos obligatorios (cliente, cuenta, fechas, monto y al menos una unidad: muelle/slip o grupo/inmueble).';
     } else {
         if ($accion === 'editar' && $id > 0) {
-            $pdo->prepare('UPDATE contratos SET cliente_id=?, cuenta_id=?, muelle_id=?, slip_id=?, grupo_id=?, inmueble_id=?, fecha_inicio=?, fecha_fin=?, monto_total=?, observaciones=?, activo=?, updated_by=? WHERE id=?')
+            $pdo->prepare('UPDATE contratos SET cliente_id=?, cuenta_id=?, muelle_id=?, slip_id=?, grupo_id=?, inmueble_id=?, fecha_inicio=?, fecha_fin=?, monto_total=?, observaciones=?, numero_recibo=?, activo=?, updated_by=? WHERE id=?')
                 ->execute([
                     $cliente_id,
                     $cuenta_id,
@@ -47,13 +52,14 @@ if (enviado() && ($accion === 'crear' || $accion === 'editar')) {
                     $fecha_fin,
                     $monto_total,
                     $observaciones,
+                    $numero_recibo === '' ? null : $numero_recibo,
                     $activo,
                     $uid,
                     $id
                 ]);
             redirigir(MARINA_URL . '/index.php?p=contratos&ok=Actualizado');
         } else {
-            $pdo->prepare('INSERT INTO contratos (cliente_id, cuenta_id, muelle_id, slip_id, grupo_id, inmueble_id, fecha_inicio, fecha_fin, monto_total, observaciones, activo, created_by, updated_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)')
+            $pdo->prepare('INSERT INTO contratos (cliente_id, cuenta_id, muelle_id, slip_id, grupo_id, inmueble_id, fecha_inicio, fecha_fin, monto_total, observaciones, numero_recibo, activo, created_by, updated_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
                 ->execute([
                     $cliente_id,
                     $cuenta_id,
@@ -65,6 +71,7 @@ if (enviado() && ($accion === 'crear' || $accion === 'editar')) {
                     $fecha_fin,
                     $monto_total,
                     $observaciones,
+                    $numero_recibo === '' ? null : $numero_recibo,
                     1,
                     $uid,
                     $uid
@@ -201,6 +208,7 @@ if ($accion === 'cuotas' && $registro) {
         $fecha_pago = trim($_POST['fecha_pago'] ?? '');
         $forma_pago_id = (int)($_POST['forma_pago_id'] ?? 0);
         $ref = trim($_POST['referencia_pago'] ?? '');
+        $concepto_mov = trim($_POST['concepto_movimiento'] ?? '');
 
         if ($cuota_id < 1 || ($tipo !== 'pago' && $tipo !== 'abono') || $fecha_pago === '' || $monto_mov <= 0) {
             $mensaje = 'Complete tipo, fecha y monto válidos.';
@@ -213,7 +221,8 @@ if ($accion === 'cuotas' && $registro) {
                             'monto_movimiento' => $monto_mov,
                             'fecha_pago' => $fecha_pago,
                             'forma_pago_id' => $forma_pago_id,
-                            'referencia_pago' => $ref
+                            'referencia_pago' => $ref,
+                            'concepto_movimiento' => $concepto_mov
                         ];
             } else {
                 $mostrarModalAbonarCuota = true;
@@ -224,7 +233,8 @@ if ($accion === 'cuotas' && $registro) {
                             'monto_movimiento' => $monto_mov,
                             'fecha_pago' => $fecha_pago,
                             'forma_pago_id' => $forma_pago_id,
-                            'referencia_pago' => $ref
+                            'referencia_pago' => $ref,
+                            'concepto_movimiento' => $concepto_mov
                         ];
             }
         } else {
@@ -240,7 +250,8 @@ if ($accion === 'cuotas' && $registro) {
                                 'monto_movimiento' => $monto_mov,
                                 'fecha_pago' => $fecha_pago,
                                 'forma_pago_id' => $forma_pago_id,
-                                'referencia_pago' => $ref
+                                'referencia_pago' => $ref,
+                                'concepto_movimiento' => $concepto_mov
                             ];
                 } else {
                     $mostrarModalAbonarCuota = true;
@@ -251,14 +262,15 @@ if ($accion === 'cuotas' && $registro) {
                                 'monto_movimiento' => $monto_mov,
                                 'fecha_pago' => $fecha_pago,
                                 'forma_pago_id' => $forma_pago_id,
-                                'referencia_pago' => $ref
+                                'referencia_pago' => $ref,
+                                'concepto_movimiento' => $concepto_mov
                             ];
                 }
             } else {
                 // Registrar movimiento
                 $pdo->prepare('
-                    INSERT INTO cuotas_movimientos (cuota_id, tipo, monto, fecha_pago, forma_pago_id, referencia, created_by, updated_by)
-                    VALUES (?,?,?,?,?,?,?,?)
+                    INSERT INTO cuotas_movimientos (cuota_id, tipo, monto, fecha_pago, forma_pago_id, referencia, concepto, created_by, updated_by)
+                    VALUES (?,?,?,?,?,?,?,?,?)
                 ')->execute([
                     $cuota_id,
                     $tipo,
@@ -266,6 +278,7 @@ if ($accion === 'cuotas' && $registro) {
                     $fecha_pago,
                     $forma_pago_id ?: null,
                     $ref,
+                    $concepto_mov === '' ? null : $concepto_mov,
                     usuarioId(),
                     usuarioId()
                 ]);
@@ -291,8 +304,15 @@ if ($accion === 'cuotas' && $registro) {
 
     // Mostrar vista
     require_once __DIR__ . '/../includes/layout.php';
-    if (obtener('ok')) echo '<p class="success">' . e(obtener('ok')) . '</p>';
-    if ($mensaje && !$mostrarModalAgregarCuota && !$mostrarModalPagarCuota && !$mostrarModalAbonarCuota) echo '<p class="error">' . e($mensaje) . '</p>';
+    if (obtener('ok')) {
+        echo '<p class="success">' . e(obtener('ok')) . '</p>';
+    }
+    if (obtener('err')) {
+        echo '<p class="error">' . e(obtener('err')) . '</p>';
+    }
+    if ($mensaje && !$mostrarModalAgregarCuota && !$mostrarModalPagarCuota && !$mostrarModalAbonarCuota) {
+        echo '<p class="error">' . e($mensaje) . '</p>';
+    }
     ?>
     <h1>Contrato #<?= $id ?> – Cuotas</h1>
     <p><strong>Cliente:</strong> <?= e($clientes[$registro['cliente_id']] ?? $registro['cliente_id']) ?> |
@@ -304,7 +324,7 @@ if ($accion === 'cuotas' && $registro) {
         <button type="button" class="btn btn-primary" id="btnAgregarCuota">Registrar cuota</button>
     </div>
 
-    <table>
+    <table class="no-datatable">
         <thead>
             <tr>
                 <th>Nº</th>
@@ -355,7 +375,14 @@ if ($accion === 'cuotas' && $registro) {
             </tr>
         <?php endforeach; ?>
         <?php if (empty($cuotas)): ?>
-            <tr><td colspan="6">No hay cuotas para este contrato.</td></tr>
+            <tr>
+                <td class="text-muted">No hay cuotas para este contrato.</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+            </tr>
         <?php endif; ?>
         </tbody>
     </table>
@@ -409,6 +436,8 @@ if ($accion === 'cuotas' && $registro) {
                         <input type="text" class="form-control" id="pagarMontoPreview" value="" disabled>
                         <label class="form-label mt-2">Fecha de pago *</label>
                         <input type="date" class="form-control" id="pagarFechaPago" name="fecha_pago" value="<?= e($cuotaPagarDatos['fecha_pago'] ?? date('Y-m-d')) ?>" required>
+                        <label class="form-label mt-2">Concepto (término de la cuota)</label>
+                        <input type="text" class="form-control" id="pagarConceptoMovimiento" name="concepto_movimiento" placeholder="Ej.: Cuota febrero, mensualidad 3…" value="<?= e($cuotaPagarDatos['concepto_movimiento'] ?? '') ?>">
                         <label class="form-label mt-2">Forma de pago</label>
                         <select class="form-select" id="pagarFormaPagoId" name="forma_pago_id">
                             <option value="">—</option>
@@ -416,8 +445,9 @@ if ($accion === 'cuotas' && $registro) {
                                 <option value="<?= (int)$fid ?>" <?= (isset($cuotaPagarDatos['forma_pago_id']) && (int)$cuotaPagarDatos['forma_pago_id'] === (int)$fid) ? 'selected' : '' ?>><?= e($fnom) ?></option>
                             <?php endforeach; ?>
                         </select>
-                        <label class="form-label mt-2">Referencia</label>
-                        <input type="text" class="form-control" id="pagarReferencia" name="referencia_pago" placeholder="Ref." value="<?= e($cuotaPagarDatos['referencia_pago'] ?? '') ?>">
+                        <label class="form-label mt-2">Referencia banco / comprobante (opcional)</label>
+                        <input type="text" class="form-control" id="pagarReferencia" name="referencia_pago" placeholder="Transferencia, voucher…" value="<?= e($cuotaPagarDatos['referencia_pago'] ?? '') ?>">
+                        <small class="text-muted">En el estado de cuenta, la columna referencia prioriza el <strong>nº recibo del contrato</strong>.</small>
                     </div>
                     <div class="modal-footer">
                         <button type="submit" class="btn btn-primary">Registrar pago</button>
@@ -447,6 +477,8 @@ if ($accion === 'cuotas' && $registro) {
                         <input type="text" class="form-control" id="abonarMonto" name="monto_movimiento" required>
                         <label class="form-label mt-2">Fecha de pago *</label>
                         <input type="date" class="form-control" id="abonarFechaPago" name="fecha_pago" value="<?= e($cuotaAbonarDatos['fecha_pago'] ?? date('Y-m-d')) ?>" required>
+                        <label class="form-label mt-2">Concepto (término de la cuota)</label>
+                        <input type="text" class="form-control" id="abonarConceptoMovimiento" name="concepto_movimiento" placeholder="Ej.: Abono cuota marzo…" value="<?= e($cuotaAbonarDatos['concepto_movimiento'] ?? '') ?>">
                         <label class="form-label mt-2">Forma de pago</label>
                         <select class="form-select" id="abonarFormaPagoId" name="forma_pago_id">
                             <option value="">—</option>
@@ -454,8 +486,9 @@ if ($accion === 'cuotas' && $registro) {
                                 <option value="<?= (int)$fid ?>" <?= (isset($cuotaAbonarDatos['forma_pago_id']) && (int)$cuotaAbonarDatos['forma_pago_id'] === (int)$fid) ? 'selected' : '' ?>><?= e($fnom) ?></option>
                             <?php endforeach; ?>
                         </select>
-                        <label class="form-label mt-2">Referencia</label>
-                        <input type="text" class="form-control" id="abonarReferencia" name="referencia_pago" placeholder="Ref." value="<?= e($cuotaAbonarDatos['referencia_pago'] ?? '') ?>">
+                        <label class="form-label mt-2">Referencia banco / comprobante (opcional)</label>
+                        <input type="text" class="form-control" id="abonarReferencia" name="referencia_pago" placeholder="Transferencia, voucher…" value="<?= e($cuotaAbonarDatos['referencia_pago'] ?? '') ?>">
+                        <small class="text-muted">En el estado de cuenta, la referencia mostrada prioriza el <strong>nº recibo del contrato</strong>.</small>
                     </div>
                     <div class="modal-footer">
                         <button type="submit" class="btn btn-primary">Registrar abono</button>
@@ -488,7 +521,7 @@ if ($accion === 'cuotas' && $registro) {
                             <p class="mb-0" id="movsSaldoInfo"></p>
                         </div>
                     </div>
-                    <table class="mt-3">
+                    <table class="mt-3 no-datatable">
                         <thead>
                             <tr>
                                 <th>Fecha pago</th>
@@ -498,7 +531,12 @@ if ($accion === 'cuotas' && $registro) {
                             </tr>
                         </thead>
                         <tbody id="movsTablaBody">
-                            <tr><td colspan="4">Cargando...</td></tr>
+                            <tr>
+                                <td class="text-muted">Cargando…</td>
+                                <td></td>
+                                <td></td>
+                                <td></td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -510,6 +548,7 @@ if ($accion === 'cuotas' && $registro) {
     </div>
 
     <script>
+        window.__contratoNumeroRecibo = <?= json_encode(trim((string) ($registro['numero_recibo'] ?? '')), JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>;
         window.__cuotaAgregarModal = {
             mostrar: <?= $mostrarModalAgregarCuota ? 'true' : 'false' ?>,
             datos: <?= json_encode($cuotaAgregarDatos, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>,
@@ -534,6 +573,7 @@ if ($accion === 'cuotas' && $registro) {
 
 // --- Lista de contratos + modales
 $ok = obtener('ok');
+$err = obtener('err');
 $mostrarModal = enviado() && ($accion === 'crear' || $accion === 'editar') && $mensaje !== '';
 $modalDatos = [
     'id' => $id,
@@ -547,6 +587,7 @@ $modalDatos = [
     'fecha_fin' => $registro['fecha_fin'] ?? ($_POST['fecha_fin'] ?? ''),
     'monto_total' => $registro['monto_total'] ?? ($_POST['monto_total'] ?? ''),
     'observaciones' => $registro['observaciones'] ?? ($_POST['observaciones'] ?? ''),
+    'numero_recibo' => $registro['numero_recibo'] ?? ($_POST['numero_recibo'] ?? ''),
     'activo' => (int) ($registro['activo'] ?? (isset($_POST['activo']) ? 1 : 0)),
 ];
 ?>
@@ -554,6 +595,7 @@ $modalDatos = [
 
 <h1>Contratos</h1>
 <?php if ($ok): ?><p class="success"><?= e($ok) ?></p><?php endif; ?>
+<?php if ($err): ?><p class="error"><?= e($err) ?></p><?php endif; ?>
 <?php if ($mensaje && !$mostrarModal): ?><p class="error"><?= e($mensaje) ?></p><?php endif; ?>
 
 <div class="toolbar d-flex gap-2"><button type="button" class="btn btn-primary" id="btnNuevoContrato">Nuevo contrato</button></div>
@@ -565,7 +607,7 @@ $modalDatos = [
     <tbody>
     <?php
     $st = $pdo->query("
-        SELECT co.id, co.cliente_id, co.cuenta_id, co.muelle_id, co.slip_id, co.grupo_id, co.inmueble_id, co.fecha_inicio, co.fecha_fin, co.monto_total, co.observaciones, co.activo,
+        SELECT co.id, co.cliente_id, co.cuenta_id, co.muelle_id, co.slip_id, co.grupo_id, co.inmueble_id, co.fecha_inicio, co.fecha_fin, co.monto_total, co.observaciones, co.numero_recibo, co.activo,
                cl.nombre AS cliente_nombre, b.nombre AS banco_nombre, cu.nombre AS cuenta_nombre,
                m.nombre AS muelle_nombre, s.nombre AS slip_nombre, g.nombre AS grupo_nombre, i.nombre AS inmueble_nombre, u.nombre AS creado_por
         FROM contratos co
@@ -604,6 +646,7 @@ $modalDatos = [
                     data-fecha-fin="<?= e($r['fecha_fin']) ?>"
                     data-monto-total="<?= e($r['monto_total']) ?>"
                     data-observaciones="<?= e($r['observaciones'] ?? '') ?>"
+                    data-numero-recibo="<?= e($r['numero_recibo'] ?? '') ?>"
                     data-activo="<?= (int)$r['activo'] ?>">Editar</button>
             </td>
         </tr>
@@ -679,6 +722,9 @@ $modalDatos = [
                             <input type="text" class="form-control" id="contratoMontoTotal" name="monto_total" required>
                             <label class="mt-2">Observaciones</label>
                             <textarea class="form-control" id="contratoObservaciones" name="observaciones" rows="2"></textarea>
+                            <label class="mt-2">Nº recibo al cliente</label>
+                            <input type="text" class="form-control" id="contratoNumeroRecibo" name="numero_recibo" maxlength="100" placeholder="Número de recibo emitido al firmar el contrato">
+                            <small class="text-muted">Aparece en estado de cuenta bancaria como referencia en los cobros de cuotas.</small>
                             <label class="mt-2"><input type="checkbox" id="contratoActivo" name="activo" value="1"> Activo</label>
                         </div>
                     </div>

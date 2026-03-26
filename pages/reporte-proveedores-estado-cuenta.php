@@ -64,7 +64,8 @@ if (obtener('export') === 'excel') {
             $m['observaciones'] ?? '',
         ];
     }
-    exportarExcel('reporte_proveedores_estado_cuenta', ['Fecha', 'Proveedor', 'Partida', 'Monto', 'Cuenta', 'Forma pago', 'Referencia', 'Observaciones'], $rows);
+    $pie = [['Total', '', '', $totalGeneral, '', '', '', '']];
+    exportarExcel('reporte_proveedores_estado_cuenta', ['Fecha', 'Proveedor', 'Partida', 'Monto', 'Cuenta', 'Forma pago', 'Referencia', 'Observaciones'], $rows, $pie);
 }
 
 require_once __DIR__ . '/../includes/layout.php';

@@ -18,8 +18,12 @@ $st = $pdo->query("
 $partidas_hoja = $st->fetchAll(PDO::FETCH_KEY_PAIR);
 
 if ($accion === 'eliminar' && $id > 0 && enviado()) {
-    $pdo->prepare('DELETE FROM gastos WHERE id = ?')->execute([$id]);
-    redirigir(MARINA_URL . '/index.php?p=gastos&ok=Eliminado');
+    try {
+        $pdo->prepare('DELETE FROM gastos WHERE id = ?')->execute([$id]);
+        redirigir(MARINA_URL . '/index.php?p=gastos&ok=' . rawurlencode('Gasto eliminado'));
+    } catch (Throwable $e) {
+        redirigir(MARINA_URL . '/index.php?p=gastos&err=' . rawurlencode(marinaMensajeErrorIntegridad($e)));
+    }
 }
 
 if (enviado() && ($accion === 'crear' || $accion === 'editar')) {
@@ -60,6 +64,7 @@ $cuentas = $pdo->query('SELECT c.id, CONCAT(b.nombre, " - ", c.nombre) AS nom FR
 $formas_pago = $pdo->query("SELECT id, nombre FROM formas_pago WHERE tipo_movimiento = 'costo' ORDER BY nombre")->fetchAll(PDO::FETCH_KEY_PAIR);
 
 $ok = obtener('ok');
+$err = obtener('err');
 $mostrarModal = enviado() && ($accion === 'crear' || $accion === 'editar') && $mensaje !== '';
 $modalDatos = [
     'id' => $id,
@@ -77,6 +82,7 @@ $modalDatos = [
 
 <h1>Gastos</h1>
 <?php if ($ok): ?><p class="success"><?= e($ok) ?></p><?php endif; ?>
+<?php if ($err): ?><p class="error"><?= e($err) ?></p><?php endif; ?>
 <?php if ($mensaje && !$mostrarModal): ?><p class="error"><?= e($mensaje) ?></p><?php endif; ?>
 
 <div class="toolbar d-flex gap-2"><button type="button" class="btn btn-primary" id="btnNuevoGasto">Nuevo gasto</button></div>

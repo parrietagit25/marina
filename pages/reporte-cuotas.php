@@ -104,7 +104,18 @@ if (obtener('export') === 'excel') {
             $f['contrato_activo'] ? 'Si' : 'No',
         ];
     }
-    exportarExcel('reporte_cuotas', ['Contrato', 'Cuota', 'Cliente', 'Monto', 'Pagado', 'Saldo', 'Vencimiento', 'Estado', 'Contrato activo'], $rows);
+    $pie = [[
+        'Totales',
+        '',
+        '',
+        $totalMonto,
+        $totalPagado,
+        $totalSaldo,
+        '',
+        '',
+        '',
+    ]];
+    exportarExcel('reporte_cuotas', ['Contrato', 'Cuota', 'Cliente', 'Monto', 'Pagado', 'Saldo', 'Vencimiento', 'Estado', 'Contrato activo'], $rows, $pie);
 }
 
 require_once __DIR__ . '/../includes/layout.php';

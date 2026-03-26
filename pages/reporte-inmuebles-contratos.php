@@ -55,7 +55,11 @@ if (obtener('export') === 'excel') {
             !empty($r['activo']) ? 'Si' : 'No',
         ];
     }
-    exportarExcel('reporte_inmuebles_contratos', ['ID', 'Grupo', 'Inmueble', 'Cliente', 'Cuenta', 'Inicio', 'Fin', 'Monto total', 'Activo'], $rows);
+    $sumMontos = array_sum(array_map(static function ($r) {
+        return (float) ($r['monto_total'] ?? 0);
+    }, $filas));
+    $pie = [['Total', '', '', '', '', '', '', $sumMontos, '']];
+    exportarExcel('reporte_inmuebles_contratos', ['ID', 'Grupo', 'Inmueble', 'Cliente', 'Cuenta', 'Inicio', 'Fin', 'Monto total', 'Activo'], $rows, $pie);
 }
 
 require_once __DIR__ . '/../includes/layout.php';

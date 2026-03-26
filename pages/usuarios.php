@@ -11,13 +11,19 @@ $mensaje = '';
 
 // Eliminar
 if ($accion === 'eliminar' && $id > 0 && enviado()) {
-    if ($id !== usuarioId()) {
-        $pdo->prepare('DELETE FROM usuarios WHERE id = ?')->execute([$id]);
-        $mensaje = 'Usuario eliminado.';
-    } else {
-        $mensaje = 'No puedes eliminarte a ti mismo.';
+    if ($id === usuarioId()) {
+        redirigir(MARINA_URL . '/index.php?p=usuarios&err=' . rawurlencode('No puede eliminar su propio usuario.'));
     }
-    redirigir(MARINA_URL . '/index.php?p=usuarios');
+    $bloqueo = marinaBloqueoEliminarUsuario($pdo, $id);
+    if ($bloqueo !== null) {
+        redirigir(MARINA_URL . '/index.php?p=usuarios&err=' . rawurlencode($bloqueo));
+    }
+    try {
+        $pdo->prepare('DELETE FROM usuarios WHERE id = ?')->execute([$id]);
+        redirigir(MARINA_URL . '/index.php?p=usuarios&ok=' . rawurlencode('Usuario eliminado.'));
+    } catch (Throwable $e) {
+        redirigir(MARINA_URL . '/index.php?p=usuarios&err=' . rawurlencode(marinaMensajeErrorIntegridad($e)));
+    }
 }
 
 // Guardar (crear o editar)
@@ -66,6 +72,7 @@ if ($accion === 'editar' && $id > 0) {
 }
 
 $ok = obtener('ok');
+$err = obtener('err');
 $mostrarModal = enviado() && ($accion === 'crear' || $accion === 'editar') && $mensaje !== '';
 $modoModal = ($accion === 'editar') ? 'editar' : 'crear';
 $modalDatos = [
@@ -82,6 +89,9 @@ $modalDatos = [
 
 <?php if ($ok): ?>
     <p class="success"><?= e($ok) ?></p>
+<?php endif; ?>
+<?php if ($err): ?>
+    <p class="error"><?= e($err) ?></p>
 <?php endif; ?>
 
 <?php

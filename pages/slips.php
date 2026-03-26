@@ -10,8 +10,16 @@ $id = (int) obtener('id');
 $mensaje = '';
 
 if ($accion === 'eliminar' && $id > 0 && enviado()) {
-    $pdo->prepare('DELETE FROM slips WHERE id = ?')->execute([$id]);
-    redirigir(MARINA_URL . '/index.php?p=slips&ok=Slip+eliminado');
+    $bloqueo = marinaBloqueoEliminarSlip($pdo, $id);
+    if ($bloqueo !== null) {
+        redirigir(MARINA_URL . '/index.php?p=slips&err=' . rawurlencode($bloqueo));
+    }
+    try {
+        $pdo->prepare('DELETE FROM slips WHERE id = ?')->execute([$id]);
+        redirigir(MARINA_URL . '/index.php?p=slips&ok=' . rawurlencode('Slip eliminado'));
+    } catch (Throwable $e) {
+        redirigir(MARINA_URL . '/index.php?p=slips&err=' . rawurlencode(marinaMensajeErrorIntegridad($e)));
+    }
 }
 
 if (enviado() && ($accion === 'crear' || $accion === 'editar')) {
@@ -41,6 +49,7 @@ if ($accion === 'editar' && $id > 0) {
 
 $muelles = $pdo->query('SELECT id, nombre FROM muelles ORDER BY nombre')->fetchAll(PDO::FETCH_KEY_PAIR);
 $ok = obtener('ok');
+$err = obtener('err');
 $mostrarModal = enviado() && ($accion === 'crear' || $accion === 'editar') && $mensaje !== '';
 $modalDatos = [
     'id' => $id,
@@ -52,6 +61,7 @@ $modalDatos = [
 
 <h1>Slips</h1>
 <?php if ($ok): ?><p class="success"><?= e($ok) ?></p><?php endif; ?>
+<?php if ($err): ?><p class="error"><?= e($err) ?></p><?php endif; ?>
 <?php if ($mensaje && !$mostrarModal): ?><p class="error"><?= e($mensaje) ?></p><?php endif; ?>
 
 <div class="toolbar d-flex gap-2"><button type="button" class="btn btn-primary" id="btnNuevoSlip">Nuevo slip</button></div>

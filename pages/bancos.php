@@ -10,8 +10,42 @@ $id = (int) obtener('id');
 $mensaje = '';
 
 if ($accion === 'eliminar' && $id > 0 && enviado()) {
-    $pdo->prepare('DELETE FROM bancos WHERE id = ?')->execute([$id]);
-    redirigir(MARINA_URL . '/index.php?p=bancos&ok=Banco+eliminado');
+    $stIds = $pdo->prepare('SELECT id FROM cuentas WHERE banco_id = ?');
+    $stIds->execute([$id]);
+    $cuentaIds = array_map('intval', $stIds->fetchAll(PDO::FETCH_COLUMN));
+
+    if ($cuentaIds !== []) {
+        $ph = implode(',', array_fill(0, count($cuentaIds), '?'));
+        $stC = $pdo->prepare("SELECT COUNT(*) FROM contratos WHERE cuenta_id IN ($ph)");
+        $stC->execute($cuentaIds);
+        if ((int) $stC->fetchColumn() > 0) {
+            redirigir(MARINA_URL . '/index.php?p=bancos&err=' . rawurlencode(
+                'No se puede eliminar: hay contratos que usan una cuenta de este banco. Cambie la cuenta en los contratos o délos de baja antes.'
+            ));
+        }
+        $stM = $pdo->prepare("SELECT COUNT(*) FROM movimientos_bancarios WHERE cuenta_id IN ($ph)");
+        $stM->execute($cuentaIds);
+        if ((int) $stM->fetchColumn() > 0) {
+            redirigir(MARINA_URL . '/index.php?p=bancos&err=' . rawurlencode(
+                'No se puede eliminar: hay movimientos bancarios registrados en cuentas de este banco. Elimine o reasigne esos movimientos primero.'
+            ));
+        }
+    }
+
+    try {
+        $pdo->beginTransaction();
+        if ($cuentaIds !== []) {
+            $pdo->prepare('DELETE FROM cuentas WHERE banco_id = ?')->execute([$id]);
+        }
+        $pdo->prepare('DELETE FROM bancos WHERE id = ?')->execute([$id]);
+        $pdo->commit();
+        redirigir(MARINA_URL . '/index.php?p=bancos&ok=' . rawurlencode('Banco eliminado'));
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        redirigir(MARINA_URL . '/index.php?p=bancos&err=' . rawurlencode(marinaMensajeErrorIntegridad($e)));
+    }
 }
 
 if (enviado() && ($accion === 'crear' || $accion === 'editar')) {
@@ -39,6 +73,7 @@ if ($accion === 'editar' && $id > 0) {
 }
 
 $ok = obtener('ok');
+$err = obtener('err');
 $mostrarModal = enviado() && ($accion === 'crear' || $accion === 'editar') && $mensaje !== '';
 $modalDatos = ['id' => $id, 'nombre' => $registro['nombre'] ?? ($_POST['nombre'] ?? '')];
 ?>
@@ -46,6 +81,7 @@ $modalDatos = ['id' => $id, 'nombre' => $registro['nombre'] ?? ($_POST['nombre']
 
 <h1>Bancos</h1>
 <?php if ($ok): ?><p class="success"><?= e($ok) ?></p><?php endif; ?>
+<?php if ($err): ?><p class="error"><?= e($err) ?></p><?php endif; ?>
 <?php if ($mensaje && !$mostrarModal): ?><p class="error"><?= e($mensaje) ?></p><?php endif; ?>
 
 <div class="toolbar d-flex gap-2"><button type="button" class="btn btn-primary" id="btnNuevoBanco">Nuevo banco</button></div>

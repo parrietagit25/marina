@@ -63,10 +63,12 @@ if (obtener('export') === 'excel') {
     foreach ($gastos_por_partida as $r) {
         $rows[] = ['Costo por partida', $r['partida_nombre'] ?? '', (float) ($r['total'] ?? 0)];
     }
-    $rows[] = ['Resumen', 'Total ingresos', $total_ingresos];
-    $rows[] = ['Resumen', 'Total costos', $total_gastos];
-    $rows[] = ['Resumen', 'Diferencia', $diferencia];
-    exportarExcel('reporte_ingresos_costos', ['Seccion', 'Concepto', 'Total'], $rows);
+    $pie = [
+        ['Total ingresos', '', $total_ingresos],
+        ['Total costos', '', $total_gastos],
+        ['Diferencia (ingresos − costos)', '', $diferencia],
+    ];
+    exportarExcel('reporte_ingresos_costos', ['Seccion', 'Concepto', 'Total'], $rows, $pie);
 }
 
 require_once __DIR__ . '/../includes/layout.php';

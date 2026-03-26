@@ -84,7 +84,8 @@ if (obtener('export') === 'excel') {
             (float) ($r['monto'] ?? 0),
         ];
     }
-    exportarExcel('reporte_ingresos', ['Fecha', 'Cliente', 'Concepto', 'Cuenta', 'Forma pago', 'Referencia', 'Monto'], $rows);
+    $pie = [['Total', '', '', '', '', '', $total]];
+    exportarExcel('reporte_ingresos', ['Fecha', 'Cliente', 'Concepto', 'Cuenta', 'Forma pago', 'Referencia', 'Monto'], $rows, $pie);
 }
 
 $cuentasOpts = $pdo->query("

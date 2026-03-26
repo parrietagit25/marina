@@ -35,3 +35,5 @@ function obtener(string $key, $default = '') {
 function enviado(): bool {
     return $_SERVER['REQUEST_METHOD'] === 'POST';
 }
+
+require_once __DIR__ . '/eliminar_dependencias.php';
