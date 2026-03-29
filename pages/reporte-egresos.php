@@ -100,14 +100,12 @@ if (obtener('export') === 'excel') {
             $r['origen'] ?? '',
             $r['concepto'] ?? '',
             $r['proveedor_nombre'] ?? '',
-            $r['cuenta_nombre'] ?? '',
-            $r['forma_pago_nombre'] ?? '',
             $r['referencia'] ?? '',
             (float) ($r['monto'] ?? 0),
         ];
     }
-    $pie = [['Total', '', '', '', '', '', '', $total]];
-    exportarExcel('reporte_egresos', ['Fecha', 'Origen', 'Concepto', 'Proveedor', 'Cuenta', 'Forma pago', 'Referencia', 'Monto'], $rows, $pie);
+    $pie = [['Total', '', '', '', '', $total]];
+    exportarExcel('reporte_egresos', ['Fecha', 'Origen', 'Concepto', 'Proveedor', 'Referencia', 'Monto'], $rows, $pie);
 }
 
 require_once __DIR__ . '/../includes/layout.php';
@@ -150,6 +148,7 @@ require_once __DIR__ . '/../includes/layout.php';
             <button type="submit" class="btn btn-success" name="export" value="excel">Exportar Excel</button>
         </div>
     </div>
+    <p class="text-muted small mb-0 mt-2">Banco, cuenta y forma de pago no se muestran en la tabla; el filtro por cuenta sigue aplicando a gastos y movimientos.</p>
 </form>
 
 <div class="card p-3 mb-3">
@@ -165,8 +164,6 @@ require_once __DIR__ . '/../includes/layout.php';
                     <th>Origen</th>
                     <th>Concepto</th>
                     <th>Proveedor</th>
-                    <th>Cuenta</th>
-                    <th>Forma pago</th>
                     <th>Referencia</th>
                     <th class="text-end">Monto</th>
                 </tr>
@@ -178,14 +175,12 @@ require_once __DIR__ . '/../includes/layout.php';
                     <td><?= e($r['origen'] ?? '') ?></td>
                     <td><?= e($r['concepto'] ?? '') ?></td>
                     <td><?= e($r['proveedor_nombre'] ?? '—') ?></td>
-                    <td><?= e($r['cuenta_nombre'] ?? '—') ?></td>
-                    <td><?= e($r['forma_pago_nombre'] ?? '—') ?></td>
                     <td><?= e($r['referencia'] ?? '') ?></td>
                     <td class="text-end"><?= dinero((float) ($r['monto'] ?? 0)) ?></td>
                 </tr>
             <?php endforeach; ?>
             <?php if (empty($filas)): ?>
-                <tr><td colspan="8" class="text-muted">No hay egresos en el período.</td></tr>
+                <tr><td colspan="6" class="text-muted">No hay egresos en el período.</td></tr>
             <?php endif; ?>
             </tbody>
         </table>

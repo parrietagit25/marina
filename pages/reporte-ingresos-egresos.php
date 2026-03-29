@@ -1,6 +1,6 @@
 <?php
 /**
- * Reporte Ingresos / Egresos — línea de tiempo combinada del período.
+ * Reporte Ingresos / Egresos — detalle sin banco/cuenta en ingresos; opción agrupado (ingresos por grupo).
  */
 $titulo = 'Reporte — Ingresos / Egresos';
 $pdo = getDb();
@@ -10,6 +10,8 @@ require_once __DIR__ . '/../includes/export_excel.php';
 $desde = obtener('desde', date('Y-m-01'));
 $hasta = obtener('hasta', date('Y-m-d'));
 $cuenta_id = (int) obtener('cuenta_id', 0);
+$vista = obtener('vista', 'detallado');
+$vista = ($vista === 'agrupado') ? 'agrupado' : 'detallado';
 
 $cuentaCond = '';
 $paramsIng = [$desde, $hasta];
@@ -23,7 +25,7 @@ if ($cuenta_id > 0) {
     $paramsIng[] = $cuenta_id;
 }
 
-$sqlIng = 'SELECT fecha, monto, concepto, cuenta_nombre, referencia, forma_pago_nombre, cliente_nombre FROM (' . reportesSqlIngresosDetalle($cuentaCond) . ') z';
+$sqlIng = 'SELECT fecha, monto, concepto, referencia, cliente_nombre, grupo_nombre, slip_o_inmueble FROM (' . reportesSqlIngresosDetalle($cuentaCond) . ') z';
 $st = $pdo->prepare($sqlIng);
 $st->execute($paramsIng);
 $ingFilas = $st->fetchAll(PDO::FETCH_ASSOC);
@@ -40,10 +42,10 @@ try {
         SELECT mb.fecha_movimiento AS fecha,
                mb.monto AS monto,
                CONCAT('Mov. manual — ', fp.nombre) AS concepto,
-               CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre,
                COALESCE(mb.referencia, '') AS referencia,
-               fp.nombre AS forma_pago_nombre,
-               '' AS cliente_nombre
+               '' AS cliente_nombre,
+               'Movimientos manuales' AS grupo_nombre,
+               '' AS slip_o_inmueble
         FROM movimientos_bancarios mb
         JOIN cuentas c ON c.id = mb.cuenta_id
         JOIN bancos b ON b.id = c.banco_id
@@ -58,6 +60,49 @@ try {
     $manIng = [];
 }
 
+$combIng = [];
+try {
+    $cp = [$desde, $hasta];
+    $cc = '';
+    if ($cuenta_id > 0) {
+        $cc = ' AND cd.cuenta_id = ? ';
+        $cp[] = $cuenta_id;
+    }
+    $cst = $pdo->prepare("
+        SELECT cd.fecha AS fecha,
+               cd.monto_total AS monto,
+               CONCAT('Combustible — ', cd.embarcacion) AS concepto,
+               '' AS referencia,
+               cd.embarcacion AS cliente_nombre,
+               'Combustible (despacho)' AS grupo_nombre,
+               '' AS slip_o_inmueble
+        FROM combustible_despachos cd
+        JOIN cuentas c ON c.id = cd.cuenta_id
+        JOIN bancos b ON b.id = c.banco_id
+        WHERE cd.fecha BETWEEN ? AND ?
+        $cc
+    ");
+    $cst->execute($cp);
+    $combIng = $cst->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable $e) {
+    $combIng = [];
+}
+
+$todasIng = array_merge($ingFilas, $manIng, $combIng);
+
+$agrupadoIngresos = [];
+foreach ($todasIng as $r) {
+    $g = trim((string) ($r['grupo_nombre'] ?? ''));
+    if ($g === '') {
+        $g = 'Sin ubicación';
+    }
+    if (!isset($agrupadoIngresos[$g])) {
+        $agrupadoIngresos[$g] = 0.0;
+    }
+    $agrupadoIngresos[$g] += (float) ($r['monto'] ?? 0);
+}
+uksort($agrupadoIngresos, 'strnatcasecmp');
+
 $gParams = [$desde, $hasta];
 $gWhere = '';
 if ($cuenta_id > 0) {
@@ -68,16 +113,11 @@ $st = $pdo->prepare("
     SELECT g.fecha_gasto AS fecha,
            g.monto AS monto,
            CONCAT('Gasto — ', p.nombre) AS concepto,
-           CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre,
            COALESCE(g.referencia, '') AS referencia,
-           fp.nombre AS forma_pago_nombre,
-           pr.nombre AS cliente_nombre
+           pr.nombre AS proveedor_nombre
     FROM gastos g
     JOIN partidas p ON p.id = g.partida_id
     JOIN proveedores pr ON pr.id = g.proveedor_id
-    LEFT JOIN cuentas c ON c.id = g.cuenta_id
-    LEFT JOIN bancos b ON b.id = c.banco_id
-    LEFT JOIN formas_pago fp ON fp.id = g.forma_pago_id
     WHERE g.fecha_gasto BETWEEN ? AND ?
     $gWhere
 ");
@@ -96,10 +136,8 @@ try {
         SELECT mb.fecha_movimiento AS fecha,
                mb.monto AS monto,
                CONCAT('Mov. manual — ', fp.nombre) AS concepto,
-               CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre,
                COALESCE(mb.referencia, '') AS referencia,
-               fp.nombre AS forma_pago_nombre,
-               '' AS cliente_nombre
+               '' AS proveedor_nombre
         FROM movimientos_bancarios mb
         JOIN cuentas c ON c.id = mb.cuenta_id
         JOIN bancos b ON b.id = c.banco_id
@@ -114,45 +152,53 @@ try {
     $manEgr = [];
 }
 
-$lineas = [];
-foreach (array_merge($ingFilas, $manIng) as $r) {
-    $lineas[] = [
+$lineasIng = [];
+foreach ($todasIng as $r) {
+    $lineasIng[] = [
         'fecha' => $r['fecha'],
-        'naturaleza' => 'Ingreso',
         'monto' => (float) $r['monto'],
         'concepto' => $r['concepto'] ?? '',
-        'cuenta_nombre' => $r['cuenta_nombre'] ?? '',
+        'grupo' => $r['grupo_nombre'] ?? '',
+        'slip' => $r['slip_o_inmueble'] ?? '',
         'tercero' => $r['cliente_nombre'] ?? '',
         'referencia' => $r['referencia'] ?? '',
-        'forma_pago' => $r['forma_pago_nombre'] ?? '',
     ];
 }
-foreach (array_merge($gastos, $manEgr) as $r) {
-    $lineas[] = [
-        'fecha' => $r['fecha'],
-        'naturaleza' => 'Egreso',
-        'monto' => (float) $r['monto'],
-        'concepto' => $r['concepto'] ?? '',
-        'cuenta_nombre' => $r['cuenta_nombre'] ?? '',
-        'tercero' => $r['cliente_nombre'] ?? '',
-        'referencia' => $r['referencia'] ?? '',
-        'forma_pago' => $r['forma_pago_nombre'] ?? '',
-    ];
-}
-
-usort($lineas, function ($a, $b) {
+usort($lineasIng, function ($a, $b) {
     return strcmp((string) $a['fecha'], (string) $b['fecha']);
 });
 
-$totIng = 0.0;
-$totEgr = 0.0;
-foreach ($lineas as $L) {
-    if ($L['naturaleza'] === 'Ingreso') {
-        $totIng += $L['monto'];
-    } else {
-        $totEgr += $L['monto'];
-    }
+$lineasEgr = [];
+foreach (array_merge($gastos, $manEgr) as $r) {
+    $lineasEgr[] = [
+        'fecha' => $r['fecha'],
+        'monto' => (float) $r['monto'],
+        'concepto' => $r['concepto'] ?? '',
+        'tercero' => $r['proveedor_nombre'] ?? '',
+        'referencia' => $r['referencia'] ?? '',
+    ];
 }
+usort($lineasEgr, function ($a, $b) {
+    return strcmp((string) $a['fecha'], (string) $b['fecha']);
+});
+
+$totIng = array_sum(array_map(static function ($x) {
+    return $x['monto'];
+}, $lineasIng));
+$totEgr = array_sum(array_map(static function ($x) {
+    return $x['monto'];
+}, $lineasEgr));
+
+$lineas = [];
+foreach ($lineasIng as $L) {
+    $lineas[] = array_merge($L, ['naturaleza' => 'Ingreso']);
+}
+foreach ($lineasEgr as $L) {
+    $lineas[] = array_merge($L, ['naturaleza' => 'Egreso', 'grupo' => '', 'slip' => '']);
+}
+usort($lineas, function ($a, $b) {
+    return strcmp((string) $a['fecha'], (string) $b['fecha']);
+});
 
 $acum = 0.0;
 foreach ($lineas as &$L) {
@@ -166,27 +212,49 @@ foreach ($lineas as &$L) {
 unset($L);
 
 if (obtener('export') === 'excel') {
-    $rows = [];
-    foreach ($lineas as $L) {
-        $rows[] = [
-            $L['fecha'] ?? '',
-            $L['naturaleza'] ?? '',
-            $L['concepto'] ?? '',
-            $L['tercero'] ?? '',
-            $L['cuenta_nombre'] ?? '',
-            $L['forma_pago'] ?? '',
-            $L['referencia'] ?? '',
-            (float) ($L['monto'] ?? 0),
-            (float) ($L['acumulado'] ?? 0),
+    if ($vista === 'agrupado') {
+        $rows = [];
+        foreach ($agrupadoIngresos as $nom => $m) {
+            $rows[] = ['Ingreso (por grupo)', $nom, '', '', (float) $m];
+        }
+        foreach ($lineasEgr as $E) {
+            $rows[] = [
+                'Egreso',
+                $E['fecha'] ?? '',
+                $E['concepto'] ?? '',
+                $E['tercero'] ?? '',
+                (float) ($E['monto'] ?? 0),
+            ];
+        }
+        $pie = [
+            ['Totales', 'Ingresos', '', '', $totIng],
+            ['Totales', 'Egresos', '', '', $totEgr],
+            ['Neto', '', '', '', $totIng - $totEgr],
         ];
+        exportarExcel('reporte_ingresos_egresos', ['Tipo', 'Grupo o fecha', 'Concepto', 'Proveedor / —', 'Monto'], $rows, $pie);
+    } else {
+        $rows = [];
+        foreach ($lineas as $L) {
+            $rows[] = [
+                $L['fecha'] ?? '',
+                $L['naturaleza'] ?? '',
+                $L['grupo'] ?? '',
+                $L['slip'] ?? '',
+                $L['concepto'] ?? '',
+                $L['tercero'] ?? '',
+                $L['referencia'] ?? '',
+                (float) ($L['monto'] ?? 0),
+                (float) ($L['acumulado'] ?? 0),
+            ];
+        }
+        $pie = [
+            ['Totales ingresos', '', '', '', '', '', '', $totIng, ''],
+            ['Totales egresos', '', '', '', '', '', '', $totEgr, ''],
+            ['Neto del período', '', '', '', '', '', '', $totIng - $totEgr, ''],
+            ['Saldo acumulado final', '', '', '', '', '', '', '', $acum],
+        ];
+        exportarExcel('reporte_ingresos_egresos', ['Fecha', 'Naturaleza', 'Grupo', 'Slip / inmueble', 'Concepto', 'Cliente / Proveedor', 'Referencia', 'Monto', 'Acumulado'], $rows, $pie);
     }
-    $pie = [
-        ['Totales ingresos', '', '', '', '', '', '', $totIng, ''],
-        ['Totales egresos', '', '', '', '', '', '', $totEgr, ''],
-        ['Neto del período (ingresos − egresos)', '', '', '', '', '', '', $totIng - $totEgr, ''],
-        ['Saldo acumulado final', '', '', '', '', '', '', '', $acum],
-    ];
-    exportarExcel('reporte_ingresos_egresos', ['Fecha', 'Naturaleza', 'Concepto', 'Cliente/Proveedor', 'Cuenta', 'Forma pago', 'Referencia', 'Monto', 'Acumulado'], $rows, $pie);
 }
 
 $cuentasOpts = $pdo->query("
@@ -202,21 +270,28 @@ require_once __DIR__ . '/../includes/layout.php';
 <form method="get" class="toolbar mb-3">
     <input type="hidden" name="p" value="reporte-ingresos-egresos">
     <div class="row g-2 align-items-end">
-        <div class="col-12 col-md-3">
+        <div class="col-12 col-md-2">
             <label class="form-label mb-1">Desde</label>
             <input type="date" class="form-control" name="desde" value="<?= e($desde) ?>">
         </div>
-        <div class="col-12 col-md-3">
+        <div class="col-12 col-md-2">
             <label class="form-label mb-1">Hasta</label>
             <input type="date" class="form-control" name="hasta" value="<?= e($hasta) ?>">
         </div>
         <div class="col-12 col-md-3">
-            <label class="form-label mb-1">Cuenta</label>
+            <label class="form-label mb-1">Cuenta (filtro)</label>
             <select class="form-select" name="cuenta_id">
                 <option value="0">Todas</option>
                 <?php foreach ($cuentasOpts as $cid => $cnom): ?>
                     <option value="<?= (int) $cid ?>" <?= $cuenta_id === (int) $cid ? 'selected' : '' ?>><?= e($cnom) ?></option>
                 <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="col-12 col-md-3">
+            <label class="form-label mb-1">Vista</label>
+            <select class="form-select" name="vista">
+                <option value="detallado" <?= $vista === 'detallado' ? 'selected' : '' ?>>Detallado (línea a línea)</option>
+                <option value="agrupado" <?= $vista === 'agrupado' ? 'selected' : '' ?>>Agrupado (ingresos por grupo + egresos en detalle)</option>
             </select>
         </div>
         <div class="col-12 col-md-auto">
@@ -226,6 +301,7 @@ require_once __DIR__ . '/../includes/layout.php';
             <button type="submit" class="btn btn-success" name="export" value="excel">Exportar Excel</button>
         </div>
     </div>
+    <p class="text-muted small mb-0 mt-2">Los ingresos por cuota muestran <strong>grupo</strong> (muelle o grupo de locales) y <strong>slip / inmueble</strong>. No se listan banco ni cuenta. En vista agrupada no hay columna acumulada día a día.</p>
 </form>
 
 <div class="card p-3 mb-3">
@@ -234,9 +310,67 @@ require_once __DIR__ . '/../includes/layout.php';
         <div class="col-md-4"><strong>Total egresos:</strong> <?= dinero($totEgr) ?></div>
         <div class="col-md-4"><strong>Neto:</strong> <span class="<?= ($totIng - $totEgr) >= 0 ? 'text-success' : 'text-danger' ?>"><?= dinero($totIng - $totEgr) ?></span></div>
     </div>
-    <p class="text-muted small mb-0 mt-2">Acumulado = neto dentro del período (ordenado por fecha).</p>
+    <?php if ($vista === 'detallado'): ?>
+        <p class="text-muted small mb-0 mt-2">Acumulado = neto dentro del período (ordenado por fecha).</p>
+    <?php endif; ?>
 </div>
 
+<?php if ($vista === 'agrupado'): ?>
+<div class="card p-3 mb-3">
+    <h2 class="h6 mb-3">Ingresos por grupo / origen</h2>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Grupo / origen</th>
+                    <th class="text-end">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($agrupadoIngresos as $nom => $m): ?>
+                <tr>
+                    <td><?= e($nom) ?></td>
+                    <td class="text-end"><?= dinero($m) ?></td>
+                </tr>
+            <?php endforeach; ?>
+            <?php if (empty($agrupadoIngresos)): ?>
+                <tr><td colspan="2" class="text-muted">No hay ingresos en el período.</td></tr>
+            <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
+<div class="card p-3">
+    <h2 class="h6 mb-3">Egresos del período</h2>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Concepto</th>
+                    <th>Proveedor</th>
+                    <th>Referencia</th>
+                    <th class="text-end">Monto</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($lineasEgr as $E): ?>
+                <tr>
+                    <td><?= fechaFormato($E['fecha']) ?></td>
+                    <td><?= e($E['concepto']) ?></td>
+                    <td><?= e($E['tercero'] ?: '—') ?></td>
+                    <td><?= e($E['referencia']) ?></td>
+                    <td class="text-end"><?= dinero($E['monto']) ?></td>
+                </tr>
+            <?php endforeach; ?>
+            <?php if (empty($lineasEgr)): ?>
+                <tr><td colspan="5" class="text-muted">No hay egresos en el período.</td></tr>
+            <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
+<?php else: ?>
 <div class="card p-3">
     <div class="table-responsive">
         <table class="table table-hover align-middle">
@@ -244,10 +378,10 @@ require_once __DIR__ . '/../includes/layout.php';
                 <tr>
                     <th>Fecha</th>
                     <th>Naturaleza</th>
+                    <th>Grupo</th>
+                    <th>Slip / inmueble</th>
                     <th>Concepto</th>
                     <th>Cliente / Proveedor</th>
-                    <th>Cuenta</th>
-                    <th>Forma pago</th>
                     <th>Referencia</th>
                     <th class="text-end">Monto</th>
                     <th class="text-end">Acumulado</th>
@@ -259,10 +393,10 @@ require_once __DIR__ . '/../includes/layout.php';
                 <tr>
                     <td><?= fechaFormato($L['fecha']) ?></td>
                     <td><span class="fw-semibold" style="color:<?= $col ?>"><?= e($L['naturaleza']) ?></span></td>
+                    <td><?= e($L['grupo'] ?: '—') ?></td>
+                    <td><?= e($L['slip'] ?: '—') ?></td>
                     <td><?= e($L['concepto']) ?></td>
                     <td><?= e($L['tercero'] ?: '—') ?></td>
-                    <td><?= e($L['cuenta_nombre'] ?: '—') ?></td>
-                    <td><?= e($L['forma_pago'] ?: '—') ?></td>
                     <td><?= e($L['referencia']) ?></td>
                     <td class="text-end"><?= dinero($L['monto']) ?></td>
                     <td class="text-end"><?= dinero($L['acumulado']) ?></td>
@@ -275,5 +409,6 @@ require_once __DIR__ . '/../includes/layout.php';
         </table>
     </div>
 </div>
+<?php endif; ?>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

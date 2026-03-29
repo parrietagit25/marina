@@ -277,6 +277,74 @@ CREATE TABLE movimientos_bancarios (
   INDEX idx_mov_banc_tipo_fecha (tipo_movimiento, fecha_movimiento)
 ) ENGINE=InnoDB;
 
+-- Combustible (migración incremental también en includes/migrate_light.php)
+-- desde aqui
+CREATE TABLE IF NOT EXISTS combustible_precios (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  tipo_combustible VARCHAR(20) NOT NULL,
+  precio_compra_galon DECIMAL(14,4) NOT NULL DEFAULT 0,
+  precio_venta_galon DECIMAL(14,4) NOT NULL DEFAULT 0,
+  vigente_desde DATE NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_by INT UNSIGNED NULL,
+  updated_by INT UNSIGNED NULL,
+  UNIQUE KEY uk_comb_precio (tipo_combustible, vigente_desde)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS combustible_pedidos (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  tipo_combustible VARCHAR(20) NOT NULL,
+  fecha_pedido DATE NOT NULL,
+  gls_pedido DECIMAL(14,3) NOT NULL DEFAULT 0,
+  fecha_recibido DATE NULL,
+  gls_recibido DECIMAL(14,3) NULL,
+  numero_factura VARCHAR(100) NULL,
+  estado_pago VARCHAR(20) NOT NULL DEFAULT 'por_pagar',
+  costo_total DECIMAL(14,2) NOT NULL DEFAULT 0,
+  cuenta_id INT UNSIGNED NULL,
+  gasto_id INT UNSIGNED NULL COMMENT 'Gasto egreso costo al recibir',
+  observaciones TEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_by INT UNSIGNED NULL,
+  updated_by INT UNSIGNED NULL,
+  FOREIGN KEY (cuenta_id) REFERENCES cuentas(id) ON DELETE SET NULL,
+  FOREIGN KEY (gasto_id) REFERENCES gastos(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS combustible_pedido_pagos (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  pedido_id INT UNSIGNED NOT NULL,
+  monto DECIMAL(14,2) NOT NULL,
+  fecha_pago DATE NOT NULL,
+  cuenta_id INT UNSIGNED NULL,
+  forma_pago_id INT UNSIGNED NULL,
+  referencia VARCHAR(100) NULL,
+  gasto_id INT UNSIGNED NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_by INT UNSIGNED NULL,
+  FOREIGN KEY (pedido_id) REFERENCES combustible_pedidos(id) ON DELETE CASCADE,
+  FOREIGN KEY (cuenta_id) REFERENCES cuentas(id) ON DELETE SET NULL,
+  FOREIGN KEY (forma_pago_id) REFERENCES formas_pago(id) ON DELETE SET NULL,
+  FOREIGN KEY (gasto_id) REFERENCES gastos(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS combustible_despachos (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  tipo_combustible VARCHAR(20) NOT NULL,
+  fecha DATE NOT NULL,
+  embarcacion VARCHAR(200) NOT NULL,
+  gls DECIMAL(14,3) NOT NULL,
+  monto_total DECIMAL(14,2) NOT NULL,
+  cuenta_id INT UNSIGNED NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_by INT UNSIGNED NULL,
+  updated_by INT UNSIGNED NULL,
+  FOREIGN KEY (cuenta_id) REFERENCES cuentas(id) ON DELETE RESTRICT
+) ENGINE=InnoDB;
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- Usuario admin: ejecutar install/crear_admin.php para crear con password admin123

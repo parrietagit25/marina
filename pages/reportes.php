@@ -13,7 +13,8 @@ $hasta = obtener('hasta', date('Y-m-d'));
 
 // Ingresos: suma de movimientos (pago/abono) por fecha_pago.
 // Compatibilidad: si una cuota no tiene movimientos en `cuotas_movimientos`, tomamos el pago viejo de `cuotas.fecha_pago`.
-$st = $pdo->prepare("
+// Incluye despachos de combustible acreditados a cuenta (si existe la tabla).
+$sqlIngresosCuotas = "
     SELECT t.cuenta_id, t.cuenta_nombre, SUM(t.total) AS total
     FROM (
         SELECT co.cuenta_id, CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre, mo.monto AS total
@@ -35,9 +36,48 @@ $st = $pdo->prepare("
           AND NOT EXISTS (SELECT 1 FROM cuotas_movimientos x WHERE x.cuota_id = cu.id)
     ) t
     GROUP BY t.cuenta_id, t.cuenta_nombre
-");
-$st->execute([$desde, $hasta, $desde, $hasta]);
-$ingresos_por_cuenta = $st->fetchAll(PDO::FETCH_ASSOC);
+";
+$sqlIngresosConCombustible = "
+    SELECT t.cuenta_id, t.cuenta_nombre, SUM(t.total) AS total
+    FROM (
+        SELECT co.cuenta_id, CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre, mo.monto AS total
+        FROM cuotas_movimientos mo
+        JOIN cuotas cu ON mo.cuota_id = cu.id
+        JOIN contratos co ON cu.contrato_id = co.id
+        JOIN cuentas c ON co.cuenta_id = c.id
+        JOIN bancos b ON c.banco_id = b.id
+        WHERE mo.fecha_pago BETWEEN ? AND ?
+
+        UNION ALL
+
+        SELECT co.cuenta_id, CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre, cu.monto AS total
+        FROM cuotas cu
+        JOIN contratos co ON cu.contrato_id = co.id
+        JOIN cuentas c ON co.cuenta_id = c.id
+        JOIN bancos b ON c.banco_id = b.id
+        WHERE cu.fecha_pago BETWEEN ? AND ?
+          AND NOT EXISTS (SELECT 1 FROM cuotas_movimientos x WHERE x.cuota_id = cu.id)
+
+        UNION ALL
+
+        SELECT cd.cuenta_id, CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre, cd.monto_total AS total
+        FROM combustible_despachos cd
+        JOIN cuentas c ON c.id = cd.cuenta_id
+        JOIN bancos b ON b.id = c.banco_id
+        WHERE cd.fecha BETWEEN ? AND ?
+    ) t
+    GROUP BY t.cuenta_id, t.cuenta_nombre
+";
+$ingresos_por_cuenta = [];
+try {
+    $st = $pdo->prepare($sqlIngresosConCombustible);
+    $st->execute([$desde, $hasta, $desde, $hasta, $desde, $hasta]);
+    $ingresos_por_cuenta = $st->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable $e) {
+    $st = $pdo->prepare($sqlIngresosCuotas);
+    $st->execute([$desde, $hasta, $desde, $hasta]);
+    $ingresos_por_cuenta = $st->fetchAll(PDO::FETCH_ASSOC);
+}
 $total_ingresos = array_sum(array_column($ingresos_por_cuenta, 'total'));
 
 // Gastos en el período
@@ -74,6 +114,7 @@ if (obtener('export') === 'excel') {
 require_once __DIR__ . '/../includes/layout.php';
 ?>
 <h1>Ingresos y costos</h1>
+<p class="text-muted small mb-2">Los despachos de combustible se suman en ingresos por cuenta; los pedidos recibidos generan un gasto (egreso) por el costo total en la partida «Combustible». <a href="<?= MARINA_URL ?>/index.php?p=reporte-combustible">Reporte detallado de combustible</a></p>
 <form method="get" class="toolbar" style="margin-bottom:1rem">
     <input type="hidden" name="p" value="reportes">
     <div class="row g-2 align-items-end">
@@ -104,7 +145,7 @@ require_once __DIR__ . '/../includes/layout.php';
 </div>
 
 <div class="card p-3 mb-3">
-    <h2 class="h5 mb-3">Ingresos por cuenta (cuotas pagadas)</h2>
+    <h2 class="h5 mb-3">Ingresos por cuenta (cuotas pagadas y despacho combustible)</h2>
     <div class="table-responsive">
         <table class="table">
             <thead>

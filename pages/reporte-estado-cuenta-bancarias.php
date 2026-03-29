@@ -46,6 +46,31 @@ $ing = $pdo->prepare("
 $ing->execute($params);
 $ingresos = $ing->fetchAll(PDO::FETCH_ASSOC);
 
+$ingComb = [];
+try {
+    $icParams = [$desde, $hasta];
+    $icFiltro = '';
+    if ($cuenta_id > 0) {
+        $icFiltro = ' AND cd.cuenta_id = ? ';
+        $icParams[] = $cuenta_id;
+    }
+    $ic = $pdo->prepare("
+        SELECT cd.fecha AS fecha,
+               'Ingreso' AS tipo,
+               cd.monto_total AS monto,
+               CONCAT('Combustible — ', UPPER(SUBSTRING(cd.tipo_combustible, 1, 1)), SUBSTRING(cd.tipo_combustible, 2), ' — ', cd.embarcacion) AS concepto,
+               '' AS referencia,
+               CONCAT('GLS: ', cd.gls) AS descripcion_extra
+        FROM combustible_despachos cd
+        WHERE cd.fecha BETWEEN ? AND ?
+        $icFiltro
+    ");
+    $ic->execute($icParams);
+    $ingComb = $ic->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable $e) {
+    $ingComb = [];
+}
+
 $gParams = [$desde, $hasta];
 $gFiltro = '';
 if ($cuenta_id > 0) {
@@ -93,7 +118,7 @@ try {
     $manuales = [];
 }
 
-$movs = array_merge($ingresos, $gastos, $manuales);
+$movs = array_merge($ingresos, $ingComb, $gastos, $manuales);
 usort($movs, function ($a, $b) {
     $ta = strtotime($a['fecha'] ?? '');
     $tb = strtotime($b['fecha'] ?? '');

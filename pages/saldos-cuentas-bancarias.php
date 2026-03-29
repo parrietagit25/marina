@@ -47,13 +47,25 @@ LEFT JOIN (
 ";
 $mbExpr = ' + COALESCE(mbi.s, 0) - COALESCE(mbc.s, 0)';
 
+$mbJoinComb = $mbJoin . "
+LEFT JOIN (
+    SELECT cuenta_id, SUM(monto_total) AS s FROM combustible_despachos GROUP BY cuenta_id
+) cdin ON cdin.cuenta_id = c.id
+";
+$mbExprComb = ' + COALESCE(mbi.s, 0) - COALESCE(mbc.s, 0) + COALESCE(cdin.s, 0)';
+
 $filas = [];
 try {
-    $sql = sprintf($sqlBase, $mbExpr, $mbJoin);
+    $sql = sprintf($sqlBase, $mbExprComb, $mbJoinComb);
     $filas = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
 } catch (Throwable $e) {
-    $sql = sprintf($sqlBase, '', '');
-    $filas = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+    try {
+        $sql = sprintf($sqlBase, $mbExpr, $mbJoin);
+        $filas = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e2) {
+        $sql = sprintf($sqlBase, '', '');
+        $filas = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+    }
 }
 
 $totalSaldo = 0.0;
@@ -66,6 +78,7 @@ require_once __DIR__ . '/../includes/layout.php';
 <h1 class="h4 mb-3">Saldos de cuentas bancarias</h1>
 <p class="text-muted small mb-3">
     Resumen al <?= fechaFormato($fechaRef) ?>: ingresos por cuotas (movimientos y compatibilidad con pago único),
+    ingresos por <a href="<?= MARINA_URL ?>/index.php?p=combustible-despacho">despacho de combustible</a>,
     menos gastos asignados a la cuenta, más ingresos manuales y menos costos manuales en <a href="<?= MARINA_URL ?>/index.php?p=movimiento-bancario">movimientos bancarios</a>.
     Para el detalle por fechas use <a href="<?= MARINA_URL ?>/index.php?p=reporte-estado-cuenta-bancarias">Estado de cuenta bancaria</a>.
 </p>
