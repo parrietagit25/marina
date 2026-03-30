@@ -188,12 +188,13 @@ require_once __DIR__ . '/../includes/layout.php';
             </div>
         <?php endforeach; ?>
     </div>
-    <p class="text-muted small mb-0 mt-2">Inventario = suma de GLS recibidos en pedidos − despachos registrados. Con fecha de recibido, GLS recibidos y costo, el pedido genera un <strong>gasto</strong> (egreso) visible en reportes y en Factura / Pagar.</p>
+    <p class="text-muted small mb-0 mt-2">Inventario = GLS recibidos en pedidos − despachos + <a href="<?= MARINA_URL ?>/index.php?p=combustible-ajuste">ajustes</a>. Con fecha de recibido, GLS recibidos y costo, el pedido genera un <strong>gasto</strong> (egreso) visible en reportes y en Factura / Pagar.</p>
 </div>
 
 <div class="toolbar d-flex flex-wrap gap-2 mb-3">
     <button type="button" class="btn btn-primary" id="btnNuevoPedido">Nuevo pedido</button>
     <a class="btn btn-outline-secondary" href="<?= MARINA_URL ?>/index.php?p=combustible-despacho">Despacho</a>
+    <a class="btn btn-outline-secondary" href="<?= MARINA_URL ?>/index.php?p=combustible-ajuste">Ajuste</a>
     <a class="btn btn-outline-secondary" href="<?= MARINA_URL ?>/index.php?p=combustible-precios">Precio por galón</a>
 </div>
 

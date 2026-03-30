@@ -89,6 +89,19 @@ function marina_ensure_schema(PDO $pdo): void
           KEY idx_cd_fecha (fecha),
           CONSTRAINT fk_cd_cuenta FOREIGN KEY (cuenta_id) REFERENCES cuentas(id) ON DELETE RESTRICT
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+        "CREATE TABLE IF NOT EXISTS combustible_ajustes (
+          id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+          tipo_combustible VARCHAR(20) NOT NULL,
+          fecha DATE NOT NULL,
+          gls_delta DECIMAL(14,3) NOT NULL COMMENT 'Positivo suma inventario, negativo resta',
+          motivo TEXT NULL,
+          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          created_by INT UNSIGNED NULL,
+          updated_by INT UNSIGNED NULL,
+          KEY idx_ca_fecha (fecha),
+          KEY idx_ca_tipo (tipo_combustible)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
     ];
     foreach ($combustibleTables as $sql) {
         try {

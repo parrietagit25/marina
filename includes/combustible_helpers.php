@@ -122,9 +122,43 @@ function marina_combustible_inventario_por_tipo(PDO $pdo): array
             }
         }
     } catch (Throwable $e) {
-        // sin tablas
+        return $inv;
+    }
+    try {
+        $st3 = $pdo->query('SELECT tipo_combustible, COALESCE(SUM(gls_delta), 0) AS a FROM combustible_ajustes GROUP BY tipo_combustible');
+        while ($row = $st3->fetch(PDO::FETCH_ASSOC)) {
+            $t = strtolower((string) ($row['tipo_combustible'] ?? ''));
+            if (isset($inv[$t])) {
+                $inv[$t] += (float) $row['a'];
+            }
+        }
+    } catch (Throwable $e) {
+        // tabla combustible_ajustes aún no existe
     }
     return $inv;
+}
+
+/**
+ * Inventario disponible para validar un ajuste de salida al editar (excluye el efecto del registro actual).
+ */
+function marina_combustible_inventario_efectivo_para_ajuste(PDO $pdo, string $tipo, ?int $editAjusteId): float
+{
+    $tipo = strtolower($tipo);
+    $inv = marina_combustible_inventario_por_tipo($pdo);
+    $base = $inv[$tipo] ?? 0.0;
+    if ($editAjusteId !== null && $editAjusteId > 0) {
+        try {
+            $st = $pdo->prepare('SELECT gls_delta FROM combustible_ajustes WHERE id = ?');
+            $st->execute([$editAjusteId]);
+            $old = $st->fetchColumn();
+            if ($old !== false) {
+                $base -= (float) $old;
+            }
+        } catch (Throwable $e) {
+            // ignorar
+        }
+    }
+    return $base;
 }
 
 function marina_combustible_actualizar_estado_pedido(PDO $pdo, int $pedidoId): void

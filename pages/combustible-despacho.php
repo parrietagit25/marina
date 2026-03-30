@@ -86,11 +86,13 @@ require_once __DIR__ . '/../includes/layout.php';
             <div class="col-md-6"><strong><?= e($lab) ?>:</strong> <?= number_format($inv[$k] ?? 0, 3, '.', ',') ?> gal</div>
         <?php endforeach; ?>
     </div>
+    <p class="text-muted small mb-0 mt-2">Incluye <a href="<?= MARINA_URL ?>/index.php?p=combustible-ajuste">ajustes</a> de inventario. Cada despacho resta GLS.</p>
 </div>
 
 <div class="toolbar d-flex flex-wrap gap-2 mb-3">
     <button type="button" class="btn btn-primary" id="btnNuevoDespacho">Nuevo despacho</button>
     <a class="btn btn-outline-secondary" href="<?= MARINA_URL ?>/index.php?p=combustible-pedidos">Pedidos</a>
+    <a class="btn btn-outline-secondary" href="<?= MARINA_URL ?>/index.php?p=combustible-ajuste">Ajuste</a>
     <a class="btn btn-outline-secondary" href="<?= MARINA_URL ?>/index.php?p=combustible-precios">Precio por galón</a>
 </div>
 

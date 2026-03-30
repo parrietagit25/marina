@@ -1,6 +1,6 @@
 <?php
 /**
- * Reporte combustible: elegir pedidos o despachos, filtrar por fechas y exportar.
+ * Reporte combustible: pedidos, despachos o ajustes de inventario.
  */
 $titulo = 'Reporte — Combustible';
 $pdo = getDb();
@@ -11,22 +11,29 @@ $vista = trim((string) obtener('vista', ''));
 $desde = obtener('desde', date('Y-m-01'));
 $hasta = obtener('hasta', date('Y-m-d'));
 
-if ($vista !== 'pedidos' && $vista !== 'despachos') {
+$vistasOk = ['pedidos', 'despachos', 'ajustes'];
+if (!in_array($vista, $vistasOk, true)) {
     require_once __DIR__ . '/../includes/layout.php';
     ?>
     <h1 class="h4 mb-3">Reporte — Combustible</h1>
     <p class="text-muted mb-4">Seleccione qué movimientos desea consultar.</p>
     <div class="row g-3">
-        <div class="col-md-6">
+        <div class="col-md-4">
             <a class="card h-100 text-decoration-none text-body p-4 border shadow-sm" href="<?= MARINA_URL ?>/index.php?p=reporte-combustible&vista=pedidos">
                 <h2 class="h5">Pedidos</h2>
                 <p class="text-muted small mb-0">Compras, GLS pedido/recibido, factura, costo, pagos y estado.</p>
             </a>
         </div>
-        <div class="col-md-6">
+        <div class="col-md-4">
             <a class="card h-100 text-decoration-none text-body p-4 border shadow-sm" href="<?= MARINA_URL ?>/index.php?p=reporte-combustible&vista=despachos">
                 <h2 class="h5">Despachos</h2>
                 <p class="text-muted small mb-0">Ventas por fecha, embarcación, GLS, monto y cuenta.</p>
+            </a>
+        </div>
+        <div class="col-md-4">
+            <a class="card h-100 text-decoration-none text-body p-4 border shadow-sm" href="<?= MARINA_URL ?>/index.php?p=reporte-combustible&vista=ajustes">
+                <h2 class="h5">Ajustes</h2>
+                <p class="text-muted small mb-0">Entradas y salidas de GLS sin compra ni venta (mermas, inventario físico, etc.).</p>
             </a>
         </div>
     </div>
@@ -66,7 +73,7 @@ if ($vista === 'pedidos') {
         }
         exportarExcel('reporte_combustible_pedidos', $encabezados, $rows, []);
     }
-} else {
+} elseif ($vista === 'despachos') {
     $st = $pdo->prepare("
         SELECT d.id, d.tipo_combustible, d.fecha, d.embarcacion, d.gls, d.monto_total,
                CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre
@@ -94,11 +101,40 @@ if ($vista === 'pedidos') {
         }
         exportarExcel('reporte_combustible_despachos', $encabezados, $rows, []);
     }
+} else {
+    try {
+        $st = $pdo->prepare('
+            SELECT id, tipo_combustible, fecha, gls_delta, motivo
+            FROM combustible_ajustes
+            WHERE fecha BETWEEN ? AND ?
+            ORDER BY fecha DESC, id DESC
+        ');
+        $st->execute([$desde, $hasta]);
+        $filas = $st->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        $filas = [];
+    }
+    $encabezados = ['Id', 'Tipo', 'Fecha', 'GLS (Δ)', 'Motivo'];
+    if (obtener('export') === 'excel') {
+        $rows = [];
+        foreach ($filas as $r) {
+            $rows[] = [
+                $r['id'],
+                MARINA_COMB_TIPOS[$r['tipo_combustible']] ?? $r['tipo_combustible'],
+                $r['fecha'],
+                (float) $r['gls_delta'],
+                $r['motivo'] ?? '',
+            ];
+        }
+        exportarExcel('reporte_combustible_ajustes', $encabezados, $rows, []);
+    }
 }
+
+$tituloVista = $vista === 'pedidos' ? 'Pedidos' : ($vista === 'despachos' ? 'Despachos' : 'Ajustes');
 
 require_once __DIR__ . '/../includes/layout.php';
 ?>
-<h1 class="h4 mb-3">Reporte — Combustible (<?= $vista === 'pedidos' ? 'Pedidos' : 'Despachos' ?>)</h1>
+<h1 class="h4 mb-3">Reporte — Combustible (<?= e($tituloVista) ?>)</h1>
 
 <form method="get" class="toolbar mb-3">
     <input type="hidden" name="p" value="reporte-combustible">
@@ -150,7 +186,7 @@ require_once __DIR__ . '/../includes/layout.php';
                         <td><?= ($r['estado_pago'] ?? '') === 'pagado' ? 'Pagado' : 'Por pagar' ?></td>
                     </tr>
                 <?php endforeach; ?>
-            <?php else: ?>
+            <?php elseif ($vista === 'despachos'): ?>
                 <?php foreach ($filas as $r): ?>
                     <tr>
                         <td><?= (int) $r['id'] ?></td>
@@ -160,6 +196,17 @@ require_once __DIR__ . '/../includes/layout.php';
                         <td class="text-end"><?= e((string) $r['gls']) ?></td>
                         <td class="text-end"><?= dinero((float) $r['monto_total']) ?></td>
                         <td><?= e($r['cuenta_nombre'] ?? '') ?></td>
+                    </tr>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <?php foreach ($filas as $r): ?>
+                    <?php $d = (float) $r['gls_delta']; ?>
+                    <tr>
+                        <td><?= (int) $r['id'] ?></td>
+                        <td><?= e(MARINA_COMB_TIPOS[$r['tipo_combustible']] ?? $r['tipo_combustible']) ?></td>
+                        <td><?= fechaFormato($r['fecha']) ?></td>
+                        <td class="text-end fw-semibold <?= $d >= 0 ? 'text-success' : 'text-danger' ?>"><?= $d >= 0 ? '+' : '' ?><?= e((string) $r['gls_delta']) ?></td>
+                        <td class="small"><?= e($r['motivo'] ?? '') ?: '—' ?></td>
                     </tr>
                 <?php endforeach; ?>
             <?php endif; ?>

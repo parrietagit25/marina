@@ -345,6 +345,20 @@ CREATE TABLE IF NOT EXISTS combustible_despachos (
   FOREIGN KEY (cuenta_id) REFERENCES cuentas(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS combustible_ajustes (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  tipo_combustible VARCHAR(20) NOT NULL,
+  fecha DATE NOT NULL,
+  gls_delta DECIMAL(14,3) NOT NULL COMMENT 'Positivo: suma al inventario; negativo: resta',
+  motivo TEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_by INT UNSIGNED NULL,
+  updated_by INT UNSIGNED NULL,
+  KEY idx_ca_fecha (fecha),
+  KEY idx_ca_tipo (tipo_combustible)
+) ENGINE=InnoDB;
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- Usuario admin: ejecutar install/crear_admin.php para crear con password admin123

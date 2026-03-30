@@ -11,7 +11,7 @@ $seccionMantenimiento = in_array($p, ['usuarios', 'bancos', 'cuentas'], true);
 $seccionBanco = in_array($p, ['movimiento-bancario', 'reporte-estado-cuenta-bancarias', 'saldos-cuentas-bancarias'], true);
 $seccionCostoGastos = in_array($p, ['proveedores', 'gastos', 'reporte-proveedores-estado-cuenta'], true);
 $seccionTransacciones = in_array($p, ['formas-pago', 'partidas', 'reportes'], true);
-$paginasCombustible = ['combustible-pedidos', 'combustible-despacho', 'combustible-precios'];
+$paginasCombustible = ['combustible-pedidos', 'combustible-despacho', 'combustible-ajuste', 'combustible-precios'];
 $seccionCombustibleSub = in_array($p, $paginasCombustible, true);
 $seccionMarina = in_array($p, array_merge(['clientes', 'muelles', 'slips', 'grupos', 'inmuebles', 'mapa-marina', 'mapa-grupos', 'contratos'], $paginasCombustible), true);
 $seccionReportes = in_array($p, ['reporte-cuotas', 'reporte-ingresos', 'reporte-egresos', 'reporte-ingresos-egresos', 'reporte-marina-contratos', 'reporte-inmuebles-contratos', 'reporte-combustible'], true);
@@ -97,6 +97,7 @@ $seccionReportes = in_array($p, ['reporte-cuotas', 'reporte-ingresos', 'reporte-
           <div id="menuCombustibleSubDesktop" class="collapse <?= $seccionCombustibleSub ? 'show' : '' ?>">
             <a class='list-group-item list-group-item-action ps-4 <?= ($p === 'combustible-pedidos') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=combustible-pedidos'>Pedidos</a>
             <a class='list-group-item list-group-item-action ps-4 <?= ($p === 'combustible-despacho') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=combustible-despacho'>Despacho</a>
+            <a class='list-group-item list-group-item-action ps-4 <?= ($p === 'combustible-ajuste') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=combustible-ajuste'>Ajuste</a>
             <a class='list-group-item list-group-item-action ps-4 <?= ($p === 'combustible-precios') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=combustible-precios'>Precio x galón</a>
           </div>
         </div>
@@ -202,6 +203,7 @@ $seccionReportes = in_array($p, ['reporte-cuotas', 'reporte-ingresos', 'reporte-
                 <div id="menuCombustibleSubMobile" class="collapse <?= $seccionCombustibleSub ? 'show' : '' ?>">
                   <a class='list-group-item list-group-item-action ps-4 <?= ($p === 'combustible-pedidos') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=combustible-pedidos'>Pedidos</a>
                   <a class='list-group-item list-group-item-action ps-4 <?= ($p === 'combustible-despacho') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=combustible-despacho'>Despacho</a>
+                  <a class='list-group-item list-group-item-action ps-4 <?= ($p === 'combustible-ajuste') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=combustible-ajuste'>Ajuste</a>
                   <a class='list-group-item list-group-item-action ps-4 <?= ($p === 'combustible-precios') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=combustible-precios'>Precio x galón</a>
                 </div>
               </div>

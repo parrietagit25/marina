@@ -111,6 +111,7 @@ require_once __DIR__ . '/../includes/layout.php';
     <button type="button" class="btn btn-primary" id="btnNuevoPrecio">Nuevo precio</button>
     <a class="btn btn-outline-secondary" href="<?= MARINA_URL ?>/index.php?p=combustible-pedidos">Pedidos</a>
     <a class="btn btn-outline-secondary" href="<?= MARINA_URL ?>/index.php?p=combustible-despacho">Despacho</a>
+    <a class="btn btn-outline-secondary" href="<?= MARINA_URL ?>/index.php?p=combustible-ajuste">Ajuste</a>
 </div>
 
 <div class="card p-0">
