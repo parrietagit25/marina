@@ -360,6 +360,14 @@ CREATE TABLE IF NOT EXISTS combustible_ajustes (
   KEY idx_ca_tipo (tipo_combustible)
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS marina_config (
+  clave VARCHAR(64) NOT NULL PRIMARY KEY,
+  valor TEXT NOT NULL,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+INSERT IGNORE INTO marina_config (clave, valor) VALUES ('font_size_percent', '100');
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- Usuario admin: ejecutar install/crear_admin.php para crear con password admin123

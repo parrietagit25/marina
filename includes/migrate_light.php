@@ -172,6 +172,17 @@ function marina_ensure_schema(PDO $pdo): void
         }
     }
 
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS marina_config (
+          clave VARCHAR(64) NOT NULL PRIMARY KEY,
+          valor TEXT NOT NULL,
+          updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $pdo->exec("INSERT IGNORE INTO marina_config (clave, valor) VALUES ('font_size_percent', '100')");
+    } catch (Throwable $e) {
+        // permisos o motor
+    }
+
     require_once __DIR__ . '/combustible_helpers.php';
     try {
         marina_combustible_seed_catalog($pdo);

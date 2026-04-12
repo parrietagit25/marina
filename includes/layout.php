@@ -7,7 +7,16 @@ $p = trim($_GET['p'] ?? 'dashboard');
 $p = preg_replace('/[^a-z0-9_-]/', '', $p) ?: 'dashboard';
 $nombre_usuario = e($usuario['nombre'] ?? '');
 
-$seccionMantenimiento = in_array($p, ['usuarios', 'bancos', 'cuentas'], true);
+$marinaFontSizePct = 100;
+if (function_exists('getDb')) {
+    try {
+        $marinaFontSizePct = marina_config_font_size_percent(getDb());
+    } catch (Throwable $e) {
+        $marinaFontSizePct = 100;
+    }
+}
+
+$seccionMantenimiento = in_array($p, ['usuarios', 'bancos', 'cuentas', 'configuracion'], true);
 $seccionBanco = in_array($p, ['movimiento-bancario', 'reporte-estado-cuenta-bancarias', 'saldos-cuentas-bancarias'], true);
 $seccionCostoGastos = in_array($p, ['proveedores', 'gastos', 'reporte-proveedores-estado-cuenta'], true);
 $seccionTransacciones = in_array($p, ['formas-pago', 'partidas', 'reportes'], true);
@@ -17,7 +26,7 @@ $seccionMarina = in_array($p, array_merge(['clientes', 'muelles', 'slips', 'grup
 $seccionReportes = in_array($p, ['reporte-cuotas', 'reporte-ingresos', 'reporte-egresos', 'reporte-ingresos-egresos', 'reporte-marina-contratos', 'reporte-inmuebles-contratos', 'reporte-combustible'], true);
 ?>
 <!DOCTYPE html>
-<html lang='es'>
+<html lang='es' style='font-size: <?= (int) $marinaFontSizePct ?>%;'>
 <head>
   <meta charset='UTF-8'>
   <meta name='viewport' content='width=device-width, initial-scale=1.0'>
@@ -50,6 +59,7 @@ $seccionReportes = in_array($p, ['reporte-cuotas', 'reporte-ingresos', 'reporte-
           <a class='list-group-item list-group-item-action <?= ($p === 'usuarios') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=usuarios'><i data-lucide='users' class='menu-ico'></i>Usuarios</a>
           <a class='list-group-item list-group-item-action <?= ($p === 'bancos') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=bancos'><i data-lucide='landmark' class='menu-ico'></i>Bancos</a>
           <a class='list-group-item list-group-item-action <?= ($p === 'cuentas') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=cuentas'><i data-lucide='wallet-cards' class='menu-ico'></i>Cuentas</a>
+          <a class='list-group-item list-group-item-action <?= ($p === 'configuracion') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=configuracion'><i data-lucide='type' class='menu-ico'></i>Configuración</a>
         </div>
 
         <button class="menu-section-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#menuBancoDesktop" aria-expanded="<?= $seccionBanco ? 'true' : 'false' ?>">
@@ -156,6 +166,7 @@ $seccionReportes = in_array($p, ['reporte-cuotas', 'reporte-ingresos', 'reporte-
                 <a class='list-group-item list-group-item-action <?= ($p === 'usuarios') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=usuarios'>Usuarios</a>
                 <a class='list-group-item list-group-item-action <?= ($p === 'bancos') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=bancos'>Bancos</a>
                 <a class='list-group-item list-group-item-action <?= ($p === 'cuentas') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=cuentas'>Cuentas</a>
+                <a class='list-group-item list-group-item-action <?= ($p === 'configuracion') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=configuracion'>Configuración</a>
               </div>
 
               <button class="menu-section-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#menuBancoMobile" aria-expanded="<?= $seccionBanco ? 'true' : 'false' ?>">
