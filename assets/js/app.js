@@ -323,7 +323,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     })();
 
-    // Clientes (nombre, documento, telefono, email, direccion)
+    // Clientes (nombre, documento, telefono, email, direccion, duenoCapitan)
     (function() {
         var el = document.getElementById('clienteModal');
         if (!el) return;
@@ -332,7 +332,7 @@ document.addEventListener('DOMContentLoaded', function () {
         var fid = document.getElementById('clienteFormId');
         var modal = new bootstrap.Modal(el);
         var msg = document.getElementById('clienteModalMensaje');
-        var fields = ['nombre','documento','telefono','email','direccion'];
+        var fields = ['nombre','documento','telefono','email','direccion','duenoCapitan'];
         function setErr(m) { if (msg) { msg.textContent = m || ''; msg.classList.toggle('d-none', !m); } }
         function clearForm() { fields.forEach(function(f) { var e = document.getElementById('cliente' + f.charAt(0).toUpperCase() + f.slice(1)); if (e) e.value = ''; }); }
         function fillForm(data) { fields.forEach(function(f) { var e = document.getElementById('cliente' + f.charAt(0).toUpperCase() + f.slice(1)); if (e && data[f] !== undefined) e.value = data[f] || ''; }); }
@@ -343,7 +343,7 @@ document.addEventListener('DOMContentLoaded', function () {
             b.addEventListener('click', function() {
                 title.textContent = 'Editar cliente'; accion.value = 'editar';
                 fid.value = b.getAttribute('data-id') || '';
-                fillForm({ nombre: b.getAttribute('data-nombre'), documento: b.getAttribute('data-documento'), telefono: b.getAttribute('data-telefono'), email: b.getAttribute('data-email'), direccion: b.getAttribute('data-direccion') });
+                fillForm({ nombre: b.getAttribute('data-nombre'), documento: b.getAttribute('data-documento'), telefono: b.getAttribute('data-telefono'), email: b.getAttribute('data-email'), direccion: b.getAttribute('data-direccion'), duenoCapitan: b.getAttribute('data-dueno-capitan') });
                 setErr(''); modal.show();
             });
         });

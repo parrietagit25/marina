@@ -28,17 +28,18 @@ if (enviado() && ($accion === 'crear' || $accion === 'editar')) {
     $telefono = trim($_POST['telefono'] ?? '');
     $email = trim($_POST['email'] ?? '');
     $direccion = trim($_POST['direccion'] ?? '');
+    $dueno_capitan = trim($_POST['dueno_capitan'] ?? '');
     $uid = usuarioId();
     if ($nombre === '') {
         $mensaje = 'Nombre obligatorio.';
     } else {
         if ($accion === 'editar' && $id > 0) {
-            $pdo->prepare('UPDATE clientes SET nombre=?, documento=?, telefono=?, email=?, direccion=?, updated_by=? WHERE id=?')
-                ->execute([$nombre, $documento, $telefono, $email, $direccion, $uid, $id]);
+            $pdo->prepare('UPDATE clientes SET nombre=?, documento=?, telefono=?, email=?, direccion=?, dueno_capitan=?, updated_by=? WHERE id=?')
+                ->execute([$nombre, $documento, $telefono, $email, $direccion, $dueno_capitan !== '' ? $dueno_capitan : null, $uid, $id]);
             redirigir(MARINA_URL . '/index.php?p=clientes&ok=Actualizado');
         } else {
-            $pdo->prepare('INSERT INTO clientes (nombre, documento, telefono, email, direccion, created_by, updated_by) VALUES (?,?,?,?,?,?,?)')
-                ->execute([$nombre, $documento, $telefono, $email, $direccion, $uid, $uid]);
+            $pdo->prepare('INSERT INTO clientes (nombre, documento, telefono, email, direccion, dueno_capitan, created_by, updated_by) VALUES (?,?,?,?,?,?,?,?)')
+                ->execute([$nombre, $documento, $telefono, $email, $direccion, $dueno_capitan !== '' ? $dueno_capitan : null, $uid, $uid]);
             redirigir(MARINA_URL . '/index.php?p=clientes&ok=Creado');
         }
     }
@@ -62,6 +63,7 @@ $modalDatos = [
     'telefono' => $registro['telefono'] ?? ($_POST['telefono'] ?? ''),
     'email' => $registro['email'] ?? ($_POST['email'] ?? ''),
     'direccion' => $registro['direccion'] ?? ($_POST['direccion'] ?? ''),
+    'duenoCapitan' => $registro['dueno_capitan'] ?? ($_POST['dueno_capitan'] ?? ''),
 ];
 ?>
 <?php require_once __DIR__ . '/../includes/layout.php'; ?>
@@ -88,7 +90,7 @@ $modalDatos = [
             <td><?= e($r['creado_por'] ?? '—') ?></td>
             <td class="acciones">
                 <button type="button" class="btn btn-danger btn-sm btn-eliminar-cliente" data-id="<?= (int)$r['id'] ?>" data-nombre="<?= e($r['nombre']) ?>">Eliminar</button>
-                <button type="button" class="btn btn-secondary btn-sm btn-editar-cliente" data-id="<?= (int)$r['id'] ?>" data-nombre="<?= e($r['nombre']) ?>" data-documento="<?= e($r['documento'] ?? '') ?>" data-telefono="<?= e($r['telefono'] ?? '') ?>" data-email="<?= e($r['email'] ?? '') ?>" data-direccion="<?= e($r['direccion'] ?? '') ?>">Editar</button>
+                <button type="button" class="btn btn-secondary btn-sm btn-editar-cliente" data-id="<?= (int)$r['id'] ?>" data-nombre="<?= e($r['nombre']) ?>" data-documento="<?= e($r['documento'] ?? '') ?>" data-telefono="<?= e($r['telefono'] ?? '') ?>" data-email="<?= e($r['email'] ?? '') ?>" data-direccion="<?= e($r['direccion'] ?? '') ?>" data-dueno-capitan="<?= e($r['dueno_capitan'] ?? '') ?>">Editar</button>
             </td>
         </tr>
     <?php endwhile; ?>
@@ -117,6 +119,8 @@ $modalDatos = [
                     <input type="email" class="form-control" id="clienteEmail" name="email">
                     <label class="mt-2">Dirección</label>
                     <textarea class="form-control" id="clienteDireccion" name="direccion" rows="2"></textarea>
+                    <label class="mt-2">Dueño / Capitán</label>
+                    <input type="text" class="form-control" id="clienteDuenoCapitan" name="dueno_capitan" maxlength="150" placeholder="Nombre del dueño o capitán">
                 </div>
                 <div class="modal-footer">
                     <button type="submit" class="btn btn-primary">Guardar</button>
