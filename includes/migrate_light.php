@@ -23,6 +23,54 @@ function marina_ensure_schema(PDO $pdo): void
         }
     }
 
+    // slips: instalaciones antiguas sin muelle_id (requerido por JOIN con muelles)
+    try {
+        $pdo->exec('ALTER TABLE slips ADD COLUMN muelle_id INT UNSIGNED NULL DEFAULT NULL AFTER id');
+    } catch (Throwable $e) {
+        // columna ya existe
+    }
+    try {
+        $col = $pdo->query("SHOW COLUMNS FROM slips LIKE 'muelle_id'")->fetch(PDO::FETCH_ASSOC);
+        if ($col !== false) {
+            $stMin = $pdo->query('SELECT MIN(id) AS mid FROM muelles');
+            $rowMin = $stMin ? $stMin->fetch(PDO::FETCH_ASSOC) : false;
+            $firstMuelle = isset($rowMin['mid']) ? (int) $rowMin['mid'] : 0;
+            if ($firstMuelle > 0) {
+                $pdo->prepare('UPDATE slips SET muelle_id = ? WHERE muelle_id IS NULL')->execute([$firstMuelle]);
+            }
+        }
+    } catch (Throwable $e) {
+        // sin tabla o sin muelles
+    }
+    try {
+        $pdo->exec('ALTER TABLE slips MODIFY muelle_id INT UNSIGNED NOT NULL');
+    } catch (Throwable $e) {
+        // aún hay NULL o sin columna
+    }
+    try {
+        $pdo->exec("
+            UPDATE slips s
+            INNER JOIN (
+                SELECT muelle_id, nombre, MIN(id) AS keep_id
+                FROM slips
+                GROUP BY muelle_id, nombre
+                HAVING COUNT(*) > 1
+            ) dup ON s.muelle_id = dup.muelle_id AND s.nombre = dup.nombre AND s.id <> dup.keep_id
+            SET s.nombre = CONCAT(TRIM(s.nombre), ' (id ', s.id, ')')
+        ");
+    } catch (Throwable $e) {
+        // sin columna muelle_id o tabla ausente
+    }
+    foreach (['ALTER TABLE slips ADD CONSTRAINT fk_slips_muelle FOREIGN KEY (muelle_id) REFERENCES muelles(id) ON DELETE RESTRICT',
+        'ALTER TABLE slips ADD UNIQUE KEY uk_slip_muelle (muelle_id, nombre)',
+    ] as $sqlSlip) {
+        try {
+            $pdo->exec($sqlSlip);
+        } catch (Throwable $e) {
+            // FK o índice ya existente, o datos duplicados
+        }
+    }
+
     $combustibleTables = [
         "CREATE TABLE IF NOT EXISTS combustible_precios (
           id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

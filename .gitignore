@@ -1,0 +1,3 @@
+# Local (no subir)
+.env
+config/config.local.php

@@ -35,10 +35,11 @@ $ing = $pdo->prepare("
            mo.monto AS monto,
            COALESCE(NULLIF(TRIM(mo.concepto), ''), CONCAT('Cuota #', cu.numero_cuota, ' — Contrato #', co.id)) AS concepto,
            TRIM(COALESCE(NULLIF(co.numero_recibo, ''), NULLIF(mo.referencia, ''), '')) AS referencia,
-           '' AS descripcion_extra
+           COALESCE(cl.nombre, '') AS cliente_o_proveedor
     FROM cuotas_movimientos mo
     JOIN cuotas cu ON mo.cuota_id = cu.id
     JOIN contratos co ON cu.contrato_id = co.id
+    JOIN clientes cl ON co.cliente_id = cl.id
     WHERE mo.fecha_pago BETWEEN ? AND ?
       AND mo.tipo IN ('pago','abono')
       $cuentaFiltro
@@ -60,7 +61,7 @@ try {
                cd.monto_total AS monto,
                CONCAT('Combustible — ', UPPER(SUBSTRING(cd.tipo_combustible, 1, 1)), SUBSTRING(cd.tipo_combustible, 2), ' — ', cd.embarcacion) AS concepto,
                '' AS referencia,
-               CONCAT('GLS: ', cd.gls) AS descripcion_extra
+               '' AS cliente_o_proveedor
         FROM combustible_despachos cd
         WHERE cd.fecha BETWEEN ? AND ?
         $icFiltro
@@ -83,9 +84,10 @@ $cos = $pdo->prepare("
            g.monto AS monto,
            CONCAT('Gasto — ', p.nombre) AS concepto,
            COALESCE(g.referencia, '') AS referencia,
-           COALESCE(g.observaciones, '') AS descripcion_extra
+           COALESCE(pr.nombre, '') AS cliente_o_proveedor
     FROM gastos g
     JOIN partidas p ON p.id = g.partida_id
+    JOIN proveedores pr ON pr.id = g.proveedor_id
     WHERE g.fecha_gasto BETWEEN ? AND ?
       $gFiltro
 ");
@@ -106,7 +108,7 @@ try {
                mb.monto AS monto,
                CONCAT('Mov. manual — ', fp.nombre) AS concepto,
                COALESCE(mb.referencia, '') AS referencia,
-               COALESCE(mb.descripcion, '') AS descripcion_extra
+               '' AS cliente_o_proveedor
         FROM movimientos_bancarios mb
         JOIN formas_pago fp ON fp.id = mb.forma_pago_id
         WHERE mb.fecha_movimiento BETWEEN ? AND ?
@@ -159,7 +161,7 @@ if (obtener('export') === 'excel') {
             $m['tipo'] ?? '',
             $m['concepto'] ?? '',
             $m['referencia'] ?? '',
-            $m['descripcion_extra'] ?? '',
+            $m['cliente_o_proveedor'] ?? '',
             (float) ($m['monto'] ?? 0),
             (float) ($m['acumulado'] ?? 0),
         ];
@@ -171,7 +173,7 @@ if (obtener('export') === 'excel') {
         ['Total egresos del período', '', '', '', '', $totEgr, ''],
         ['Neto del período', '', '', '', '', $neto, $acumFinal],
     ];
-    exportarExcel('reporte_estado_cuenta_bancaria', ['Fecha', 'Tipo', 'Concepto', 'Referencia', 'Notas', 'Monto', 'Acumulado'], $rows, $pie);
+    exportarExcel('reporte_estado_cuenta_bancaria', ['Fecha', 'Tipo', 'Concepto', 'Referencia', 'Cliente / Proveedor', 'Monto', 'Acumulado'], $rows, $pie);
 }
 
 $netoPeriodo = $totIng - $totEgr;
@@ -236,7 +238,7 @@ require_once __DIR__ . '/../includes/layout.php';
                     <th>Tipo</th>
                     <th style="min-width:200px">Concepto</th>
                     <th>Referencia</th>
-                    <th>Notas</th>
+                    <th>Cliente / Proveedor</th>
                     <th class="text-end">Monto</th>
                     <th class="text-end">Acumulado</th>
                 </tr>
@@ -252,7 +254,7 @@ require_once __DIR__ . '/../includes/layout.php';
                     <td><span class="fw-semibold" style="color:<?= $color ?>"><?= e($tipo) ?></span></td>
                     <td><?= e($m['concepto'] ?? '') ?></td>
                     <td><?= e($m['referencia'] ?? '') ?></td>
-                    <td><?= e($m['descripcion_extra'] ?? '') ?></td>
+                    <td><?= e($m['cliente_o_proveedor'] ?? '') ?: '—' ?></td>
                     <td class="text-end"><?= dinero((float) ($m['monto'] ?? 0)) ?></td>
                     <td class="text-end"><?= dinero((float) ($m['acumulado'] ?? 0)) ?></td>
                 </tr>
