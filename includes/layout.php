@@ -50,6 +50,7 @@ $seccionReportes = in_array($p, ['reporte-cuotas', 'reporte-ingresos', 'reporte-
 
     <div class='sidebar-menu list-group list-group-flush'>
       <a class='list-group-item list-group-item-action <?= ($p === 'dashboard') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php'><i data-lucide='layout-dashboard' class='menu-ico'></i>Inicio</a>
+      <a class='list-group-item list-group-item-action <?= ($p === 'manual') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=manual'><i data-lucide='book-open' class='menu-ico'></i>Manual</a>
 
       <div class="sidebar-accordion mt-2" id="sidebarAccordionDesktop">
         <button class="menu-section-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#menuMantDesktop" aria-expanded="<?= $seccionMantenimiento ? 'true' : 'false' ?>">
@@ -158,6 +159,7 @@ $seccionReportes = in_array($p, ['reporte-cuotas', 'reporte-ingresos', 'reporte-
           </div>
           <div class='sidebar-menu list-group list-group-flush'>
             <a class='list-group-item list-group-item-action <?= ($p === 'dashboard') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php'><i data-lucide='layout-dashboard' class='menu-ico'></i>Inicio</a>
+            <a class='list-group-item list-group-item-action <?= ($p === 'manual') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=manual'><i data-lucide='book-open' class='menu-ico'></i>Manual</a>
             <div class="sidebar-accordion mt-2" id="sidebarAccordionMobile">
               <button class="menu-section-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#menuMantMobile" aria-expanded="<?= $seccionMantenimiento ? 'true' : 'false' ?>">
                 Mantenimiento
