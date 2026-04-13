@@ -247,13 +247,39 @@ function marina_combustible_sync_pedido_gasto(PDO $pdo, int $pedidoId): void
     $obs = 'Pedido combustible #' . $pedidoId . ' — ' . $tipo . ' — ' . $glsRec . ' GLS recibidos';
     $fechaGasto = (string) $fechaRec;
 
+    require_once __DIR__ . '/gasto_helpers.php';
+
     if ($gastoId > 0) {
-        $pdo->prepare('UPDATE gastos SET partida_id=?, proveedor_id=?, cuenta_id=?, forma_pago_id=NULL, monto=?, fecha_gasto=?, referencia=?, observaciones=?, updated_by=? WHERE id=?')
-            ->execute([$partidaId, $provId, $cuentaId, $costo, $fechaGasto, $fact !== '' ? $fact : null, $obs, $uid, $gastoId]);
+        $pdo->prepare('UPDATE gastos SET partida_id=?, proveedor_id=?, cuenta_id=NULL, forma_pago_id=NULL, monto=?, fecha_gasto=?, referencia=?, observaciones=?, updated_by=? WHERE id=?')
+            ->execute([$partidaId, $provId, $costo, $fechaGasto, $fact !== '' ? $fact : null, $obs, $uid, $gastoId]);
+        marina_gasto_sync_pago_unico(
+            $pdo,
+            $gastoId,
+            $costo,
+            $fechaGasto,
+            $cuentaId,
+            null,
+            $fact !== '' ? $fact : null,
+            $obs,
+            $uid,
+            $uid
+        );
     } else {
-        $pdo->prepare('INSERT INTO gastos (partida_id, proveedor_id, cuenta_id, forma_pago_id, monto, fecha_gasto, referencia, observaciones, created_by, updated_by) VALUES (?,?,?,?,?,?,?,?,?,?)')
-            ->execute([$partidaId, $provId, $cuentaId, null, $costo, $fechaGasto, $fact !== '' ? $fact : null, $obs, $uid, $uid]);
+        $pdo->prepare('INSERT INTO gastos (partida_id, proveedor_id, cuenta_id, forma_pago_id, monto, fecha_gasto, referencia, observaciones, created_by, updated_by, estado) VALUES (?,?,NULL,NULL,?,?,?,?,?,?,\'pagada\')')
+            ->execute([$partidaId, $provId, $costo, $fechaGasto, $fact !== '' ? $fact : null, $obs, $uid, $uid]);
         $gid = (int) $pdo->lastInsertId();
+        marina_gasto_sync_pago_unico(
+            $pdo,
+            $gid,
+            $costo,
+            $fechaGasto,
+            $cuentaId,
+            null,
+            $fact !== '' ? $fact : null,
+            $obs,
+            $uid,
+            $uid
+        );
         try {
             $pdo->prepare('UPDATE combustible_pedidos SET gasto_id = ? WHERE id = ?')->execute([$gid, $pedidoId]);
         } catch (Throwable $e) {

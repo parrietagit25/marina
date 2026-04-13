@@ -1,12 +1,26 @@
 <?php
 /**
  * Mapa Marina: muelles y slips dentro de cada muelle.
- * - Slip en verde si tiene contrato activo (contratos.activo=1).
+ * - Slip en verde si tiene contrato activo (estado = activo).
  */
 $titulo = 'Mapa Marina';
 
 $pdo = getDb();
 $mensaje = '';
+
+if (enviado() && (($_POST['accion'] ?? '') === 'liberar_contrato_mapa')) {
+    $contratoId = (int) ($_POST['contrato_id'] ?? 0);
+    if ($contratoId <= 0) {
+        $mensaje = 'Contrato no válido.';
+    } else {
+        $libErr = marina_contrato_liberar($pdo, $contratoId);
+        if ($libErr !== null) {
+            $mensaje = $libErr;
+        } else {
+            redirigir(MARINA_URL . '/index.php?p=mapa-marina&ok=' . rawurlencode('Contrato liberado: slip disponible.'));
+        }
+    }
+}
 
 if (enviado() && (($_POST['accion'] ?? '') === 'cambiar_slip_contrato')) {
     $contratoId = (int) ($_POST['contrato_id'] ?? 0);
@@ -14,11 +28,13 @@ if (enviado() && (($_POST['accion'] ?? '') === 'cambiar_slip_contrato')) {
     if ($contratoId <= 0 || $slipNuevoId <= 0) {
         $mensaje = 'Datos inválidos para cambiar el slip.';
     } else {
-        $stContrato = $pdo->prepare('SELECT id, activo, muelle_id, slip_id FROM contratos WHERE id = ?');
+        $stContrato = $pdo->prepare('SELECT id, activo, estado, muelle_id, slip_id FROM contratos WHERE id = ?');
         $stContrato->execute([$contratoId]);
         $contrato = $stContrato->fetch(PDO::FETCH_ASSOC);
         if (!$contrato) {
             $mensaje = 'Contrato no encontrado.';
+        } elseif ((string) ($contrato['estado'] ?? 'activo') !== 'activo') {
+            $mensaje = 'No se puede mover un contrato terminado.';
         } else {
             $stSlip = $pdo->prepare('SELECT id, muelle_id FROM slips WHERE id = ?');
             $stSlip->execute([$slipNuevoId]);
@@ -26,7 +42,7 @@ if (enviado() && (($_POST['accion'] ?? '') === 'cambiar_slip_contrato')) {
             if (!$slipNuevo) {
                 $mensaje = 'Slip destino no encontrado.';
             } else {
-                $stOcupado = $pdo->prepare('SELECT id FROM contratos WHERE activo = 1 AND slip_id = ? AND id <> ? LIMIT 1');
+                $stOcupado = $pdo->prepare('SELECT id FROM contratos WHERE COALESCE(estado, \'activo\') = \'activo\' AND slip_id = ? AND id <> ? LIMIT 1');
                 $stOcupado->execute([$slipNuevoId, $contratoId]);
                 $ocupado = (bool) $stOcupado->fetchColumn();
                 if ($ocupado) {
@@ -50,14 +66,14 @@ $slips = $pdo->query('SELECT id, nombre, muelle_id FROM slips ORDER BY muelle_id
 $contratosPorSlip = [];
 $detalleContratoPorSlip = [];
 $st = $pdo->query("
-    SELECT co.id, co.slip_id, co.muelle_id, co.fecha_inicio, co.fecha_fin, co.monto_total, co.observaciones, co.activo,
+    SELECT co.id, co.slip_id, co.muelle_id, co.fecha_inicio, co.fecha_fin, co.monto_total, co.observaciones, co.activo, COALESCE(co.estado, 'activo') AS estado,
            cl.nombre AS cliente_nombre,
            CONCAT(b.nombre, ' - ', cu.nombre) AS cuenta_nombre
     FROM contratos co
     LEFT JOIN clientes cl ON cl.id = co.cliente_id
     LEFT JOIN cuentas cu ON cu.id = co.cuenta_id
     LEFT JOIN bancos b ON b.id = cu.banco_id
-    WHERE co.activo = 1 AND co.slip_id IS NOT NULL
+    WHERE COALESCE(co.estado, 'activo') = 'activo' AND co.slip_id IS NOT NULL
 ");
 while ($r = $st->fetch(PDO::FETCH_ASSOC)) {
     $sid = (int) $r['slip_id'];
@@ -123,7 +139,7 @@ $ok = obtener('ok');
 <div class="d-flex align-items-center justify-content-between mb-3">
     <div>
         <h1 class="mb-1">Mapa Marina</h1>
-        <div class="text-muted">Muelle -> Slips. Verde = slip con contrato activo.</div>
+        <div class="text-muted">Muelle → slips. Verde = contrato activo en ese slip.</div>
     </div>
     <div class="d-flex gap-2">
         <div><span class="badge bg-success">Con contrato</span></div>
@@ -168,7 +184,8 @@ $ok = obtener('ok');
                                         'slip_actual_id' => $sid,
                                         'slip_actual_nombre' => $s['nombre'] ?? '',
                                         'muelle_actual_nombre' => $m['nombre'] ?? '',
-                                        'cuotas' => $cuotasByContrato[$contratoId] ?? []
+                                        'cuotas' => $cuotasByContrato[$contratoId] ?? [],
+                                        'estado' => (string) ($detalle['estado'] ?? 'activo'),
                                     ];
                                 }
                             ?>
@@ -235,12 +252,18 @@ $ok = obtener('ok');
                     </table>
                 </div>
             </div>
-            <form method="post" action="?p=mapa-marina">
+            <div class="modal-footer flex-column align-items-stretch gap-2">
+                <form method="post" action="?p=mapa-marina" class="d-flex flex-wrap justify-content-end gap-2 border-bottom pb-2 mb-0" id="formLiberarContratoMapaMarina">
+                    <input type="hidden" name="accion" value="liberar_contrato_mapa">
+                    <input type="hidden" name="contrato_id" id="mapaMarinaLiberarContratoId" value="">
+                    <button type="submit" class="btn btn-warning">Liberar contrato</button>
+                </form>
+                <form method="post" action="?p=mapa-marina" class="mb-0">
                 <input type="hidden" name="accion" value="cambiar_slip_contrato">
                 <input type="hidden" name="contrato_id" id="cambiarSlipContratoId" value="">
-                <div class="modal-footer d-flex justify-content-between flex-wrap gap-2">
-                    <div class="d-flex align-items-center gap-2">
-                        <label for="cambiarSlipNuevoId" class="mb-0"><strong>Cambiar a slip:</strong></label>
+                <div class="d-flex justify-content-between flex-wrap gap-2 w-100">
+                    <div class="d-flex align-items-center gap-2 flex-grow-1">
+                        <label for="cambiarSlipNuevoId" class="mb-0 text-nowrap"><strong>Cambiar a slip:</strong></label>
                         <select class="form-select" id="cambiarSlipNuevoId" name="slip_nuevo_id" required>
                             <option value="">Seleccione...</option>
                             <?php foreach ($slipsDisponibles as $sd): ?>
@@ -260,7 +283,8 @@ $ok = obtener('ok');
                         <button type="submit" class="btn btn-primary">Cambiar slip</button>
                     </div>
                 </div>
-            </form>
+                </form>
+            </div>
         </div>
     </div>
 </div>
@@ -281,6 +305,7 @@ window.addEventListener('load', function() {
     var elObs = document.getElementById('dcObs');
     var elTbody = document.getElementById('dcCuotasTbody');
     var elContratoInput = document.getElementById('cambiarSlipContratoId');
+    var elLiberarInput = document.getElementById('mapaMarinaLiberarContratoId');
     var elSlipNuevo = document.getElementById('cambiarSlipNuevoId');
 
     function money(n) {
@@ -312,6 +337,7 @@ window.addEventListener('load', function() {
             elFFin.textContent = d.fecha_fin || '—';
             elObs.textContent = d.observaciones || '—';
             if (elContratoInput) elContratoInput.value = d.id || '';
+            if (elLiberarInput) elLiberarInput.value = d.id || '';
             if (elSlipNuevo) elSlipNuevo.value = '';
 
             var cuotas = Array.isArray(d.cuotas) ? d.cuotas : [];

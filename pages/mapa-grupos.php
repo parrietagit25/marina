@@ -1,12 +1,26 @@
 <?php
 /**
  * Mapa Grupos: grupos y sus inmuebles.
- * - Inmueble en verde si tiene contrato activo (contratos.activo=1).
+ * - Inmueble en verde si tiene contrato activo (estado = activo).
  */
 $titulo = 'Mapa Grupos';
 
 $pdo = getDb();
 $mensaje = '';
+
+if (enviado() && (($_POST['accion'] ?? '') === 'liberar_contrato_mapa')) {
+    $contratoId = (int) ($_POST['contrato_id'] ?? 0);
+    if ($contratoId <= 0) {
+        $mensaje = 'Contrato no válido.';
+    } else {
+        $libErr = marina_contrato_liberar($pdo, $contratoId);
+        if ($libErr !== null) {
+            $mensaje = $libErr;
+        } else {
+            redirigir(MARINA_URL . '/index.php?p=mapa-grupos&ok=' . rawurlencode('Contrato liberado: inmueble disponible.'));
+        }
+    }
+}
 
 if (enviado() && (($_POST['accion'] ?? '') === 'cambiar_inmueble_contrato')) {
     $contratoId = (int) ($_POST['contrato_id'] ?? 0);
@@ -14,11 +28,13 @@ if (enviado() && (($_POST['accion'] ?? '') === 'cambiar_inmueble_contrato')) {
     if ($contratoId <= 0 || $inmuebleNuevoId <= 0) {
         $mensaje = 'Datos inválidos para cambiar el inmueble.';
     } else {
-        $stContrato = $pdo->prepare('SELECT id, activo, grupo_id, inmueble_id FROM contratos WHERE id = ?');
+        $stContrato = $pdo->prepare('SELECT id, activo, estado, grupo_id, inmueble_id FROM contratos WHERE id = ?');
         $stContrato->execute([$contratoId]);
         $contrato = $stContrato->fetch(PDO::FETCH_ASSOC);
         if (!$contrato) {
             $mensaje = 'Contrato no encontrado.';
+        } elseif ((string) ($contrato['estado'] ?? 'activo') !== 'activo') {
+            $mensaje = 'No se puede mover un contrato terminado.';
         } else {
             $stInmueble = $pdo->prepare('SELECT id, grupo_id FROM inmuebles WHERE id = ?');
             $stInmueble->execute([$inmuebleNuevoId]);
@@ -26,7 +42,7 @@ if (enviado() && (($_POST['accion'] ?? '') === 'cambiar_inmueble_contrato')) {
             if (!$inmuebleNuevo) {
                 $mensaje = 'Inmueble destino no encontrado.';
             } else {
-                $stOcupado = $pdo->prepare('SELECT id FROM contratos WHERE activo = 1 AND inmueble_id = ? AND id <> ? LIMIT 1');
+                $stOcupado = $pdo->prepare('SELECT id FROM contratos WHERE COALESCE(estado, \'activo\') = \'activo\' AND inmueble_id = ? AND id <> ? LIMIT 1');
                 $stOcupado->execute([$inmuebleNuevoId, $contratoId]);
                 $ocupado = (bool) $stOcupado->fetchColumn();
                 if ($ocupado) {
@@ -50,14 +66,14 @@ $inmuebles = $pdo->query('SELECT id, nombre, grupo_id FROM inmuebles ORDER BY gr
 $contratosPorInmueble = [];
 $detalleContratoPorInmueble = [];
 $st = $pdo->query("
-    SELECT co.id, co.inmueble_id, co.grupo_id, co.fecha_inicio, co.fecha_fin, co.monto_total, co.observaciones, co.activo,
+    SELECT co.id, co.inmueble_id, co.grupo_id, co.fecha_inicio, co.fecha_fin, co.monto_total, co.observaciones, co.activo, COALESCE(co.estado, 'activo') AS estado,
            cl.nombre AS cliente_nombre,
            CONCAT(b.nombre, ' - ', cu.nombre) AS cuenta_nombre
     FROM contratos co
     LEFT JOIN clientes cl ON cl.id = co.cliente_id
     LEFT JOIN cuentas cu ON cu.id = co.cuenta_id
     LEFT JOIN bancos b ON b.id = cu.banco_id
-    WHERE co.activo = 1 AND co.inmueble_id IS NOT NULL
+    WHERE COALESCE(co.estado, 'activo') = 'activo' AND co.inmueble_id IS NOT NULL
 ");
 while ($r = $st->fetch(PDO::FETCH_ASSOC)) {
     $iid = (int) $r['inmueble_id'];
@@ -115,7 +131,7 @@ $ok = obtener('ok');
 <div class="d-flex align-items-center justify-content-between mb-3">
     <div>
         <h1 class="mb-1">Mapa Grupos</h1>
-        <div class="text-muted">Grupo -> Inmuebles. Verde = inmueble con contrato activo.</div>
+        <div class="text-muted">Grupo → inmuebles. Verde = contrato activo en ese inmueble.</div>
     </div>
     <div class="d-flex gap-2">
         <div><span class="badge bg-success">Con contrato</span></div>
@@ -159,7 +175,8 @@ $ok = obtener('ok');
                                         'inmueble_actual_id' => $iid,
                                         'inmueble_actual_nombre' => $i['nombre'] ?? '',
                                         'grupo_actual_nombre' => $g['nombre'] ?? '',
-                                        'cuotas' => $cuotasByContrato[$contratoId] ?? []
+                                        'cuotas' => $cuotasByContrato[$contratoId] ?? [],
+                                        'estado' => (string) ($detalle['estado'] ?? 'activo'),
                                     ];
                                 }
                             ?>
@@ -226,12 +243,18 @@ $ok = obtener('ok');
                     </table>
                 </div>
             </div>
-            <form method="post" action="?p=mapa-grupos">
+            <div class="modal-footer flex-column align-items-stretch gap-2">
+                <form method="post" action="?p=mapa-grupos" class="d-flex flex-wrap justify-content-end gap-2 border-bottom pb-2 mb-0">
+                    <input type="hidden" name="accion" value="liberar_contrato_mapa">
+                    <input type="hidden" name="contrato_id" id="mapaGruposLiberarContratoId" value="">
+                    <button type="submit" class="btn btn-warning">Liberar contrato</button>
+                </form>
+                <form method="post" action="?p=mapa-grupos" class="mb-0">
                 <input type="hidden" name="accion" value="cambiar_inmueble_contrato">
                 <input type="hidden" name="contrato_id" id="cambiarInmuebleContratoId" value="">
-                <div class="modal-footer d-flex justify-content-between flex-wrap gap-2">
-                    <div class="d-flex align-items-center gap-2">
-                        <label for="cambiarInmuebleNuevoId" class="mb-0"><strong>Cambiar a inmueble:</strong></label>
+                <div class="d-flex justify-content-between flex-wrap gap-2 w-100">
+                    <div class="d-flex align-items-center gap-2 flex-grow-1">
+                        <label for="cambiarInmuebleNuevoId" class="mb-0 text-nowrap"><strong>Cambiar a inmueble:</strong></label>
                         <select class="form-select" id="cambiarInmuebleNuevoId" name="inmueble_nuevo_id" required>
                             <option value="">Seleccione...</option>
                             <?php foreach ($inmueblesDisponibles as $idisp): ?>
@@ -250,7 +273,8 @@ $ok = obtener('ok');
                         <button type="submit" class="btn btn-primary">Cambiar inmueble</button>
                     </div>
                 </div>
-            </form>
+                </form>
+            </div>
         </div>
     </div>
 </div>
@@ -271,6 +295,7 @@ window.addEventListener('load', function() {
     var elObs = document.getElementById('dciObs');
     var elTbody = document.getElementById('dciCuotasTbody');
     var elContratoInput = document.getElementById('cambiarInmuebleContratoId');
+    var elLiberarInput = document.getElementById('mapaGruposLiberarContratoId');
     var elInmuebleNuevo = document.getElementById('cambiarInmuebleNuevoId');
 
     function money(n) {
@@ -302,6 +327,7 @@ window.addEventListener('load', function() {
             elFFin.textContent = d.fecha_fin || '—';
             elObs.textContent = d.observaciones || '—';
             if (elContratoInput) elContratoInput.value = d.id || '';
+            if (elLiberarInput) elLiberarInput.value = d.id || '';
             if (elInmuebleNuevo) elInmuebleNuevo.value = '';
 
             var cuotas = Array.isArray(d.cuotas) ? d.cuotas : [];

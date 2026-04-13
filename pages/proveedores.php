@@ -74,7 +74,7 @@ $modalDatos = [
 <div class="toolbar d-flex gap-2"><button type="button" class="btn btn-primary" id="btnNuevoProveedor">Nuevo proveedor</button></div>
 
 <table>
-    <thead><tr><th>Id</th><th>Nombre</th><th>Documento</th><th>Teléfono</th><th>Creado</th><th>Creado por</th><th></th></tr></thead>
+    <thead><tr><th>Id</th><th>Nombre</th><th>RUC/Cédula</th><th>Teléfono</th><th>Creado</th><th>Creado por</th><th></th></tr></thead>
     <tbody>
     <?php
     $st = $pdo->query('SELECT p.*, u.nombre AS creado_por FROM proveedores p LEFT JOIN usuarios u ON p.created_by = u.id ORDER BY p.nombre');
@@ -109,7 +109,7 @@ $modalDatos = [
                     <div id="proveedorModalMensaje" class="alert alert-danger d-none"></div>
                     <label>Nombre *</label>
                     <input type="text" class="form-control" id="proveedorNombre" name="nombre" required>
-                    <label class="mt-2">Documento</label>
+                    <label class="mt-2">RUC/Cédula</label>
                     <input type="text" class="form-control" id="proveedorDocumento" name="documento">
                     <label class="mt-2">Teléfono</label>
                     <input type="text" class="form-control" id="proveedorTelefono" name="telefono">

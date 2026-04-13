@@ -51,4 +51,42 @@ function marina_config_font_size_percent(PDO $pdo): int {
     return 100;
 }
 
+/**
+ * Termina el contrato y libera slip/inmueble para nuevos contratos.
+ * @return null si OK, o mensaje de error
+ */
+function marina_contrato_liberar(PDO $pdo, int $id): ?string
+{
+    if ($id < 1) {
+        return 'Contrato no válido.';
+    }
+    try {
+        $st = $pdo->prepare('SELECT id, estado FROM contratos WHERE id = ? LIMIT 1');
+        $st->execute([$id]);
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            return 'Contrato no encontrado.';
+        }
+        $est = (string) ($row['estado'] ?? 'activo');
+        if ($est !== 'activo') {
+            return 'El contrato ya está terminado.';
+        }
+        $uid = function_exists('usuarioId') ? usuarioId() : null;
+        $pdo->prepare('
+            UPDATE contratos SET
+                estado = \'terminado\',
+                activo = 0,
+                muelle_id = NULL,
+                slip_id = NULL,
+                grupo_id = NULL,
+                inmueble_id = NULL,
+                updated_by = ?
+            WHERE id = ? AND estado = \'activo\'
+        ')->execute([$uid, $id]);
+        return null;
+    } catch (Throwable $e) {
+        return 'No se pudo liberar la unidad.';
+    }
+}
+
 require_once __DIR__ . '/eliminar_dependencias.php';

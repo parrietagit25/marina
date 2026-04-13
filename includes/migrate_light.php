@@ -183,6 +183,105 @@ function marina_ensure_schema(PDO $pdo): void
         // permisos o motor
     }
 
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS gasto_pagos (
+          id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+          gasto_id INT UNSIGNED NOT NULL,
+          monto DECIMAL(12,2) NOT NULL,
+          fecha_pago DATE NOT NULL,
+          cuenta_id INT UNSIGNED NULL,
+          forma_pago_id INT UNSIGNED NULL,
+          referencia VARCHAR(100) NULL,
+          observaciones TEXT NULL,
+          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          created_by INT UNSIGNED NULL,
+          updated_by INT UNSIGNED NULL,
+          KEY idx_gp_gasto (gasto_id),
+          KEY idx_gp_fecha (fecha_pago),
+          CONSTRAINT fk_gp_gasto FOREIGN KEY (gasto_id) REFERENCES gastos(id) ON DELETE CASCADE,
+          CONSTRAINT fk_gp_cuenta FOREIGN KEY (cuenta_id) REFERENCES cuentas(id) ON DELETE SET NULL,
+          CONSTRAINT fk_gp_forma FOREIGN KEY (forma_pago_id) REFERENCES formas_pago(id) ON DELETE SET NULL,
+          CONSTRAINT fk_gp_created FOREIGN KEY (created_by) REFERENCES usuarios(id),
+          CONSTRAINT fk_gp_updated FOREIGN KEY (updated_by) REFERENCES usuarios(id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    } catch (Throwable $e) {
+        // motor o FK no disponible
+    }
+    try {
+        $pdo->exec("ALTER TABLE gastos ADD COLUMN estado VARCHAR(20) NOT NULL DEFAULT 'pendiente' COMMENT 'pendiente|pagada' AFTER observaciones");
+    } catch (Throwable $e) {
+        // columna ya existe
+    }
+
+    try {
+        $pdo->exec("ALTER TABLE contratos ADD COLUMN estado VARCHAR(20) NOT NULL DEFAULT 'activo' COMMENT 'activo|terminado' AFTER activo");
+    } catch (Throwable $e) {
+        // columna ya existe
+    }
+    try {
+        $stM = $pdo->prepare("SELECT 1 FROM marina_config WHERE clave = 'migration_contrato_estado_v1' LIMIT 1");
+        $stM->execute();
+        if (!$stM->fetchColumn()) {
+            $pdo->exec("UPDATE contratos SET estado = IF(activo = 1, 'activo', 'terminado')");
+            $pdo->prepare("INSERT INTO marina_config (clave, valor) VALUES ('migration_contrato_estado_v1', '1') ON DUPLICATE KEY UPDATE valor = '1'")->execute();
+        }
+    } catch (Throwable $e) {
+        // sin marina_config o columna
+    }
+
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS contrato_electricidad_facturas (
+          id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+          contrato_id INT UNSIGNED NOT NULL,
+          monto_total DECIMAL(12,2) NOT NULL,
+          fecha_factura DATE NOT NULL,
+          numero_factura VARCHAR(100) NULL,
+          periodo_desde DATE NULL,
+          periodo_hasta DATE NULL,
+          observaciones TEXT NULL,
+          estado VARCHAR(20) NOT NULL DEFAULT 'pendiente' COMMENT 'pendiente|pagada',
+          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          created_by INT UNSIGNED NULL,
+          updated_by INT UNSIGNED NULL,
+          KEY idx_ele_f_contrato (contrato_id),
+          CONSTRAINT fk_ele_f_contrato FOREIGN KEY (contrato_id) REFERENCES contratos(id) ON DELETE CASCADE,
+          CONSTRAINT fk_ele_f_created FOREIGN KEY (created_by) REFERENCES usuarios(id),
+          CONSTRAINT fk_ele_f_updated FOREIGN KEY (updated_by) REFERENCES usuarios(id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    } catch (Throwable $e) {
+        // motor o FK
+    }
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS contrato_electricidad_pagos (
+          id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+          factura_id INT UNSIGNED NOT NULL,
+          monto DECIMAL(12,2) NOT NULL,
+          fecha_pago DATE NOT NULL,
+          cuenta_id INT UNSIGNED NOT NULL COMMENT 'Cuenta de acreditación',
+          forma_pago_id INT UNSIGNED NULL,
+          referencia VARCHAR(100) NULL,
+          observaciones TEXT NULL,
+          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          created_by INT UNSIGNED NULL,
+          updated_by INT UNSIGNED NULL,
+          KEY idx_ele_p_factura (factura_id),
+          KEY idx_ele_p_fecha (fecha_pago),
+          CONSTRAINT fk_ele_p_factura FOREIGN KEY (factura_id) REFERENCES contrato_electricidad_facturas(id) ON DELETE CASCADE,
+          CONSTRAINT fk_ele_p_cuenta FOREIGN KEY (cuenta_id) REFERENCES cuentas(id) ON DELETE RESTRICT,
+          CONSTRAINT fk_ele_p_forma FOREIGN KEY (forma_pago_id) REFERENCES formas_pago(id) ON DELETE SET NULL,
+          CONSTRAINT fk_ele_p_created FOREIGN KEY (created_by) REFERENCES usuarios(id),
+          CONSTRAINT fk_ele_p_updated FOREIGN KEY (updated_by) REFERENCES usuarios(id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    } catch (Throwable $e) {
+        // motor o FK
+    }
+
+    require_once __DIR__ . '/gasto_helpers.php';
+    marina_gasto_migrar_legacy_si_falta($pdo);
+
     require_once __DIR__ . '/combustible_helpers.php';
     try {
         marina_combustible_seed_catalog($pdo);

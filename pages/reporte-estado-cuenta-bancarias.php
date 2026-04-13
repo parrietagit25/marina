@@ -47,6 +47,33 @@ $ing = $pdo->prepare("
 $ing->execute($params);
 $ingresos = $ing->fetchAll(PDO::FETCH_ASSOC);
 
+$ingEleParams = [$desde, $hasta];
+$ingEleFiltro = '';
+if ($cuenta_id > 0) {
+    $ingEleFiltro = ' AND ep.cuenta_id = ? ';
+    $ingEleParams[] = $cuenta_id;
+}
+try {
+    $ingEle = $pdo->prepare("
+        SELECT ep.fecha_pago AS fecha,
+               'Ingreso' AS tipo,
+               ep.monto AS monto,
+               CONCAT('Electricidad — Contrato #', co.id) AS concepto,
+               TRIM(COALESCE(NULLIF(co.numero_recibo, ''), NULLIF(ep.referencia, ''), '')) AS referencia,
+               COALESCE(cl.nombre, '') AS cliente_o_proveedor
+        FROM contrato_electricidad_pagos ep
+        JOIN contrato_electricidad_facturas f ON f.id = ep.factura_id
+        JOIN contratos co ON co.id = f.contrato_id
+        JOIN clientes cl ON cl.id = co.cliente_id
+        WHERE ep.fecha_pago BETWEEN ? AND ?
+          $ingEleFiltro
+    ");
+    $ingEle->execute($ingEleParams);
+    $ingresos = array_merge($ingresos, $ingEle->fetchAll(PDO::FETCH_ASSOC));
+} catch (Throwable $e) {
+    // sin tablas de electricidad
+}
+
 $ingComb = [];
 try {
     $icParams = [$desde, $hasta];
@@ -75,20 +102,21 @@ try {
 $gParams = [$desde, $hasta];
 $gFiltro = '';
 if ($cuenta_id > 0) {
-    $gFiltro = ' AND g.cuenta_id = ? ';
+    $gFiltro = ' AND gp.cuenta_id = ? ';
     $gParams[] = $cuenta_id;
 }
 $cos = $pdo->prepare("
-    SELECT g.fecha_gasto AS fecha,
+    SELECT gp.fecha_pago AS fecha,
            'Egreso' AS tipo,
-           g.monto AS monto,
+           gp.monto AS monto,
            CONCAT('Gasto — ', p.nombre) AS concepto,
-           COALESCE(g.referencia, '') AS referencia,
+           COALESCE(gp.referencia, '') AS referencia,
            COALESCE(pr.nombre, '') AS cliente_o_proveedor
-    FROM gastos g
+    FROM gasto_pagos gp
+    JOIN gastos g ON g.id = gp.gasto_id
     JOIN partidas p ON p.id = g.partida_id
     JOIN proveedores pr ON pr.id = g.proveedor_id
-    WHERE g.fecha_gasto BETWEEN ? AND ?
+    WHERE gp.fecha_pago BETWEEN ? AND ?
       $gFiltro
 ");
 $cos->execute($gParams);

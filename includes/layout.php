@@ -22,7 +22,7 @@ $seccionCostoGastos = in_array($p, ['proveedores', 'gastos', 'reporte-proveedore
 $seccionTransacciones = in_array($p, ['formas-pago', 'partidas', 'reportes'], true);
 $paginasCombustible = ['combustible-pedidos', 'combustible-despacho', 'combustible-ajuste', 'combustible-precios'];
 $seccionCombustibleSub = in_array($p, $paginasCombustible, true);
-$seccionMarina = in_array($p, array_merge(['clientes', 'muelles', 'slips', 'grupos', 'inmuebles', 'mapa-marina', 'mapa-grupos', 'contratos'], $paginasCombustible), true);
+$seccionMarina = in_array($p, array_merge(['clientes', 'muelles', 'slips', 'grupos', 'inmuebles', 'mapa-marina', 'mapa-grupos', 'contratos', 'contratos-electricidad'], $paginasCombustible), true);
 $seccionReportes = in_array($p, ['reporte-cuotas', 'reporte-ingresos', 'reporte-egresos', 'reporte-ingresos-egresos', 'reporte-marina-contratos', 'reporte-inmuebles-contratos', 'reporte-combustible'], true);
 ?>
 <!DOCTYPE html>
@@ -100,7 +100,7 @@ $seccionReportes = in_array($p, ['reporte-cuotas', 'reporte-ingresos', 'reporte-
           <a class='list-group-item list-group-item-action <?= ($p === 'inmuebles') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=inmuebles'>Inmuebles</a>
           <a class='list-group-item list-group-item-action <?= ($p === 'mapa-marina') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=mapa-marina'><i data-lucide='anchor' class='menu-ico'></i>Mapa Marina</a>
           <a class='list-group-item list-group-item-action <?= ($p === 'mapa-grupos') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=mapa-grupos'><i data-lucide='building-2' class='menu-ico'></i>Mapa Grupos</a>
-          <a class='list-group-item list-group-item-action <?= ($p === 'contratos') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=contratos'>Contratos</a>
+          <a class='list-group-item list-group-item-action <?= (in_array($p, ['contratos', 'contratos-electricidad'], true)) ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=contratos'>Contratos</a>
           <button class="menu-section-toggle menu-sub-toggle ps-3 py-2" type="button" data-bs-toggle="collapse" data-bs-target="#menuCombustibleSubDesktop" aria-expanded="<?= $seccionCombustibleSub ? 'true' : 'false' ?>">
             Combustible
           </button>
@@ -207,7 +207,7 @@ $seccionReportes = in_array($p, ['reporte-cuotas', 'reporte-ingresos', 'reporte-
                 <a class='list-group-item list-group-item-action <?= ($p === 'inmuebles') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=inmuebles'>Inmuebles</a>
                 <a class='list-group-item list-group-item-action <?= ($p === 'mapa-marina') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=mapa-marina'>Mapa Marina</a>
                 <a class='list-group-item list-group-item-action <?= ($p === 'mapa-grupos') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=mapa-grupos'>Mapa Grupos</a>
-                <a class='list-group-item list-group-item-action <?= ($p === 'contratos') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=contratos'>Contratos</a>
+                <a class='list-group-item list-group-item-action <?= (in_array($p, ['contratos', 'contratos-electricidad'], true)) ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=contratos'>Contratos</a>
                 <button class="menu-section-toggle menu-sub-toggle ps-3 py-2" type="button" data-bs-toggle="collapse" data-bs-target="#menuCombustibleSubMobile" aria-expanded="<?= $seccionCombustibleSub ? 'true' : 'false' ?>">
                   Combustible
                 </button>

@@ -22,7 +22,7 @@ $partidasOpts = $pdo->query('SELECT id, nombre FROM partidas ORDER BY nombre')->
 $gParams = [$desde, $hasta];
 $gWhere = '';
 if ($cuenta_id > 0) {
-    $gWhere .= ' AND g.cuenta_id = ? ';
+    $gWhere .= ' AND gp.cuenta_id = ? ';
     $gParams[] = $cuenta_id;
 }
 if ($partida_id > 0) {
@@ -31,21 +31,22 @@ if ($partida_id > 0) {
 }
 
 $st = $pdo->prepare("
-    SELECT g.fecha_gasto AS fecha,
+    SELECT gp.fecha_pago AS fecha,
            'Gasto' AS origen,
-           g.monto,
+           gp.monto,
            CONCAT('Gasto — ', p.nombre) AS concepto,
            CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre,
            pr.nombre AS proveedor_nombre,
            fp.nombre AS forma_pago_nombre,
-           COALESCE(g.referencia, '') AS referencia
-    FROM gastos g
+           COALESCE(gp.referencia, '') AS referencia
+    FROM gasto_pagos gp
+    JOIN gastos g ON g.id = gp.gasto_id
     JOIN partidas p ON p.id = g.partida_id
     JOIN proveedores pr ON pr.id = g.proveedor_id
-    LEFT JOIN cuentas c ON c.id = g.cuenta_id
+    LEFT JOIN cuentas c ON c.id = gp.cuenta_id
     LEFT JOIN bancos b ON b.id = c.banco_id
-    LEFT JOIN formas_pago fp ON fp.id = g.forma_pago_id
-    WHERE g.fecha_gasto BETWEEN ? AND ?
+    LEFT JOIN formas_pago fp ON fp.id = gp.forma_pago_id
+    WHERE gp.fecha_pago BETWEEN ? AND ?
     $gWhere
 ");
 $st->execute($gParams);

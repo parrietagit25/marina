@@ -5,6 +5,7 @@
 $titulo = 'Partidas';
 
 $pdo = getDb();
+require_once __DIR__ . '/../includes/gasto_helpers.php';
 $accion = obtener('accion');
 $id = (int) obtener('id');
 $parent_id = (int) obtener('parent_id');
@@ -73,25 +74,54 @@ if (enviado() && (($_POST['accion'] ?? '') === 'pagar_partida')) {
     }
 
     if ($pagoError === '') {
-        $sqlPago = "
-            INSERT INTO gastos
-                (partida_id, proveedor_id, cuenta_id, forma_pago_id, monto, fecha_gasto, referencia, observaciones, created_by, updated_by)
-            VALUES
-                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ";
-        $pdo->prepare($sqlPago)->execute([
-            (int) $pagoDatos['partida_id'],
-            (int) $pagoDatos['proveedor_id'],
-            $pagoDatos['cuenta_id'] > 0 ? (int) $pagoDatos['cuenta_id'] : null,
-            $pagoDatos['forma_pago_id'] > 0 ? (int) $pagoDatos['forma_pago_id'] : null,
-            $montoPago,
-            $pagoDatos['fecha_gasto'],
-            $pagoDatos['referencia'] !== '' ? $pagoDatos['referencia'] : null,
-            $pagoDatos['observaciones'] !== '' ? $pagoDatos['observaciones'] : null,
-            usuarioId(),
-            usuarioId()
-        ]);
-        redirigir(MARINA_URL . '/index.php?p=partidas&ok=Pago registrado');
+        $uid = usuarioId();
+        $pdo->beginTransaction();
+        try {
+            $pdo->prepare('INSERT INTO gastos (partida_id, proveedor_id, cuenta_id, forma_pago_id, monto, fecha_gasto, referencia, observaciones, created_by, updated_by, estado) VALUES (?,?,NULL,NULL,?,?,?,?,?,?,\'pendiente\')')
+                ->execute([
+                    (int) $pagoDatos['partida_id'],
+                    (int) $pagoDatos['proveedor_id'],
+                    $montoPago,
+                    $pagoDatos['fecha_gasto'],
+                    $pagoDatos['referencia'] !== '' ? $pagoDatos['referencia'] : null,
+                    $pagoDatos['observaciones'] !== '' ? $pagoDatos['observaciones'] : null,
+                    $uid,
+                    $uid,
+                ]);
+            $gid = (int) $pdo->lastInsertId();
+            if ($pagoDatos['cuenta_id'] > 0 && $pagoDatos['forma_pago_id'] > 0) {
+                $stF = $pdo->prepare('SELECT tipo_movimiento FROM formas_pago WHERE id = ?');
+                $stF->execute([(int) $pagoDatos['forma_pago_id']]);
+                $tf = $stF->fetch(PDO::FETCH_ASSOC);
+                if (!$tf || ($tf['tipo_movimiento'] ?? '') !== 'costo') {
+                    $pdo->rollBack();
+                    $pagoError = 'La forma de pago debe ser de tipo costo (egreso).';
+                } else {
+                    $pdo->prepare('INSERT INTO gasto_pagos (gasto_id, monto, fecha_pago, cuenta_id, forma_pago_id, referencia, observaciones, created_by, updated_by) VALUES (?,?,?,?,?,?,?,?,?)')
+                        ->execute([
+                            $gid,
+                            $montoPago,
+                            $pagoDatos['fecha_gasto'],
+                            (int) $pagoDatos['cuenta_id'],
+                            (int) $pagoDatos['forma_pago_id'],
+                            $pagoDatos['referencia'] !== '' ? $pagoDatos['referencia'] : null,
+                            $pagoDatos['observaciones'] !== '' ? $pagoDatos['observaciones'] : null,
+                            $uid,
+                            $uid,
+                        ]);
+                    marina_gasto_refrescar_estado($pdo, $gid);
+                }
+            }
+            if ($pagoError === '') {
+                $pdo->commit();
+                redirigir(MARINA_URL . '/index.php?p=partidas&ok=Pago registrado');
+            }
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            $pagoError = 'No se pudo registrar el pago.';
+        }
     }
 }
 
@@ -135,16 +165,17 @@ if ($accion === 'editar' && $id > 0) {
 $todas = $pdo->query('SELECT id, parent_id, nombre FROM partidas ORDER BY nombre')->fetchAll(PDO::FETCH_ASSOC);
 
 $gastosRows = $pdo->query("
-    SELECT g.id, g.partida_id, g.fecha_gasto, g.monto, g.referencia, g.observaciones,
+    SELECT gp.id, g.partida_id, gp.fecha_pago AS fecha_gasto, gp.monto, gp.referencia, gp.observaciones,
            pr.nombre AS proveedor_nombre,
            fp.nombre AS forma_pago_nombre,
            CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre
-    FROM gastos g
+    FROM gasto_pagos gp
+    JOIN gastos g ON g.id = gp.gasto_id
     LEFT JOIN proveedores pr ON pr.id = g.proveedor_id
-    LEFT JOIN formas_pago fp ON fp.id = g.forma_pago_id
-    LEFT JOIN cuentas c ON c.id = g.cuenta_id
+    LEFT JOIN formas_pago fp ON fp.id = gp.forma_pago_id
+    LEFT JOIN cuentas c ON c.id = gp.cuenta_id
     LEFT JOIN bancos b ON b.id = c.banco_id
-    ORDER BY g.fecha_gasto DESC, g.id DESC
+    ORDER BY gp.fecha_pago DESC, gp.id DESC
 ")->fetchAll(PDO::FETCH_ASSOC);
 
 $pagosByPartida = [];

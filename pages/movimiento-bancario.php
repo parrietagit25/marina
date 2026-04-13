@@ -1,7 +1,7 @@
 <?php
 /**
  * Movimiento bancario: línea de tiempo de ingresos/costos
- * (cuotas, gastos y movimientos manuales).
+ * (cuotas, electricidad por contrato, gastos y movimientos manuales).
  */
 $titulo = 'Movimiento bancario';
 $pdo = getDb();
@@ -34,6 +34,7 @@ foreach ($formasRows as $fr) {
 }
 
 $formData = [
+    'movimiento_id' => 0,
     'fecha_movimiento' => date('Y-m-d'),
     'cuenta_id' => 0,
     'tipo_movimiento' => 'ingreso',
@@ -43,12 +44,14 @@ $formData = [
     'descripcion' => ''
 ];
 
-if (enviado() && (($_POST['accion'] ?? '') === 'crear_movimiento_bancario')) {
+$accionPost = enviado() ? trim((string) ($_POST['accion'] ?? '')) : '';
+if (enviado() && ($accionPost === 'crear_movimiento_bancario' || $accionPost === 'actualizar_movimiento_bancario')) {
     $formData = [
+        'movimiento_id' => $accionPost === 'actualizar_movimiento_bancario' ? (int) ($_POST['movimiento_id'] ?? 0) : 0,
         'fecha_movimiento' => trim($_POST['fecha_movimiento'] ?? date('Y-m-d')),
-        'cuenta_id' => (int)($_POST['cuenta_id'] ?? 0),
+        'cuenta_id' => (int) ($_POST['cuenta_id'] ?? 0),
         'tipo_movimiento' => trim($_POST['tipo_movimiento'] ?? ''),
-        'forma_pago_id' => (int)($_POST['forma_pago_id'] ?? 0),
+        'forma_pago_id' => (int) ($_POST['forma_pago_id'] ?? 0),
         'monto' => trim($_POST['monto'] ?? ''),
         'referencia' => trim($_POST['referencia'] ?? ''),
         'descripcion' => trim($_POST['descripcion'] ?? '')
@@ -58,41 +61,83 @@ if (enviado() && (($_POST['accion'] ?? '') === 'crear_movimiento_bancario')) {
     $tipoValido = in_array($formData['tipo_movimiento'], ['ingreso', 'costo'], true);
     $formaSeleccionada = $formasById[$formData['forma_pago_id']] ?? null;
     $montoNum = (float) str_replace(',', '', $formData['monto']);
+    $esEdicion = $accionPost === 'actualizar_movimiento_bancario' && $formData['movimiento_id'] > 0;
 
-    if ($formData['cuenta_id'] <= 0 || !isset($cuentasById[$formData['cuenta_id']])) {
+    if ($accionPost === 'actualizar_movimiento_bancario' && $formData['movimiento_id'] <= 0) {
+        $mensaje = 'Movimiento no válido.';
+    }
+
+    if ($mensaje === '' && $esEdicion) {
+        $stEx = $pdo->prepare('SELECT id FROM movimientos_bancarios WHERE id = ? LIMIT 1');
+        $stEx->execute([$formData['movimiento_id']]);
+        if (!$stEx->fetch()) {
+            $mensaje = 'El movimiento ya no existe o no se puede editar.';
+        }
+    }
+
+    if ($mensaje === '' && ($formData['cuenta_id'] <= 0 || !isset($cuentasById[$formData['cuenta_id']]))) {
         $mensaje = 'Debe seleccionar una cuenta válida.';
-    } elseif (!$tipoValido) {
+    } elseif ($mensaje === '' && !$tipoValido) {
         $mensaje = 'Debe seleccionar el tipo de movimiento.';
-    } elseif ($formData['forma_pago_id'] <= 0 || !$formaSeleccionada) {
+    } elseif ($mensaje === '' && ($formData['forma_pago_id'] <= 0 || !$formaSeleccionada)) {
         $mensaje = 'Debe seleccionar un tipo de movimiento bancario.';
-    } elseif (($formaSeleccionada['tipo_movimiento'] ?? '') !== $formData['tipo_movimiento']) {
+    } elseif ($mensaje === '' && (($formaSeleccionada['tipo_movimiento'] ?? '') !== $formData['tipo_movimiento'])) {
         $mensaje = 'El tipo seleccionado no coincide con la clasificación del movimiento.';
-    } elseif ($montoNum <= 0) {
+    } elseif ($mensaje === '' && $montoNum <= 0) {
         $mensaje = 'El monto debe ser mayor a 0.';
-    } elseif ($formData['fecha_movimiento'] === '') {
+    } elseif ($mensaje === '' && $formData['fecha_movimiento'] === '') {
         $mensaje = 'La fecha es obligatoria.';
-    } else {
+    } elseif ($mensaje === '') {
         try {
-            $sqlInsert = "
-                INSERT INTO movimientos_bancarios
-                    (cuenta_id, forma_pago_id, tipo_movimiento, monto, fecha_movimiento, referencia, descripcion, created_by, updated_by)
-                VALUES
-                    (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ";
-            $pdo->prepare($sqlInsert)->execute([
-                $formData['cuenta_id'],
-                $formData['forma_pago_id'],
-                $formData['tipo_movimiento'],
-                $montoNum,
-                $formData['fecha_movimiento'],
-                $formData['referencia'] !== '' ? $formData['referencia'] : null,
-                $formData['descripcion'] !== '' ? $formData['descripcion'] : null,
-                usuarioId(),
-                usuarioId()
-            ]);
-            redirigir(MARINA_URL . '/index.php?p=movimiento-bancario&ok=Movimiento registrado');
+            if ($esEdicion) {
+                $sqlUp = "
+                    UPDATE movimientos_bancarios SET
+                        cuenta_id = ?,
+                        forma_pago_id = ?,
+                        tipo_movimiento = ?,
+                        monto = ?,
+                        fecha_movimiento = ?,
+                        referencia = ?,
+                        descripcion = ?,
+                        updated_by = ?
+                    WHERE id = ?
+                ";
+                $pdo->prepare($sqlUp)->execute([
+                    $formData['cuenta_id'],
+                    $formData['forma_pago_id'],
+                    $formData['tipo_movimiento'],
+                    $montoNum,
+                    $formData['fecha_movimiento'],
+                    $formData['referencia'] !== '' ? $formData['referencia'] : null,
+                    $formData['descripcion'] !== '' ? $formData['descripcion'] : null,
+                    usuarioId(),
+                    $formData['movimiento_id'],
+                ]);
+                redirigir(MARINA_URL . '/index.php?p=movimiento-bancario&ok=' . rawurlencode('Movimiento actualizado'));
+            } else {
+                $sqlInsert = "
+                    INSERT INTO movimientos_bancarios
+                        (cuenta_id, forma_pago_id, tipo_movimiento, monto, fecha_movimiento, referencia, descripcion, created_by, updated_by)
+                    VALUES
+                        (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ";
+                $pdo->prepare($sqlInsert)->execute([
+                    $formData['cuenta_id'],
+                    $formData['forma_pago_id'],
+                    $formData['tipo_movimiento'],
+                    $montoNum,
+                    $formData['fecha_movimiento'],
+                    $formData['referencia'] !== '' ? $formData['referencia'] : null,
+                    $formData['descripcion'] !== '' ? $formData['descripcion'] : null,
+                    usuarioId(),
+                    usuarioId()
+                ]);
+                redirigir(MARINA_URL . '/index.php?p=movimiento-bancario&ok=Movimiento registrado');
+            }
         } catch (Throwable $e) {
-            $mensaje = 'No se pudo registrar. Verifique que exista la tabla movimientos_bancarios.';
+            $mensaje = $esEdicion
+                ? 'No se pudo actualizar el movimiento.'
+                : 'No se pudo registrar. Verifique que exista la tabla movimientos_bancarios.';
         }
     }
 }
@@ -113,7 +158,10 @@ $ing = $pdo->prepare("
            CONCAT('Cuota #', cu.numero_cuota) AS concepto,
            CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre,
            COALESCE(mo.referencia, '') AS referencia,
-           '' AS descripcion
+           '' AS descripcion,
+           NULL AS movimiento_manual_id,
+           NULL AS manual_cuenta_id,
+           NULL AS manual_forma_pago_id
     FROM cuotas_movimientos mo
     JOIN cuotas cu ON mo.cuota_id = cu.id
     JOIN contratos co ON cu.contrato_id = co.id
@@ -126,28 +174,66 @@ $ing = $pdo->prepare("
 $ing->execute($params);
 $ingresos = $ing->fetchAll(PDO::FETCH_ASSOC);
 
+$ingEleParams = [$desde, $hasta];
+$ingEleFiltro = '';
+if ($cuenta_id > 0) {
+    $ingEleFiltro = ' AND ep.cuenta_id = ? ';
+    $ingEleParams[] = $cuenta_id;
+}
+$ingresosEle = [];
+try {
+    $ingEle = $pdo->prepare("
+        SELECT ep.fecha_pago AS fecha,
+               'Ingreso' AS tipo,
+               'electricidad' AS origen,
+               ep.monto AS monto,
+               CONCAT('Electricidad — Contrato #', co.id) AS concepto,
+               CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre,
+               COALESCE(ep.referencia, '') AS referencia,
+               COALESCE(ep.observaciones, '') AS descripcion,
+               NULL AS movimiento_manual_id,
+               NULL AS manual_cuenta_id,
+               NULL AS manual_forma_pago_id
+        FROM contrato_electricidad_pagos ep
+        JOIN contrato_electricidad_facturas f ON f.id = ep.factura_id
+        JOIN contratos co ON co.id = f.contrato_id
+        JOIN cuentas c ON c.id = ep.cuenta_id
+        JOIN bancos b ON c.banco_id = b.id
+        WHERE ep.fecha_pago BETWEEN ? AND ?
+          $ingEleFiltro
+    ");
+    $ingEle->execute($ingEleParams);
+    $ingresosEle = $ingEle->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable $e) {
+    $ingresosEle = [];
+}
+
 // Costos por gastos
 $gastosParams = [$desde, $hasta];
 $gastoCuentaFiltro = '';
 if ($cuenta_id > 0) {
-    $gastoCuentaFiltro = ' AND g.cuenta_id = ? ';
+    $gastoCuentaFiltro = ' AND gp.cuenta_id = ? ';
     $gastosParams[] = $cuenta_id;
 }
 
 $cos = $pdo->prepare("
-    SELECT g.fecha_gasto AS fecha,
+    SELECT gp.fecha_pago AS fecha,
            'Costo' AS tipo,
            'gasto' AS origen,
-           g.monto AS monto,
+           gp.monto AS monto,
            CONCAT('Gasto - ', p.nombre) AS concepto,
            CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre,
-           COALESCE(g.referencia, '') AS referencia,
-           COALESCE(g.observaciones, '') AS descripcion
-    FROM gastos g
+           COALESCE(gp.referencia, '') AS referencia,
+           COALESCE(gp.observaciones, '') AS descripcion,
+           NULL AS movimiento_manual_id,
+           NULL AS manual_cuenta_id,
+           NULL AS manual_forma_pago_id
+    FROM gasto_pagos gp
+    JOIN gastos g ON gp.gasto_id = g.id
     JOIN partidas p ON g.partida_id = p.id
-    LEFT JOIN cuentas c ON g.cuenta_id = c.id
+    LEFT JOIN cuentas c ON gp.cuenta_id = c.id
     LEFT JOIN bancos b ON c.banco_id = b.id
-    WHERE g.fecha_gasto BETWEEN ? AND ?
+    WHERE gp.fecha_pago BETWEEN ? AND ?
       $gastoCuentaFiltro
 ");
 $cos->execute($gastosParams);
@@ -170,7 +256,10 @@ try {
                CONCAT('Movimiento - ', fp.nombre) AS concepto,
                CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre,
                COALESCE(mb.referencia, '') AS referencia,
-               COALESCE(mb.descripcion, '') AS descripcion
+               COALESCE(mb.descripcion, '') AS descripcion,
+               mb.id AS movimiento_manual_id,
+               mb.cuenta_id AS manual_cuenta_id,
+               mb.forma_pago_id AS manual_forma_pago_id
         FROM movimientos_bancarios mb
         JOIN cuentas c ON mb.cuenta_id = c.id
         JOIN bancos b ON c.banco_id = b.id
@@ -184,7 +273,7 @@ try {
     $manuales = [];
 }
 
-$movs = array_merge($ingresos, $gastos, $manuales);
+$movs = array_merge($ingresos, $ingresosEle, $gastos, $manuales);
 usort($movs, function($a, $b) {
     $ta = strtotime($a['fecha'] ?? '');
     $tb = strtotime($b['fecha'] ?? '');
@@ -263,7 +352,7 @@ $modalDataJson = json_encode([
 <div class="card p-3">
     <h2 class="h5 mb-3">Movimientos</h2>
     <div class="table-responsive">
-        <table class="table align-middle">
+        <table class="table align-middle no-datatable">
             <thead>
             <tr>
                 <th>Fecha</th>
@@ -273,17 +362,32 @@ $modalDataJson = json_encode([
                 <th>Referencia</th>
                 <th>Comentario</th>
                 <th>Monto</th>
+                <th class="text-end">Acciones</th>
             </tr>
             </thead>
             <tbody>
             <?php if (empty($movs)): ?>
-                <tr><td colspan="7">No hay movimientos en el período.</td></tr>
+                <tr><td colspan="8">No hay movimientos en el período.</td></tr>
             <?php else: ?>
                 <?php foreach ($movs as $m): ?>
                     <?php
                     $tipo = $m['tipo'] ?? '';
                     $monto = (float) ($m['monto'] ?? 0);
                     $color = $tipo === 'Ingreso' ? '#137333' : '#b42318';
+                    $midManual = isset($m['movimiento_manual_id']) ? (int) $m['movimiento_manual_id'] : 0;
+                    $editPayload = null;
+                    if ($midManual > 0) {
+                        $editPayload = [
+                            'movimiento_id' => $midManual,
+                            'cuenta_id' => (int) ($m['manual_cuenta_id'] ?? 0),
+                            'forma_pago_id' => (int) ($m['manual_forma_pago_id'] ?? 0),
+                            'tipo_movimiento' => $tipo === 'Costo' ? 'costo' : 'ingreso',
+                            'fecha_movimiento' => (string) ($m['fecha'] ?? ''),
+                            'monto' => number_format($monto, 2, '.', ''),
+                            'referencia' => (string) ($m['referencia'] ?? ''),
+                            'descripcion' => (string) ($m['descripcion'] ?? ''),
+                        ];
+                    }
                     ?>
                     <tr>
                         <td><?= fechaFormato($m['fecha']) ?></td>
@@ -293,6 +397,16 @@ $modalDataJson = json_encode([
                         <td><?= e($m['referencia'] ?? '') ?></td>
                         <td><?= e($m['descripcion'] ?? '') ?></td>
                         <td><?= dinero($monto) ?></td>
+                        <td class="text-end">
+                            <?php if ($editPayload !== null): ?>
+                                <button type="button" class="btn btn-sm btn-outline-primary btn-editar-mov-bancario"
+                                    data-mov="<?= htmlspecialchars(json_encode($editPayload, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>">
+                                    Editar
+                                </button>
+                            <?php else: ?>
+                                <span class="text-muted small">—</span>
+                            <?php endif; ?>
+                        </td>
                     </tr>
                 <?php endforeach; ?>
             <?php endif; ?>
@@ -305,9 +419,10 @@ $modalDataJson = json_encode([
     <div class="modal-dialog">
         <div class="modal-content">
             <form method="post" id="formMovBancario">
-                <input type="hidden" name="accion" value="crear_movimiento_bancario">
+                <input type="hidden" name="accion" id="movBancarioAccion" value="crear_movimiento_bancario">
+                <input type="hidden" name="movimiento_id" id="movBancarioMovimientoId" value="">
                 <div class="modal-header">
-                    <h5 class="modal-title">Registrar movimiento bancario</h5>
+                    <h5 class="modal-title" id="movBancarioModalTitle">Registrar movimiento bancario</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
                 </div>
                 <div class="modal-body">
@@ -362,7 +477,7 @@ $modalDataJson = json_encode([
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Guardar movimiento</button>
+                    <button type="submit" class="btn btn-primary" id="movBancarioSubmitBtn">Guardar movimiento</button>
                 </div>
             </form>
         </div>
@@ -385,6 +500,10 @@ window.addEventListener('load', function() {
     var descripcion = document.getElementById('movBancarioDescripcion');
     var msg = document.getElementById('movBancarioModalMensaje');
     var btnNuevo = document.getElementById('btnNuevoMovBancario');
+    var accionEl = document.getElementById('movBancarioAccion');
+    var movIdEl = document.getElementById('movBancarioMovimientoId');
+    var titleEl = document.getElementById('movBancarioModalTitle');
+    var submitBtn = document.getElementById('movBancarioSubmitBtn');
 
     function setError(texto) {
         if (!msg) return;
@@ -437,7 +556,15 @@ window.addEventListener('load', function() {
         reconstruirOpcionesForma(elegido, forma.value || '');
     }
 
+    function modoRegistrar() {
+        if (accionEl) accionEl.value = 'crear_movimiento_bancario';
+        if (movIdEl) movIdEl.value = '';
+        if (titleEl) titleEl.textContent = 'Registrar movimiento bancario';
+        if (submitBtn) submitBtn.textContent = 'Guardar movimiento';
+    }
+
     function limpiarForm() {
+        modoRegistrar();
         if (cuenta) cuenta.value = '';
         if (tipo) tipo.value = 'ingreso';
         if (forma) forma.value = '';
@@ -449,6 +576,33 @@ window.addEventListener('load', function() {
         setError('');
     }
 
+    function abrirEdicion(data) {
+        if (!data || !data.movimiento_id) return;
+        setError('');
+        if (accionEl) accionEl.value = 'actualizar_movimiento_bancario';
+        if (movIdEl) movIdEl.value = String(data.movimiento_id);
+        if (titleEl) titleEl.textContent = 'Editar movimiento bancario';
+        if (submitBtn) submitBtn.textContent = 'Guardar cambios';
+        if (cuenta) cuenta.value = String(data.cuenta_id || '');
+        if (tipo) tipo.value = data.tipo_movimiento || 'ingreso';
+        reconstruirOpcionesForma(tipo ? (tipo.value || 'ingreso') : 'ingreso', String(data.forma_pago_id || ''));
+        if (fecha) fecha.value = data.fecha_movimiento || '';
+        if (monto) monto.value = data.monto != null ? String(data.monto) : '';
+        if (referencia) referencia.value = data.referencia || '';
+        if (descripcion) descripcion.value = data.descripcion || '';
+        if (modal) modal.show();
+    }
+
+    document.addEventListener('click', function(ev) {
+        var btn = ev.target && ev.target.closest ? ev.target.closest('.btn-editar-mov-bancario') : null;
+        if (!btn) return;
+        var raw = btn.getAttribute('data-mov');
+        if (!raw) return;
+        try {
+            abrirEdicion(JSON.parse(raw));
+        } catch (e) {}
+    });
+
     if (btnNuevo) {
         btnNuevo.addEventListener('click', function() {
             limpiarForm();
@@ -459,6 +613,15 @@ window.addEventListener('load', function() {
 
     if (window.__movBancarioModal && window.__movBancarioModal.mostrar) {
         var datos = window.__movBancarioModal.datos || {};
+        var mid = parseInt(String(datos.movimiento_id || '0'), 10);
+        if (mid > 0) {
+            if (accionEl) accionEl.value = 'actualizar_movimiento_bancario';
+            if (movIdEl) movIdEl.value = String(mid);
+            if (titleEl) titleEl.textContent = 'Editar movimiento bancario';
+            if (submitBtn) submitBtn.textContent = 'Guardar cambios';
+        } else {
+            modoRegistrar();
+        }
         if (cuenta) cuenta.value = String(datos.cuenta_id || '');
         if (tipo) tipo.value = datos.tipo_movimiento || 'ingreso';
         reconstruirOpcionesForma(tipo ? (tipo.value || 'ingreso') : 'ingreso', String(datos.forma_pago_id || ''));

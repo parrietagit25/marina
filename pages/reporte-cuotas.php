@@ -19,7 +19,7 @@ $sql = "
            cu.fecha_vencimiento,
            cu.fecha_pago AS fecha_pago_legacy,
            cl.nombre AS cliente,
-           co.activo AS contrato_activo,
+           COALESCE(co.estado, 'activo') AS contrato_estado,
            COALESCE(SUM(CASE WHEN mo.tipo IN ('pago','abono') THEN mo.monto ELSE 0 END), 0) AS pagado_mov
     FROM cuotas cu
     JOIN contratos co ON cu.contrato_id = co.id
@@ -32,7 +32,7 @@ if ($contrato_id > 0) {
     $sql .= ' AND cu.contrato_id = ? ';
     $params[] = $contrato_id;
 }
-$sql .= ' GROUP BY cu.id, cu.contrato_id, cu.numero_cuota, cu.monto, cu.fecha_vencimiento, cu.fecha_pago, cl.nombre, co.activo ';
+$sql .= ' GROUP BY cu.id, cu.contrato_id, cu.numero_cuota, cu.monto, cu.fecha_vencimiento, cu.fecha_pago, cl.nombre, COALESCE(co.estado, \'activo\') ';
 $sql .= ' HAVING 1=1 ';
 
 $st = $pdo->prepare($sql);
@@ -81,7 +81,7 @@ foreach ($raw as $r) {
         'saldo' => $saldo,
         'fecha_vencimiento' => $fv,
         'estado' => $estadoFila,
-        'contrato_activo' => (int) ($r['contrato_activo'] ?? 0),
+        'contrato_estado' => (string) ($r['contrato_estado'] ?? 'activo'),
     ];
 }
 
@@ -101,7 +101,7 @@ if (obtener('export') === 'excel') {
             (float) $f['saldo'],
             $f['fecha_vencimiento'],
             $f['estado'],
-            $f['contrato_activo'] ? 'Si' : 'No',
+            ($f['contrato_estado'] ?? 'activo') === 'activo' ? 'Activo' : 'Terminado',
         ];
     }
     $pie = [[
@@ -115,7 +115,7 @@ if (obtener('export') === 'excel') {
         '',
         '',
     ]];
-    exportarExcel('reporte_cuotas', ['Contrato', 'Cuota', 'Cliente', 'Monto', 'Pagado', 'Saldo', 'Vencimiento', 'Estado', 'Contrato activo'], $rows, $pie);
+    exportarExcel('reporte_cuotas', ['Contrato', 'Cuota', 'Cliente', 'Monto', 'Pagado', 'Saldo', 'Vencimiento', 'Estado', 'Contrato'], $rows, $pie);
 }
 
 require_once __DIR__ . '/../includes/layout.php';
@@ -177,13 +177,13 @@ require_once __DIR__ . '/../includes/layout.php';
                     <th>Saldo</th>
                     <th>Vencimiento</th>
                     <th>Estado</th>
-                    <th>Activo</th>
+                    <th>Estado contrato</th>
                 </tr>
             </thead>
             <tbody>
             <?php foreach ($filas as $f): ?>
                 <tr>
-                    <td><a href="<?= MARINA_URL ?>/index.php?p=contratos&amp;accion=editar&amp;id=<?= (int) $f['contrato_id'] ?>">#<?= (int) $f['contrato_id'] ?></a></td>
+                    <td><a href="<?= MARINA_URL ?>/index.php?p=contratos&amp;accion=cuotas&amp;id=<?= (int) $f['contrato_id'] ?>">#<?= (int) $f['contrato_id'] ?></a></td>
                     <td>#<?= (int) $f['numero_cuota'] ?></td>
                     <td><?= e($f['cliente']) ?></td>
                     <td><?= dinero($f['monto']) ?></td>
@@ -203,7 +203,7 @@ require_once __DIR__ . '/../includes/layout.php';
                         ?>
                         <span class="badge <?= $badge ?>"><?= e($f['estado']) ?></span>
                     </td>
-                    <td><?= $f['contrato_activo'] ? 'Sí' : 'No' ?></td>
+                    <td><?= ($f['contrato_estado'] ?? 'activo') === 'activo' ? 'Activo' : 'Terminado' ?></td>
                 </tr>
             <?php endforeach; ?>
             <?php if (empty($filas)): ?>

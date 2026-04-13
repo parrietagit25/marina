@@ -11,12 +11,29 @@ $id = (int) obtener('id');
 $mensaje = '';
 
 if ($accion === 'eliminar' && $id > 0 && enviado()) {
+    $stDel = $pdo->prepare('SELECT COALESCE(estado, \'activo\') FROM contratos WHERE id = ?');
+    $stDel->execute([$id]);
+    $estDel = (string) ($stDel->fetchColumn() ?: '');
+    if ($estDel === '') {
+        redirigir(MARINA_URL . '/index.php?p=contratos&err=' . rawurlencode('Contrato no encontrado.'));
+    }
+    if ($estDel !== 'activo') {
+        redirigir(MARINA_URL . '/index.php?p=contratos&accion=cuotas&id=' . $id . '&err=' . rawurlencode('No se puede eliminar un contrato terminado; solo puede consultar cuotas y movimientos.'));
+    }
     try {
         $pdo->prepare('DELETE FROM contratos WHERE id = ?')->execute([$id]);
         redirigir(MARINA_URL . '/index.php?p=contratos&ok=' . rawurlencode('Contrato eliminado'));
     } catch (Throwable $e) {
         redirigir(MARINA_URL . '/index.php?p=contratos&err=' . rawurlencode(marinaMensajeErrorIntegridad($e)));
     }
+}
+
+if ($accion === 'liberar' && $id > 0 && enviado()) {
+    $libErr = marina_contrato_liberar($pdo, $id);
+    if ($libErr !== null) {
+        redirigir(MARINA_URL . '/index.php?p=contratos&err=' . rawurlencode($libErr));
+    }
+    redirigir(MARINA_URL . '/index.php?p=contratos&ok=' . rawurlencode('Contrato liberado: unidad disponible y estado en Terminado.'));
 }
 
 if (enviado() && ($accion === 'crear' || $accion === 'editar')) {
@@ -32,7 +49,6 @@ if (enviado() && ($accion === 'crear' || $accion === 'editar')) {
     $monto_total = (float) str_replace(',', '.', $_POST['monto_total'] ?? 0);
     $observaciones = trim($_POST['observaciones'] ?? '');
     $numero_recibo = trim($_POST['numero_recibo'] ?? '');
-    $activo = isset($_POST['activo']) ? 1 : 0;
 
     $tieneUnidadMuelleSlip = ($muelle_id > 0 && $slip_id > 0);
     $tieneUnidadInmueble = ($grupo_id > 0 && $inmueble_id > 0);
@@ -40,7 +56,32 @@ if (enviado() && ($accion === 'crear' || $accion === 'editar')) {
         $mensaje = 'Complete campos obligatorios (cliente, cuenta, fechas, monto y al menos una unidad: muelle/slip o grupo/inmueble).';
     } else {
         if ($accion === 'editar' && $id > 0) {
-            $pdo->prepare('UPDATE contratos SET cliente_id=?, cuenta_id=?, muelle_id=?, slip_id=?, grupo_id=?, inmueble_id=?, fecha_inicio=?, fecha_fin=?, monto_total=?, observaciones=?, numero_recibo=?, activo=?, updated_by=? WHERE id=?')
+            $stEst = $pdo->prepare('SELECT estado FROM contratos WHERE id = ?');
+            $stEst->execute([$id]);
+            $estAct = (string) ($stEst->fetchColumn() ?: 'activo');
+            if ($estAct !== 'activo') {
+                $mensaje = 'No se puede editar un contrato terminado. Solo puede consultar cuotas y movimientos (solo lectura).';
+            }
+        }
+        if ($mensaje === '' && $slip_id > 0) {
+            $oid = ($accion === 'editar' && $id > 0) ? $id : 0;
+            $stDup = $pdo->prepare('SELECT id FROM contratos WHERE estado = \'activo\' AND slip_id = ? AND id <> ? LIMIT 1');
+            $stDup->execute([$slip_id, $oid]);
+            if ($stDup->fetch()) {
+                $mensaje = 'Ese slip ya tiene otro contrato activo. Libere el contrato anterior o elija otro slip.';
+            }
+        }
+        if ($mensaje === '' && $inmueble_id > 0) {
+            $oid = ($accion === 'editar' && $id > 0) ? $id : 0;
+            $stDup = $pdo->prepare('SELECT id FROM contratos WHERE estado = \'activo\' AND inmueble_id = ? AND id <> ? LIMIT 1');
+            $stDup->execute([$inmueble_id, $oid]);
+            if ($stDup->fetch()) {
+                $mensaje = 'Ese inmueble ya tiene otro contrato activo. Libere el contrato anterior o elija otro inmueble.';
+            }
+        }
+        if ($mensaje === '') {
+        if ($accion === 'editar' && $id > 0) {
+            $pdo->prepare('UPDATE contratos SET cliente_id=?, cuenta_id=?, muelle_id=?, slip_id=?, grupo_id=?, inmueble_id=?, fecha_inicio=?, fecha_fin=?, monto_total=?, observaciones=?, numero_recibo=?, activo=1, estado=\'activo\', updated_by=? WHERE id=?')
                 ->execute([
                     $cliente_id,
                     $cuenta_id,
@@ -53,13 +94,12 @@ if (enviado() && ($accion === 'crear' || $accion === 'editar')) {
                     $monto_total,
                     $observaciones,
                     $numero_recibo === '' ? null : $numero_recibo,
-                    $activo,
                     $uid,
                     $id
                 ]);
             redirigir(MARINA_URL . '/index.php?p=contratos&ok=Actualizado');
         } else {
-            $pdo->prepare('INSERT INTO contratos (cliente_id, cuenta_id, muelle_id, slip_id, grupo_id, inmueble_id, fecha_inicio, fecha_fin, monto_total, observaciones, numero_recibo, activo, created_by, updated_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+            $pdo->prepare('INSERT INTO contratos (cliente_id, cuenta_id, muelle_id, slip_id, grupo_id, inmueble_id, fecha_inicio, fecha_fin, monto_total, observaciones, numero_recibo, activo, estado, created_by, updated_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
                 ->execute([
                     $cliente_id,
                     $cuenta_id,
@@ -73,11 +113,13 @@ if (enviado() && ($accion === 'crear' || $accion === 'editar')) {
                     $observaciones,
                     $numero_recibo === '' ? null : $numero_recibo,
                     1,
+                    'activo',
                     $uid,
                     $uid
                 ]);
             $contrato_id = (int) $pdo->lastInsertId();
             redirigir(MARINA_URL . '/index.php?p=contratos&accion=cuotas&id=' . $contrato_id);
+        }
         }
     }
 }
@@ -90,6 +132,10 @@ if (($accion === 'editar' || $accion === 'cuotas') && $id > 0) {
     if (!$registro) redirigir(MARINA_URL . '/index.php?p=contratos');
 }
 
+if ($accion === 'editar' && $id > 0 && $registro && (string) ($registro['estado'] ?? 'activo') !== 'activo') {
+    redirigir(MARINA_URL . '/index.php?p=contratos&accion=cuotas&id=' . $id . '&err=' . rawurlencode('Contrato terminado: no se puede editar; use Cuotas para consultar el historial.'));
+}
+
 $clientes = $pdo->query('SELECT id, nombre FROM clientes ORDER BY nombre')->fetchAll(PDO::FETCH_KEY_PAIR);
 $cuentas = $pdo->query('SELECT c.id, CONCAT(b.nombre, " - ", c.nombre) AS nom FROM cuentas c JOIN bancos b ON c.banco_id = b.id ORDER BY b.nombre, c.nombre')->fetchAll(PDO::FETCH_KEY_PAIR);
 $muelles = $pdo->query('SELECT id, nombre FROM muelles ORDER BY nombre')->fetchAll(PDO::FETCH_KEY_PAIR);
@@ -100,6 +146,8 @@ $formas_pago = $pdo->query("SELECT id, nombre FROM formas_pago WHERE tipo_movimi
 
 // --- Vista Cuotas (página aparte, con modales: agregar, pagar, abonar, ver)
 if ($accion === 'cuotas' && $registro) {
+    $contratoTerminado = (string) ($registro['estado'] ?? 'activo') !== 'activo';
+
     $mostrarModalAgregarCuota = false;
     $mostrarModalPagarCuota = false;
     $mostrarModalAbonarCuota = false;
@@ -182,6 +230,9 @@ if ($accion === 'cuotas' && $registro) {
 
     // --- Manejo POST: agregar cuota
     if (enviado() && isset($_POST['agregar_cuota'])) {
+        if ($contratoTerminado) {
+            redirigir(MARINA_URL . '/index.php?p=contratos&accion=cuotas&id=' . $id . '&err=' . rawurlencode('Contrato terminado: no se pueden agregar cuotas.'));
+        }
         $num = (int)($_POST['numero_cuota'] ?? 0);
         $monto = (float)str_replace(',', '.', ($_POST['monto_cuota'] ?? 0));
         $venc = trim($_POST['fecha_vencimiento'] ?? '');
@@ -202,6 +253,9 @@ if ($accion === 'cuotas' && $registro) {
 
     // --- Manejo POST: pagar/abonar (movimiento)
     if (enviado() && isset($_POST['registrar_movimiento'])) {
+        if ($contratoTerminado) {
+            redirigir(MARINA_URL . '/index.php?p=contratos&accion=cuotas&id=' . $id . '&err=' . rawurlencode('Contrato terminado: no se pueden registrar pagos ni abonos.'));
+        }
         $tipo = trim($_POST['tipo_movimiento'] ?? '');
         $cuota_id = (int)($_POST['cuota_mov_id'] ?? 0);
         $monto_mov = (float)str_replace(',', '.', ($_POST['monto_movimiento'] ?? 0));
@@ -318,11 +372,17 @@ if ($accion === 'cuotas' && $registro) {
     <p><strong>Cliente:</strong> <?= e($clientes[$registro['cliente_id']] ?? $registro['cliente_id']) ?> |
        <strong>Cuenta acreditación:</strong> <?= e($cuentas[$registro['cuenta_id']] ?? $registro['cuenta_id']) ?> |
        <strong>Monto total:</strong> <?= dinero($registro['monto_total']) ?> |
+       <?php if ($contratoTerminado): ?><span class="badge bg-secondary">Terminado</span> <?php endif; ?>
        <a href="?p=contratos">Volver a contratos</a></p>
+    <?php if ($contratoTerminado): ?>
+    <div class="alert alert-secondary mb-3">Este contrato está <strong>terminado</strong>: solo puede ver cuotas y movimientos. No se pueden agregar cuotas, registrar pagos ni eliminar el contrato.</div>
+    <?php endif; ?>
 
+    <?php if (!$contratoTerminado): ?>
     <div class="toolbar d-flex gap-2 mb-3" data-proxima-cuota="<?= count($cuotas) + 1 ?>">
         <button type="button" class="btn btn-primary" id="btnAgregarCuota">Registrar cuota</button>
     </div>
+    <?php endif; ?>
 
     <table class="no-datatable">
         <thead>
@@ -348,7 +408,9 @@ if ($accion === 'cuotas' && $registro) {
                 <td><?= fechaFormato($c['fecha_vencimiento']) ?></td>
                 <td><?= dinero($saldo) ?></td>
                 <td>
-                    <?php if (!$pagada): ?>
+                    <?php if ($contratoTerminado): ?>
+                        <span class="text-muted"><?= $pagada ? 'Pagada' : '—' ?></span>
+                    <?php elseif (!$pagada): ?>
                         <div class="d-flex gap-2 flex-wrap">
                             <button type="button" class="btn btn-primary btn-sm btn-pagar-cuota"
                                 data-cuota-id="<?= $cid ?>"
@@ -389,6 +451,7 @@ if ($accion === 'cuotas' && $registro) {
 
     <p class="mt-3"><a href="<?= MARINA_URL ?>/index.php?p=contratos" class="btn btn-secondary">Volver a contratos</a></p>
 
+    <?php if (!$contratoTerminado): ?>
     <!-- Modal agregar cuota -->
     <div class="modal fade" id="modalAgregarCuota" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
@@ -498,6 +561,7 @@ if ($accion === 'cuotas' && $registro) {
             </div>
         </div>
     </div>
+    <?php endif; ?>
 
     <!-- Modal ver movimientos de cuota -->
     <div class="modal fade" id="modalVerCuotaMovs" tabindex="-1">
@@ -588,7 +652,7 @@ $modalDatos = [
     'monto_total' => $registro['monto_total'] ?? ($_POST['monto_total'] ?? ''),
     'observaciones' => $registro['observaciones'] ?? ($_POST['observaciones'] ?? ''),
     'numero_recibo' => $registro['numero_recibo'] ?? ($_POST['numero_recibo'] ?? ''),
-    'activo' => (int) ($registro['activo'] ?? (isset($_POST['activo']) ? 1 : 0)),
+    'estado' => (string) ($registro['estado'] ?? ($_POST['estado'] ?? 'activo')),
 ];
 ?>
 <?php require_once __DIR__ . '/../includes/layout.php'; ?>
@@ -602,12 +666,12 @@ $modalDatos = [
 
 <table>
     <thead>
-        <tr><th>Id</th><th>Cliente</th><th>Cuenta</th><th>Unidad</th><th>Inicio</th><th>Fin</th><th>Monto</th><th>Creado por</th><th></th></tr>
+        <tr><th>Id</th><th>Cliente</th><th>Cuenta</th><th>Unidad</th><th>Inicio</th><th>Fin</th><th>Monto</th><th>Estado</th><th>Creado por</th><th></th></tr>
     </thead>
     <tbody>
     <?php
     $st = $pdo->query("
-        SELECT co.id, co.cliente_id, co.cuenta_id, co.muelle_id, co.slip_id, co.grupo_id, co.inmueble_id, co.fecha_inicio, co.fecha_fin, co.monto_total, co.observaciones, co.numero_recibo, co.activo,
+        SELECT co.id, co.cliente_id, co.cuenta_id, co.muelle_id, co.slip_id, co.grupo_id, co.inmueble_id, co.fecha_inicio, co.fecha_fin, co.monto_total, co.observaciones, co.numero_recibo, co.activo, COALESCE(co.estado, 'activo') AS estado,
                cl.nombre AS cliente_nombre, b.nombre AS banco_nombre, cu.nombre AS cuenta_nombre,
                m.nombre AS muelle_nombre, s.nombre AS slip_nombre, g.nombre AS grupo_nombre, i.nombre AS inmueble_nombre, u.nombre AS creado_por
         FROM contratos co
@@ -630,10 +694,15 @@ $modalDatos = [
             <td><?= fechaFormato($r['fecha_inicio']) ?></td>
             <td><?= fechaFormato($r['fecha_fin']) ?></td>
             <td><?= dinero($r['monto_total']) ?></td>
+            <td><?php $est = (string) ($r['estado'] ?? 'activo'); ?>
+                <span class="badge <?= $est === 'activo' ? 'bg-success' : 'bg-secondary' ?>"><?= $est === 'activo' ? 'Activo' : 'Terminado' ?></span>
+            </td>
             <td><?= e($r['creado_por'] ?? '—') ?></td>
             <td class="acciones">
                 <a href="?p=contratos&accion=cuotas&id=<?= $r['id'] ?>" class="btn btn-primary btn-sm">Cuotas</a>
-                <button type="button" class="btn btn-danger btn-sm btn-eliminar-contrato" data-id="<?= (int)$r['id'] ?>" data-nombre="<?= e($r['cliente_nombre'] . ' #' . $r['id']) ?>">Eliminar</button>
+                <a href="<?= MARINA_URL ?>/index.php?p=contratos-electricidad&amp;id=<?= (int) $r['id'] ?>" class="btn btn-info btn-sm text-white">Electricidad</a>
+                <?php if ($est === 'activo'): ?>
+                <button type="button" class="btn btn-warning btn-sm btn-liberar-contrato" data-id="<?= (int)$r['id'] ?>" data-nombre="<?= e($r['cliente_nombre'] . ' #' . $r['id']) ?>">Liberar</button>
                 <button type="button" class="btn btn-secondary btn-sm btn-editar-contrato"
                     data-id="<?= (int)$r['id'] ?>"
                     data-cliente-id="<?= (int)$r['cliente_id'] ?>"
@@ -646,8 +715,11 @@ $modalDatos = [
                     data-fecha-fin="<?= e($r['fecha_fin']) ?>"
                     data-monto-total="<?= e($r['monto_total']) ?>"
                     data-observaciones="<?= e($r['observaciones'] ?? '') ?>"
-                    data-numero-recibo="<?= e($r['numero_recibo'] ?? '') ?>"
-                    data-activo="<?= (int)$r['activo'] ?>">Editar</button>
+                    data-numero-recibo="<?= e($r['numero_recibo'] ?? '') ?>">Editar</button>
+                <?php endif; ?>
+                <?php if ($est === 'activo'): ?>
+                <button type="button" class="btn btn-danger btn-sm btn-eliminar-contrato" data-id="<?= (int)$r['id'] ?>" data-nombre="<?= e($r['cliente_nombre'] . ' #' . $r['id']) ?>">Eliminar</button>
+                <?php endif; ?>
             </td>
         </tr>
     <?php endwhile; ?>
@@ -725,7 +797,7 @@ $modalDatos = [
                             <label class="mt-2">Nº recibo al cliente</label>
                             <input type="text" class="form-control" id="contratoNumeroRecibo" name="numero_recibo" maxlength="100" placeholder="Número de recibo emitido al firmar el contrato">
                             <small class="text-muted">Aparece en estado de cuenta bancaria como referencia en los cobros de cuotas.</small>
-                            <label class="mt-2"><input type="checkbox" id="contratoActivo" name="activo" value="1"> Activo</label>
+                            <p class="text-muted small mt-2 mb-0">El contrato queda <strong>Activo</strong> al guardar. Use <strong>Liberar</strong> en la lista o en el mapa para pasarlo a <strong>Terminado</strong> y dejar la unidad libre.</p>
                         </div>
                     </div>
                 </div>
@@ -748,6 +820,22 @@ $modalDatos = [
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                     <button type="submit" class="btn btn-danger">Eliminar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="confirmLiberarContratoModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+            <form method="post" action="?p=contratos&accion=liberar">
+                <input type="hidden" name="id" id="contratoLiberarId" value="">
+                <div class="modal-header"><h5 class="modal-title">Liberar contrato</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">¿Liberar <span id="contratoLiberarNombre"></span>? La unidad quedará libre y el contrato pasará a <strong>Terminado</strong>.</div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-warning">Liberar</button>
                 </div>
             </form>
         </div>

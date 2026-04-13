@@ -176,6 +176,7 @@ CREATE TABLE contratos (
   observaciones TEXT NULL,
   numero_recibo VARCHAR(100) NULL COMMENT 'Número de recibo emitido al cliente',
   activo TINYINT(1) NOT NULL DEFAULT 1,
+  estado VARCHAR(20) NOT NULL DEFAULT 'activo' COMMENT 'activo|terminado',
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   created_by INT UNSIGNED NULL,
@@ -232,23 +233,89 @@ CREATE TABLE cuotas_movimientos (
   INDEX idx_tipo_fecha (tipo, fecha_pago)
 ) ENGINE=InnoDB;
 
--- Gastos (se registran en partida hoja, con proveedor)
-CREATE TABLE gastos (
+-- Electricidad facturada al cliente del contrato (pagos = ingresos a la cuenta de acreditación del contrato)
+CREATE TABLE contrato_electricidad_facturas (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  partida_id INT UNSIGNED NOT NULL,
-  proveedor_id INT UNSIGNED NOT NULL,
-  cuenta_id INT UNSIGNED NULL COMMENT 'Cuenta de la marina de donde sale el pago',
-  forma_pago_id INT UNSIGNED NULL,
+  contrato_id INT UNSIGNED NOT NULL,
+  monto_total DECIMAL(12,2) NOT NULL,
+  fecha_factura DATE NOT NULL,
+  numero_factura VARCHAR(100) NULL,
+  periodo_desde DATE NULL,
+  periodo_hasta DATE NULL,
+  observaciones TEXT NULL,
+  estado VARCHAR(20) NOT NULL DEFAULT 'pendiente' COMMENT 'pendiente|pagada',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_by INT UNSIGNED NULL,
+  updated_by INT UNSIGNED NULL,
+  FOREIGN KEY (contrato_id) REFERENCES contratos(id) ON DELETE CASCADE,
+  FOREIGN KEY (created_by) REFERENCES usuarios(id),
+  FOREIGN KEY (updated_by) REFERENCES usuarios(id),
+  INDEX idx_ele_f_contrato (contrato_id)
+) ENGINE=InnoDB;
+
+CREATE TABLE contrato_electricidad_pagos (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  factura_id INT UNSIGNED NOT NULL,
   monto DECIMAL(12,2) NOT NULL,
-  fecha_gasto DATE NOT NULL,
+  fecha_pago DATE NOT NULL,
+  cuenta_id INT UNSIGNED NOT NULL COMMENT 'Cuenta de acreditación (debe coincidir con contrato)',
+  forma_pago_id INT UNSIGNED NULL,
   referencia VARCHAR(100) NULL,
   observaciones TEXT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   created_by INT UNSIGNED NULL,
   updated_by INT UNSIGNED NULL,
+  FOREIGN KEY (factura_id) REFERENCES contrato_electricidad_facturas(id) ON DELETE CASCADE,
+  FOREIGN KEY (cuenta_id) REFERENCES cuentas(id) ON DELETE RESTRICT,
+  FOREIGN KEY (forma_pago_id) REFERENCES formas_pago(id) ON DELETE SET NULL,
+  FOREIGN KEY (created_by) REFERENCES usuarios(id),
+  FOREIGN KEY (updated_by) REFERENCES usuarios(id),
+  INDEX idx_ele_p_factura (factura_id),
+  INDEX idx_ele_p_fecha (fecha_pago)
+) ENGINE=InnoDB;
+
+-- Gastos (se registran en partida hoja, con proveedor)
+CREATE TABLE gastos (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  partida_id INT UNSIGNED NOT NULL,
+  proveedor_id INT UNSIGNED NOT NULL,
+  cuenta_id INT UNSIGNED NULL COMMENT 'Legacy; pagos en gasto_pagos',
+  forma_pago_id INT UNSIGNED NULL,
+  monto DECIMAL(12,2) NOT NULL,
+  fecha_gasto DATE NOT NULL,
+  referencia VARCHAR(100) NULL,
+  observaciones TEXT NULL,
+  estado VARCHAR(20) NOT NULL DEFAULT 'pendiente' COMMENT 'pendiente|pagada',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_by INT UNSIGNED NULL,
+  updated_by INT UNSIGNED NULL,
   FOREIGN KEY (partida_id) REFERENCES partidas(id) ON DELETE RESTRICT,
   FOREIGN KEY (proveedor_id) REFERENCES proveedores(id) ON DELETE RESTRICT,
+  FOREIGN KEY (cuenta_id) REFERENCES cuentas(id) ON DELETE SET NULL,
+  FOREIGN KEY (forma_pago_id) REFERENCES formas_pago(id) ON DELETE SET NULL,
+  FOREIGN KEY (created_by) REFERENCES usuarios(id),
+  FOREIGN KEY (updated_by) REFERENCES usuarios(id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS gasto_pagos (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  gasto_id INT UNSIGNED NOT NULL,
+  monto DECIMAL(12,2) NOT NULL,
+  fecha_pago DATE NOT NULL,
+  cuenta_id INT UNSIGNED NULL,
+  forma_pago_id INT UNSIGNED NULL,
+  referencia VARCHAR(100) NULL,
+  observaciones TEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_by INT UNSIGNED NULL,
+  updated_by INT UNSIGNED NULL,
+  KEY idx_gp_gasto (gasto_id),
+  KEY idx_gp_fecha (fecha_pago),
+  FOREIGN KEY (gasto_id) REFERENCES gastos(id) ON DELETE CASCADE,
   FOREIGN KEY (cuenta_id) REFERENCES cuentas(id) ON DELETE SET NULL,
   FOREIGN KEY (forma_pago_id) REFERENCES formas_pago(id) ON DELETE SET NULL,
   FOREIGN KEY (created_by) REFERENCES usuarios(id),

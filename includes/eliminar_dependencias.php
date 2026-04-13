@@ -99,6 +99,22 @@ function marinaBloqueoEliminarCuenta(PDO $pdo, int $id): ?string
         }
     } catch (Throwable $e) {
     }
+    try {
+        $st = $pdo->prepare('SELECT COUNT(*) FROM gasto_pagos WHERE cuenta_id = ?');
+        $st->execute([$id]);
+        if ((int) $st->fetchColumn() > 0) {
+            $bloqueos[] = 'abonos de facturas (gastos)';
+        }
+    } catch (Throwable $e) {
+    }
+    try {
+        $st = $pdo->prepare('SELECT COUNT(*) FROM contrato_electricidad_pagos WHERE cuenta_id = ?');
+        $st->execute([$id]);
+        if ((int) $st->fetchColumn() > 0) {
+            $bloqueos[] = 'pagos de electricidad (contratos)';
+        }
+    } catch (Throwable $e) {
+    }
     if ($bloqueos === []) {
         return null;
     }
@@ -130,6 +146,22 @@ function marinaBloqueoEliminarFormaPago(PDO $pdo, int $id): ?string
         $st->execute([$id]);
         if ((int) $st->fetchColumn() > 0) {
             return 'No se puede eliminar: hay movimientos bancarios manuales que usan este tipo de movimiento. Cambie la forma de pago en esos movimientos o elimínelos primero.';
+        }
+    } catch (Throwable $e) {
+    }
+    try {
+        $st = $pdo->prepare('SELECT COUNT(*) FROM gasto_pagos WHERE forma_pago_id = ?');
+        $st->execute([$id]);
+        if ((int) $st->fetchColumn() > 0) {
+            return 'No se puede eliminar: hay abonos de facturas (gastos) que usan esta forma de pago. Cambie la forma de pago en esos abonos primero.';
+        }
+    } catch (Throwable $e) {
+    }
+    try {
+        $st = $pdo->prepare('SELECT COUNT(*) FROM contrato_electricidad_pagos WHERE forma_pago_id = ?');
+        $st->execute([$id]);
+        if ((int) $st->fetchColumn() > 0) {
+            return 'No se puede eliminar: hay pagos de electricidad que usan esta forma de pago. Cambie la forma de pago en esos registros primero.';
         }
     } catch (Throwable $e) {
     }

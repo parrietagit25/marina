@@ -13,18 +13,19 @@ $proveedor_id = (int) obtener('proveedor_id', 0);
 $proveedores = $pdo->query('SELECT id, nombre FROM proveedores ORDER BY nombre')->fetchAll(PDO::FETCH_KEY_PAIR);
 
 $sql = "
-    SELECT g.id, g.fecha_gasto, g.monto, g.referencia, g.observaciones,
+    SELECT gp.id, gp.fecha_pago AS fecha_gasto, gp.monto, gp.referencia, gp.observaciones,
            pr.id AS proveedor_id, pr.nombre AS proveedor_nombre,
            p.nombre AS partida_nombre,
            CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre,
            fp.nombre AS forma_pago_nombre
-    FROM gastos g
+    FROM gasto_pagos gp
+    JOIN gastos g ON g.id = gp.gasto_id
     JOIN proveedores pr ON pr.id = g.proveedor_id
     JOIN partidas p ON p.id = g.partida_id
-    LEFT JOIN cuentas c ON c.id = g.cuenta_id
+    LEFT JOIN cuentas c ON c.id = gp.cuenta_id
     LEFT JOIN bancos b ON b.id = c.banco_id
-    LEFT JOIN formas_pago fp ON fp.id = g.forma_pago_id
-    WHERE g.fecha_gasto BETWEEN ? AND ?
+    LEFT JOIN formas_pago fp ON fp.id = gp.forma_pago_id
+    WHERE gp.fecha_pago BETWEEN ? AND ?
 ";
 $params = [$desde, $hasta];
 if ($proveedor_id > 0) {
@@ -103,7 +104,7 @@ require_once __DIR__ . '/../includes/layout.php';
 
 <div class="card p-3 mb-3">
     <strong>Total período:</strong> <?= dinero($totalGeneral) ?>
-    <span class="text-muted small ms-2">(suma de gastos registrados)</span>
+    <span class="text-muted small ms-2">(suma de abonos / pagos a facturas en el período)</span>
 </div>
 
 <?php if ($proveedor_id > 0 && !empty($movs)): ?>

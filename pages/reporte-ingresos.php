@@ -100,7 +100,45 @@ try {
     $combIngresos = [];
 }
 
-$filas = array_merge($filas, $manuales, $combIngresos);
+$eleIng = [];
+try {
+    $ep = [$desde, $hasta];
+    $ec = '';
+    if ($cuenta_id > 0) {
+        $ec = ' AND ep.cuenta_id = ? ';
+        $ep[] = $cuenta_id;
+    }
+    $stEl = $pdo->prepare("
+        SELECT ep.fecha_pago AS fecha,
+               ep.monto AS monto,
+               'Ingreso' AS tipo_linea,
+               CONCAT('Electricidad — Contrato #', co.id) AS concepto,
+               CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre,
+               ep.cuenta_id,
+               cl.nombre AS cliente_nombre,
+               co.id AS contrato_id,
+               NULL AS numero_cuota,
+               TRIM(COALESCE(NULLIF(co.numero_recibo, ''), NULLIF(ep.referencia, ''), '')) AS referencia,
+               fp.nombre AS forma_pago_nombre,
+               'Electricidad (contrato)' AS grupo_nombre,
+               '' AS slip_o_inmueble
+        FROM contrato_electricidad_pagos ep
+        JOIN contrato_electricidad_facturas f ON f.id = ep.factura_id
+        JOIN contratos co ON co.id = f.contrato_id
+        JOIN clientes cl ON cl.id = co.cliente_id
+        JOIN cuentas c ON c.id = ep.cuenta_id
+        JOIN bancos b ON b.id = c.banco_id
+        LEFT JOIN formas_pago fp ON fp.id = ep.forma_pago_id
+        WHERE ep.fecha_pago BETWEEN ? AND ?
+          $ec
+    ");
+    $stEl->execute($ep);
+    $eleIng = $stEl->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable $e) {
+    $eleIng = [];
+}
+
+$filas = array_merge($filas, $manuales, $combIngresos, $eleIng);
 usort($filas, function ($a, $b) {
     return strcmp((string) ($a['fecha'] ?? ''), (string) ($b['fecha'] ?? ''));
 });

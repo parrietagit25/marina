@@ -78,14 +78,46 @@ try {
     $st->execute([$desde, $hasta, $desde, $hasta]);
     $ingresos_por_cuenta = $st->fetchAll(PDO::FETCH_ASSOC);
 }
+try {
+    $stEl = $pdo->prepare("
+        SELECT ep.cuenta_id, CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre, SUM(ep.monto) AS total
+        FROM contrato_electricidad_pagos ep
+        JOIN cuentas c ON c.id = ep.cuenta_id
+        JOIN bancos b ON b.id = c.banco_id
+        WHERE ep.fecha_pago BETWEEN ? AND ?
+        GROUP BY ep.cuenta_id, b.nombre, c.nombre
+    ");
+    $stEl->execute([$desde, $hasta]);
+    $porCuenta = [];
+    foreach ($ingresos_por_cuenta as $r) {
+        $cid = (int) ($r['cuenta_id'] ?? 0);
+        if ($cid > 0) {
+            $porCuenta[$cid] = ['cuenta_id' => $cid, 'cuenta_nombre' => $r['cuenta_nombre'] ?? '', 'total' => (float) ($r['total'] ?? 0)];
+        }
+    }
+    while ($row = $stEl->fetch(PDO::FETCH_ASSOC)) {
+        $cid = (int) ($row['cuenta_id'] ?? 0);
+        if ($cid < 1) {
+            continue;
+        }
+        if (!isset($porCuenta[$cid])) {
+            $porCuenta[$cid] = ['cuenta_id' => $cid, 'cuenta_nombre' => $row['cuenta_nombre'] ?? '', 'total' => 0.0];
+        }
+        $porCuenta[$cid]['total'] += (float) ($row['total'] ?? 0);
+    }
+    $ingresos_por_cuenta = array_values($porCuenta);
+} catch (Throwable $e) {
+    // sin electricidad
+}
 $total_ingresos = array_sum(array_column($ingresos_por_cuenta, 'total'));
 
 // Gastos en el período
 $st = $pdo->prepare("
-    SELECT g.partida_id, p.nombre AS partida_nombre, SUM(g.monto) AS total
-    FROM gastos g
+    SELECT g.partida_id, p.nombre AS partida_nombre, SUM(gp.monto) AS total
+    FROM gasto_pagos gp
+    JOIN gastos g ON g.id = gp.gasto_id
     JOIN partidas p ON g.partida_id = p.id
-    WHERE g.fecha_gasto BETWEEN ? AND ?
+    WHERE gp.fecha_pago BETWEEN ? AND ?
     GROUP BY g.partida_id, p.nombre
     ORDER BY total DESC
 ");
@@ -114,7 +146,7 @@ if (obtener('export') === 'excel') {
 require_once __DIR__ . '/../includes/layout.php';
 ?>
 <h1>Ingresos y costos</h1>
-<p class="text-muted small mb-2">Los despachos de combustible se suman en ingresos por cuenta; los pedidos recibidos generan un gasto (egreso) por el costo total en la partida «Combustible». <a href="<?= MARINA_URL ?>/index.php?p=reporte-combustible">Reporte detallado de combustible</a></p>
+<p class="text-muted small mb-2">Los despachos de combustible se suman en ingresos por cuenta. Los costos por partida suman los <strong>abonos</strong> a facturas de gasto (fecha de pago) y el costo de pedidos de combustible recibidos. <a href="<?= MARINA_URL ?>/index.php?p=reporte-combustible">Reporte detallado de combustible</a></p>
 <form method="get" class="toolbar" style="margin-bottom:1rem">
     <input type="hidden" name="p" value="reportes">
     <div class="row g-2 align-items-end">

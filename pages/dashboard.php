@@ -192,6 +192,12 @@ $sqlTopCuentasIng = "
         JOIN bancos b ON b.id = c.banco_id
         WHERE mb.fecha_movimiento BETWEEN ? AND ?
           AND mb.tipo_movimiento = 'ingreso'
+        UNION ALL
+        SELECT ep.cuenta_id, CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre, ep.monto AS total
+        FROM contrato_electricidad_pagos ep
+        JOIN cuentas c ON c.id = ep.cuenta_id
+        JOIN bancos b ON b.id = c.banco_id
+        WHERE ep.fecha_pago BETWEEN ? AND ?
     ) t
     GROUP BY t.cuenta_id, t.cuenta_nombre
     ORDER BY total DESC
@@ -199,27 +205,27 @@ $sqlTopCuentasIng = "
 ";
 try {
     $stTop = $pdo->prepare($sqlTopCuentasIng);
-    $stTop->execute([$desde, $hasta, $desde, $hasta, $desde, $hasta, $desde, $hasta]);
+    $stTop->execute([$desde, $hasta, $desde, $hasta, $desde, $hasta, $desde, $hasta, $desde, $hasta]);
     $ingresos_por_cuenta = $stTop->fetchAll(PDO::FETCH_ASSOC);
 } catch (Throwable $e) {
     // mantener $ingresos_por_cuenta de solo cuotas si falla (p. ej. sin combustible)
 }
 
-// --- Costos: gastos registrados
+// --- Costos: abonos a facturas de gasto (fecha de pago)
 $stCostTot = $pdo->prepare("
-    SELECT COALESCE(SUM(g.monto),0) AS total
-    FROM gastos g
-    WHERE g.fecha_gasto BETWEEN ? AND ?
+    SELECT COALESCE(SUM(gp.monto), 0) AS total
+    FROM gasto_pagos gp
+    WHERE gp.fecha_pago BETWEEN ? AND ?
 ");
 $stCostTot->execute([$desde, $hasta]);
 $costos_total = (float) $stCostTot->fetch(PDO::FETCH_ASSOC)['total'];
 
 $stCostDia = $pdo->prepare("
-    SELECT g.fecha_gasto, SUM(g.monto) AS total
-    FROM gastos g
-    WHERE g.fecha_gasto BETWEEN ? AND ?
-    GROUP BY g.fecha_gasto
-    ORDER BY g.fecha_gasto
+    SELECT gp.fecha_pago AS fecha_gasto, SUM(gp.monto) AS total
+    FROM gasto_pagos gp
+    WHERE gp.fecha_pago BETWEEN ? AND ?
+    GROUP BY gp.fecha_pago
+    ORDER BY gp.fecha_pago
 ");
 $stCostDia->execute([$desde, $hasta]);
 while ($r = $stCostDia->fetch(PDO::FETCH_ASSOC)) {
@@ -252,10 +258,11 @@ try {
 }
 
 $stPartida = $pdo->prepare("
-    SELECT p.id, p.nombre AS partida_nombre, SUM(g.monto) AS total
-    FROM gastos g
+    SELECT p.id, p.nombre AS partida_nombre, SUM(gp.monto) AS total
+    FROM gasto_pagos gp
+    JOIN gastos g ON g.id = gp.gasto_id
     JOIN partidas p ON g.partida_id = p.id
-    WHERE g.fecha_gasto BETWEEN ? AND ?
+    WHERE gp.fecha_pago BETWEEN ? AND ?
     GROUP BY p.id, p.nombre
     ORDER BY total DESC
     LIMIT 5
@@ -285,7 +292,7 @@ $cuotas_vencidas_mes = (int) $stCuotasVencidas->fetch(PDO::FETCH_ASSOC)['total']
 $stContratosVencer = $pdo->prepare("
     SELECT COUNT(*) AS total
     FROM contratos
-    WHERE activo = 1
+    WHERE COALESCE(estado, 'activo') = 'activo'
       AND fecha_fin BETWEEN ? AND ?
 ");
 $stContratosVencer->execute([$desde, $hasta]);

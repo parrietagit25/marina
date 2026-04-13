@@ -11,7 +11,7 @@ $fechaRef = date('Y-m-d');
 $sqlBase = "
 SELECT c.id,
        CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre,
-       COALESCE(im.ing, 0) + COALESCE(il.ing, 0) - COALESCE(ge.egr, 0) %s AS saldo
+       COALESCE(im.ing, 0) + COALESCE(il.ing, 0) + COALESCE(imel.ing, 0) - COALESCE(ge.egr, 0) %s AS saldo
 FROM cuentas c
 JOIN bancos b ON b.id = c.banco_id
 LEFT JOIN (
@@ -31,7 +31,12 @@ LEFT JOIN (
     GROUP BY co.cuenta_id
 ) il ON il.cuenta_id = c.id
 LEFT JOIN (
-    SELECT cuenta_id, SUM(monto) AS egr FROM gastos GROUP BY cuenta_id
+    SELECT ep.cuenta_id, SUM(ep.monto) AS ing
+    FROM contrato_electricidad_pagos ep
+    GROUP BY ep.cuenta_id
+) imel ON imel.cuenta_id = c.id
+LEFT JOIN (
+    SELECT cuenta_id, SUM(monto) AS egr FROM gasto_pagos WHERE cuenta_id IS NOT NULL GROUP BY cuenta_id
 ) ge ON ge.cuenta_id = c.id
 %s
 ORDER BY b.nombre, c.nombre
@@ -54,17 +59,56 @@ LEFT JOIN (
 ";
 $mbExprComb = ' + COALESCE(mbi.s, 0) - COALESCE(mbc.s, 0) + COALESCE(cdin.s, 0)';
 
+$sqlBaseSinEle = "
+SELECT c.id,
+       CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre,
+       COALESCE(im.ing, 0) + COALESCE(il.ing, 0) - COALESCE(ge.egr, 0) %s AS saldo
+FROM cuentas c
+JOIN bancos b ON b.id = c.banco_id
+LEFT JOIN (
+    SELECT co.cuenta_id, SUM(mo.monto) AS ing
+    FROM cuotas_movimientos mo
+    JOIN cuotas cu ON mo.cuota_id = cu.id
+    JOIN contratos co ON cu.contrato_id = co.id
+    WHERE mo.tipo IN ('pago','abono')
+    GROUP BY co.cuenta_id
+) im ON im.cuenta_id = c.id
+LEFT JOIN (
+    SELECT co.cuenta_id, SUM(cu.monto) AS ing
+    FROM cuotas cu
+    JOIN contratos co ON cu.contrato_id = co.id
+    WHERE cu.fecha_pago IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM cuotas_movimientos x WHERE x.cuota_id = cu.id)
+    GROUP BY co.cuenta_id
+) il ON il.cuenta_id = c.id
+LEFT JOIN (
+    SELECT cuenta_id, SUM(monto) AS egr FROM gasto_pagos WHERE cuenta_id IS NOT NULL GROUP BY cuenta_id
+) ge ON ge.cuenta_id = c.id
+%s
+ORDER BY b.nombre, c.nombre
+";
+
 $filas = [];
 try {
     $sql = sprintf($sqlBase, $mbExprComb, $mbJoinComb);
     $filas = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
 } catch (Throwable $e) {
     try {
-        $sql = sprintf($sqlBase, $mbExpr, $mbJoin);
+        $sql = sprintf($sqlBaseSinEle, $mbExprComb, $mbJoinComb);
         $filas = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
-    } catch (Throwable $e2) {
-        $sql = sprintf($sqlBase, '', '');
-        $filas = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e1b) {
+        try {
+            $sql = sprintf($sqlBase, $mbExpr, $mbJoin);
+            $filas = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Throwable $e2) {
+            try {
+                $sql = sprintf($sqlBaseSinEle, $mbExpr, $mbJoin);
+                $filas = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+            } catch (Throwable $e2b) {
+                $sql = sprintf($sqlBaseSinEle, '', '');
+                $filas = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+            }
+        }
     }
 }
 
@@ -79,6 +123,7 @@ require_once __DIR__ . '/../includes/layout.php';
 <p class="text-muted small mb-3">
     Resumen al <?= fechaFormato($fechaRef) ?>: ingresos por cuotas (movimientos y compatibilidad con pago único),
     ingresos por <a href="<?= MARINA_URL ?>/index.php?p=combustible-despacho">despacho de combustible</a>,
+    ingresos por pagos de <strong>electricidad</strong> en contratos,
     menos gastos asignados a la cuenta, más ingresos manuales y menos costos manuales en <a href="<?= MARINA_URL ?>/index.php?p=movimiento-bancario">movimientos bancarios</a>.
     Para el detalle por fechas use <a href="<?= MARINA_URL ?>/index.php?p=reporte-estado-cuenta-bancarias">Estado de cuenta bancaria</a>.
 </p>

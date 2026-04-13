@@ -12,7 +12,7 @@ $grupo_id = (int) obtener('grupo_id', 0);
 $gruposOpts = $pdo->query('SELECT id, nombre FROM grupos ORDER BY nombre')->fetchAll(PDO::FETCH_KEY_PAIR);
 
 $sql = "
-    SELECT co.id, co.fecha_inicio, co.fecha_fin, co.monto_total, co.activo,
+    SELECT co.id, co.fecha_inicio, co.fecha_fin, co.monto_total, co.activo, COALESCE(co.estado, 'activo') AS estado,
            cl.nombre AS cliente,
            CONCAT(b.nombre, ' - ', cu.nombre) AS cuenta_nombre,
            gr.nombre AS grupo_nombre,
@@ -26,9 +26,10 @@ $sql = "
     WHERE co.inmueble_id IS NOT NULL
 ";
 $params = [];
-if ($activo === '1' || $activo === '0') {
-    $sql .= ' AND co.activo = ? ';
-    $params[] = (int) $activo;
+if ($activo === '1') {
+    $sql .= " AND COALESCE(co.estado, 'activo') = 'activo' ";
+} elseif ($activo === '0') {
+    $sql .= " AND COALESCE(co.estado, 'activo') = 'terminado' ";
 }
 if ($grupo_id > 0) {
     $sql .= ' AND co.grupo_id = ? ';
@@ -52,14 +53,14 @@ if (obtener('export') === 'excel') {
             $r['fecha_inicio'] ?? '',
             $r['fecha_fin'] ?? '',
             (float) ($r['monto_total'] ?? 0),
-            !empty($r['activo']) ? 'Si' : 'No',
+            ((string) ($r['estado'] ?? 'activo') === 'activo') ? 'Activo' : 'Terminado',
         ];
     }
     $sumMontos = array_sum(array_map(static function ($r) {
         return (float) ($r['monto_total'] ?? 0);
     }, $filas));
     $pie = [['Total', '', '', '', '', '', '', $sumMontos, '']];
-    exportarExcel('reporte_inmuebles_contratos', ['ID', 'Grupo', 'Inmueble', 'Cliente', 'Cuenta', 'Inicio', 'Fin', 'Monto total', 'Activo'], $rows, $pie);
+    exportarExcel('reporte_inmuebles_contratos', ['ID', 'Grupo', 'Inmueble', 'Cliente', 'Cuenta', 'Inicio', 'Fin', 'Monto total', 'Estado'], $rows, $pie);
 }
 
 require_once __DIR__ . '/../includes/layout.php';
@@ -83,7 +84,7 @@ require_once __DIR__ . '/../includes/layout.php';
             <select class="form-select" name="activo">
                 <option value="" <?= $activo === '' ? 'selected' : '' ?>>Todos</option>
                 <option value="1" <?= $activo === '1' ? 'selected' : '' ?>>Activos</option>
-                <option value="0" <?= $activo === '0' ? 'selected' : '' ?>>Inactivos</option>
+                <option value="0" <?= $activo === '0' ? 'selected' : '' ?>>Terminados</option>
             </select>
         </div>
         <div class="col-12 col-md-auto">
@@ -108,7 +109,7 @@ require_once __DIR__ . '/../includes/layout.php';
                     <th>Inicio</th>
                     <th>Fin</th>
                     <th class="text-end">Monto total</th>
-                    <th>Activo</th>
+                    <th>Estado</th>
                     <th></th>
                 </tr>
             </thead>
@@ -123,7 +124,7 @@ require_once __DIR__ . '/../includes/layout.php';
                     <td><?= fechaFormato($r['fecha_inicio']) ?></td>
                     <td><?= fechaFormato($r['fecha_fin']) ?></td>
                     <td class="text-end"><?= dinero((float) ($r['monto_total'] ?? 0)) ?></td>
-                    <td><?= !empty($r['activo']) ? 'Sí' : 'No' ?></td>
+                    <td><?= (string)($r['estado'] ?? 'activo') === 'activo' ? 'Activo' : 'Terminado' ?></td>
                     <td><a class="btn btn-sm btn-outline-primary" href="<?= MARINA_URL ?>/index.php?p=contratos&amp;accion=editar&amp;id=<?= (int) $r['id'] ?>">Ver</a></td>
                 </tr>
             <?php endforeach; ?>

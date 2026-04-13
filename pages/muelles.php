@@ -12,8 +12,9 @@ $mensaje = '';
 if ($accion === 'eliminar' && $id > 0 && enviado()) {
     $stC = $pdo->prepare('
         SELECT COUNT(*) FROM contratos
-        WHERE muelle_id = ?
-           OR slip_id IN (SELECT id FROM slips WHERE muelle_id = ?)
+        WHERE COALESCE(estado, \'activo\') = \'activo\'
+          AND (muelle_id = ?
+           OR slip_id IN (SELECT id FROM slips WHERE muelle_id = ?))
     ');
     $stC->execute([$id, $id]);
     $numContratos = (int) $stC->fetchColumn();

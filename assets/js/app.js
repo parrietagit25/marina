@@ -470,78 +470,193 @@ document.addEventListener('DOMContentLoaded', function () {
         function setErr(m) { if (msg) { msg.textContent = m || ''; msg.classList.toggle('d-none', !m); } }
         function get(id) { var e = document.getElementById('contrato' + id); return e ? e.value : ''; }
         function set(id, v) { var e = document.getElementById('contrato' + id); if (e) e.value = v !== undefined && v !== null ? v : ''; }
-        function setActivo(v) { var e = document.getElementById('contratoActivo'); if (e) e.checked = !!v; }
         document.getElementById('btnNuevoContrato') && document.getElementById('btnNuevoContrato').addEventListener('click', function() {
             title.textContent = 'Nuevo contrato'; accion.value = 'crear'; fid.value = '';
-            ids.forEach(function(i){ set(i, ''); }); set('FechaInicio', ''); set('FechaFin', ''); set('MontoTotal', ''); set('Observaciones', ''); set('NumeroRecibo', ''); setActivo(1); setErr(''); modal.show();
+            ids.forEach(function(i){ set(i, ''); }); set('FechaInicio', ''); set('FechaFin', ''); set('MontoTotal', ''); set('Observaciones', ''); set('NumeroRecibo', ''); setErr(''); modal.show();
         });
-        document.querySelectorAll('.btn-editar-contrato').forEach(function(b) {
-            b.addEventListener('click', function() {
+        document.addEventListener('click', function(ev) {
+            var bEdit = ev.target && ev.target.closest ? ev.target.closest('.btn-editar-contrato') : null;
+            if (bEdit) {
                 title.textContent = 'Editar contrato'; accion.value = 'editar';
-                fid.value = b.getAttribute('data-id') || '';
-                set('ClienteId', b.getAttribute('data-cliente-id')); set('CuentaId', b.getAttribute('data-cuenta-id')); set('MuelleId', b.getAttribute('data-muelle-id')); set('SlipId', b.getAttribute('data-slip-id')); set('GrupoId', b.getAttribute('data-grupo-id')); set('InmuebleId', b.getAttribute('data-inmueble-id'));
-                set('FechaInicio', b.getAttribute('data-fecha-inicio')); set('FechaFin', b.getAttribute('data-fecha-fin')); set('MontoTotal', b.getAttribute('data-monto-total')); set('Observaciones', b.getAttribute('data-observaciones')); set('NumeroRecibo', b.getAttribute('data-numero-recibo')); setActivo(b.getAttribute('data-activo') === '1'); setErr(''); modal.show();
-            });
+                fid.value = bEdit.getAttribute('data-id') || '';
+                set('ClienteId', bEdit.getAttribute('data-cliente-id')); set('CuentaId', bEdit.getAttribute('data-cuenta-id')); set('MuelleId', bEdit.getAttribute('data-muelle-id')); set('SlipId', bEdit.getAttribute('data-slip-id')); set('GrupoId', bEdit.getAttribute('data-grupo-id')); set('InmuebleId', bEdit.getAttribute('data-inmueble-id'));
+                set('FechaInicio', bEdit.getAttribute('data-fecha-inicio')); set('FechaFin', bEdit.getAttribute('data-fecha-fin')); set('MontoTotal', bEdit.getAttribute('data-monto-total')); set('Observaciones', bEdit.getAttribute('data-observaciones')); set('NumeroRecibo', bEdit.getAttribute('data-numero-recibo')); setErr(''); modal.show();
+                return;
+            }
+            var bLib = ev.target && ev.target.closest ? ev.target.closest('.btn-liberar-contrato') : null;
+            if (bLib) {
+                var libModalEl = document.getElementById('confirmLiberarContratoModal');
+                if (!libModalEl) return;
+                var hidL = document.getElementById('contratoLiberarId');
+                var nomL = document.getElementById('contratoLiberarNombre');
+                if (hidL) hidL.value = bLib.getAttribute('data-id') || '';
+                if (nomL) nomL.textContent = bLib.getAttribute('data-nombre') || '';
+                new bootstrap.Modal(libModalEl).show();
+                return;
+            }
+            var bDel = ev.target && ev.target.closest ? ev.target.closest('.btn-eliminar-contrato') : null;
+            if (bDel) {
+                var delEl2 = document.getElementById('confirmEliminarContratoModal');
+                if (!delEl2) return;
+                var hidD = document.getElementById('contratoDeleteId');
+                if (hidD) hidD.value = bDel.getAttribute('data-id') || '';
+                new bootstrap.Modal(delEl2).show();
+            }
         });
-        var delEl = document.getElementById('confirmEliminarContratoModal');
-        if (delEl) {
-            var d = new bootstrap.Modal(delEl);
-            document.querySelectorAll('.btn-eliminar-contrato').forEach(function(b) {
-                b.addEventListener('click', function() {
-                    document.getElementById('contratoDeleteId').value = b.getAttribute('data-id') || '';
-                    d.show();
-                });
-            });
-        }
         if (window.__contratoModal && window.__contratoModal.mostrar && window.__contratoModal.datos) {
             var w = window.__contratoModal;
             var d = w.datos;
             title.textContent = (d.id && d.id !== '') ? 'Editar contrato' : 'Nuevo contrato'; accion.value = (d.id && d.id !== '') ? 'editar' : 'crear'; fid.value = d.id || '';
             set('ClienteId', d.cliente_id); set('CuentaId', d.cuenta_id); set('MuelleId', d.muelle_id); set('SlipId', d.slip_id); set('GrupoId', d.grupo_id); set('InmuebleId', d.inmueble_id);
-            set('FechaInicio', d.fecha_inicio); set('FechaFin', d.fecha_fin); set('MontoTotal', d.monto_total); set('Observaciones', d.observaciones); set('NumeroRecibo', d.numero_recibo); setActivo(d.activo); setErr(w.error || ''); modal.show();
+            set('FechaInicio', d.fecha_inicio); set('FechaFin', d.fecha_fin); set('MontoTotal', d.monto_total); set('Observaciones', d.observaciones); set('NumeroRecibo', d.numero_recibo); setErr(w.error || ''); modal.show();
         }
     })();
 
-    // Gastos
+    // Gastos / facturas + abonos
     (function() {
         var el = document.getElementById('gastoModal');
+        var elAbono = document.getElementById('gastoAbonoModal');
         if (!el) return;
         var title = document.getElementById('gastoModalTitle');
         var accion = document.getElementById('gastoFormAccion');
         var fid = document.getElementById('gastoFormId');
         var modal = new bootstrap.Modal(el);
         var msg = document.getElementById('gastoModalMensaje');
-        var ids = ['PartidaId','ProveedorId','CuentaId','FormaPagoId'];
         function setErr(m) { if (msg) { msg.textContent = m || ''; msg.classList.toggle('d-none', !m); } }
         function set(id, v) { var e = document.getElementById('gasto' + id); if (e) e.value = v !== undefined && v !== null ? v : ''; }
         document.getElementById('btnNuevoGasto') && document.getElementById('btnNuevoGasto').addEventListener('click', function() {
-            title.textContent = 'Nuevo gasto'; accion.value = 'crear'; fid.value = '';
-            set('PartidaId',''); set('ProveedorId',''); set('CuentaId',''); set('FormaPagoId',''); set('Monto',''); set('FechaGasto', new Date().toISOString().slice(0,10)); set('Referencia',''); set('Observaciones',''); setErr(''); modal.show();
+            title.textContent = 'Nueva factura'; accion.value = 'crear'; fid.value = '';
+            set('PartidaId',''); set('ProveedorId',''); set('Monto',''); set('FechaGasto', new Date().toISOString().slice(0,10)); set('Referencia',''); set('Observaciones',''); setErr(''); modal.show();
         });
-        document.querySelectorAll('.btn-editar-gasto').forEach(function(b) {
-            b.addEventListener('click', function() {
-                title.textContent = 'Editar gasto'; accion.value = 'editar';
-                fid.value = b.getAttribute('data-id') || '';
-                set('PartidaId', b.getAttribute('data-partida-id')); set('ProveedorId', b.getAttribute('data-proveedor-id')); set('CuentaId', b.getAttribute('data-cuenta-id')); set('FormaPagoId', b.getAttribute('data-forma-pago-id'));
-                set('Monto', b.getAttribute('data-monto')); set('FechaGasto', b.getAttribute('data-fecha-gasto')); set('Referencia', b.getAttribute('data-referencia')); set('Observaciones', b.getAttribute('data-observaciones')); setErr(''); modal.show();
-            });
+        /* Delegación: DataTables recrea filas y rompe listeners directos en los botones */
+        document.addEventListener('click', function(ev) {
+            var bEdit = ev.target && ev.target.closest ? ev.target.closest('.btn-editar-gasto') : null;
+            if (bEdit) {
+                title.textContent = 'Editar factura'; accion.value = 'editar';
+                fid.value = bEdit.getAttribute('data-id') || '';
+                set('PartidaId', bEdit.getAttribute('data-partida-id')); set('ProveedorId', bEdit.getAttribute('data-proveedor-id'));
+                set('Monto', bEdit.getAttribute('data-monto')); set('FechaGasto', bEdit.getAttribute('data-fecha-gasto')); set('Referencia', bEdit.getAttribute('data-referencia')); set('Observaciones', bEdit.getAttribute('data-observaciones')); setErr(''); modal.show();
+                return;
+            }
         });
         var delEl = document.getElementById('confirmEliminarGastoModal');
-        if (delEl) {
-            var d = new bootstrap.Modal(delEl);
-            document.querySelectorAll('.btn-eliminar-gasto').forEach(function(b) {
-                b.addEventListener('click', function() {
-                    document.getElementById('gastoDeleteId').value = b.getAttribute('data-id') || '';
-                    d.show();
-                });
-            });
-        }
+        var modalDelGasto = delEl ? new bootstrap.Modal(delEl) : null;
+        document.addEventListener('click', function(ev) {
+            var bDel = ev.target && ev.target.closest ? ev.target.closest('.btn-eliminar-gasto') : null;
+            if (!bDel || !modalDelGasto) return;
+            var hid = document.getElementById('gastoDeleteId');
+            if (hid) hid.value = bDel.getAttribute('data-id') || '';
+            modalDelGasto.show();
+        });
         if (window.__gastoModal && window.__gastoModal.mostrar && window.__gastoModal.datos) {
             var w = window.__gastoModal;
             var d = w.datos;
-            title.textContent = (d.id && d.id !== '') ? 'Editar gasto' : 'Nuevo gasto'; accion.value = (d.id && d.id !== '') ? 'editar' : 'crear'; fid.value = d.id || '';
-            set('PartidaId', d.partida_id); set('ProveedorId', d.proveedor_id); set('CuentaId', d.cuenta_id); set('FormaPagoId', d.forma_pago_id);
+            title.textContent = (d.id && d.id !== '') ? 'Editar factura' : 'Nueva factura'; accion.value = (d.id && d.id !== '') ? 'editar' : 'crear'; fid.value = d.id || '';
+            set('PartidaId', d.partida_id); set('ProveedorId', d.proveedor_id);
             set('Monto', d.monto); set('FechaGasto', d.fecha_gasto); set('Referencia', d.referencia); set('Observaciones', d.observaciones); setErr(w.error || ''); modal.show();
+        }
+
+        var elVerAbonos = document.getElementById('gastoVerAbonosModal');
+        var mVerAbonos = elVerAbonos ? new bootstrap.Modal(elVerAbonos) : null;
+        var tbodyVerAbonos = document.getElementById('gastoVerAbonosTbody');
+        var tituloVerAbonos = document.getElementById('gastoVerAbonosModalLabel');
+        var resumenVerAbonos = document.getElementById('gastoVerAbonosResumen');
+        function gastoFmtFechaAbono(ymd) {
+            if (!ymd) return '—';
+            var p = String(ymd).split('-');
+            return p.length === 3 ? (p[2] + '/' + p[1] + '/' + p[0]) : ymd;
+        }
+        function gastoFmtMontoAbono(n) {
+            var x = parseFloat(n);
+            if (isNaN(x)) return String(n);
+            return x.toLocaleString('es-PA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+        document.addEventListener('click', function(ev) {
+            var btnV = ev.target && ev.target.closest ? ev.target.closest('.btn-ver-abonos-gasto') : null;
+            if (!btnV || !mVerAbonos || !tbodyVerAbonos) return;
+            var raw = btnV.getAttribute('data-abonos') || '[]';
+            var items;
+            try { items = JSON.parse(raw); } catch (e2) { items = []; }
+            var fid = btnV.getAttribute('data-factura-id') || '';
+            var part = btnV.getAttribute('data-partida') || '';
+            var prov = btnV.getAttribute('data-proveedor') || '';
+            if (tituloVerAbonos) tituloVerAbonos.textContent = 'Abonos — Factura #' + fid;
+            if (resumenVerAbonos) resumenVerAbonos.textContent = part + ' · ' + prov;
+            tbodyVerAbonos.textContent = '';
+            if (!items.length) {
+                var tr0 = document.createElement('tr');
+                var td0 = document.createElement('td');
+                td0.colSpan = 6;
+                td0.className = 'text-muted text-center py-3';
+                td0.textContent = 'No hay abonos registrados para esta factura.';
+                tr0.appendChild(td0);
+                tbodyVerAbonos.appendChild(tr0);
+            } else {
+                items.forEach(function(row) {
+                    var tr = document.createElement('tr');
+                    var tdf = document.createElement('td');
+                    tdf.textContent = gastoFmtFechaAbono(row.fecha_pago);
+                    tr.appendChild(tdf);
+                    var tdm = document.createElement('td');
+                    tdm.className = 'text-end';
+                    tdm.textContent = gastoFmtMontoAbono(row.monto);
+                    tr.appendChild(tdm);
+                    var tdc = document.createElement('td');
+                    tdc.textContent = row.cuenta_nombre || '—';
+                    tr.appendChild(tdc);
+                    var tdfp = document.createElement('td');
+                    tdfp.textContent = row.forma_pago_nombre || '—';
+                    tr.appendChild(tdfp);
+                    var tdr = document.createElement('td');
+                    tdr.textContent = row.referencia || '';
+                    tr.appendChild(tdr);
+                    var tdo = document.createElement('td');
+                    tdo.textContent = row.observaciones || '';
+                    tr.appendChild(tdo);
+                    tbodyVerAbonos.appendChild(tr);
+                });
+            }
+            mVerAbonos.show();
+        });
+
+        if (elAbono) {
+            var mAbono = new bootstrap.Modal(elAbono);
+            var msgAb = document.getElementById('gastoAbonoModalMensaje');
+            function setErrAb(m) { if (msgAb) { msgAb.textContent = m || ''; msgAb.classList.toggle('d-none', !m); } }
+            function setv(id, v) { var e = document.getElementById(id); if (e) e.value = v !== undefined && v !== null ? v : ''; }
+            document.addEventListener('click', function(ev) {
+                var bAb = ev.target && ev.target.closest ? ev.target.closest('.btn-abonar-gasto') : null;
+                if (!bAb) return;
+                setErrAb('');
+                setv('gastoAbonoGastoId', bAb.getAttribute('data-id') || '');
+                var pend = parseFloat((bAb.getAttribute('data-pendiente') || '0').replace(',', '.')) || 0;
+                var part = bAb.getAttribute('data-partida') || '';
+                var prov = bAb.getAttribute('data-proveedor') || '';
+                var rs = document.getElementById('gastoAbonoResumen');
+                var pt = document.getElementById('gastoAbonoPendienteTexto');
+                if (rs) rs.textContent = part + ' — ' + prov;
+                if (pt) pt.textContent = 'Saldo pendiente máximo: ' + pend.toFixed(2).replace('.', ',');
+                setv('gastoAbonoMonto', '');
+                setv('gastoAbonoFechaPago', new Date().toISOString().slice(0, 10));
+                setv('gastoAbonoCuentaId', '');
+                setv('gastoAbonoFormaPagoId', '');
+                setv('gastoAbonoReferencia', '');
+                setv('gastoAbonoObservaciones', '');
+                mAbono.show();
+            });
+            if (window.__gastoAbonoModal && window.__gastoAbonoModal.mostrar && window.__gastoAbonoModal.datos) {
+                var wa = window.__gastoAbonoModal;
+                var da = wa.datos;
+                setv('gastoAbonoGastoId', da.gasto_id || '');
+                setv('gastoAbonoMonto', da.monto_abono || '');
+                setv('gastoAbonoFechaPago', da.fecha_pago || '');
+                setv('gastoAbonoCuentaId', da.cuenta_id || '');
+                setv('gastoAbonoFormaPagoId', da.forma_pago_id || '');
+                setv('gastoAbonoReferencia', da.referencia_abono || '');
+                setv('gastoAbonoObservaciones', da.observaciones_abono || '');
+                setErrAb(wa.error || '');
+                mAbono.show();
+            }
         }
     })();
 
@@ -745,6 +860,79 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
             }
         }
+    })();
+
+    // --- Electricidad por contrato (p=contratos-electricidad): modales tras Bootstrap; delegación por si DataTables recrea filas
+    (function() {
+        var mAbono = document.getElementById('modalAbonoEle');
+        var mVer = document.getElementById('modalVerAbonosEle');
+        if (!mAbono || typeof bootstrap === 'undefined') return;
+        var bsAbono = bootstrap.Modal.getOrCreateInstance(mAbono);
+        var bsVer = mVer ? bootstrap.Modal.getOrCreateInstance(mVer) : null;
+        function fmtEle(n) {
+            var x = parseFloat(String(n).replace(',', '.'));
+            if (isNaN(x)) return String(n);
+            return x.toLocaleString('es-PA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+        document.addEventListener('click', function(ev) {
+            var bVer = ev.target && ev.target.closest ? ev.target.closest('.btn-ver-abonos-ele') : null;
+            if (bVer) {
+                var raw = bVer.getAttribute('data-abonos') || '[]';
+                var list = [];
+                try { list = JSON.parse(raw); } catch (e2) { list = []; }
+                var res = document.getElementById('eleVerResumen');
+                if (res) res.textContent = bVer.getAttribute('data-resumen') || '';
+                var tb = document.getElementById('eleVerAbonosTbody');
+                if (tb) {
+                    if (!list.length) {
+                        tb.innerHTML = '<tr><td colspan="6" class="text-muted">Sin pagos registrados.</td></tr>';
+                    } else {
+                        tb.innerHTML = list.map(function(a) {
+                            return '<tr><td>' + (a.fecha_pago || '') + '</td><td class="text-end">' + fmtEle(a.monto) + '</td><td>' +
+                                (a.cuenta_nombre || '') + '</td><td>' + (a.forma_pago_nombre || '') + '</td><td>' +
+                                (a.referencia || '') + '</td><td>' + (a.observaciones || '') + '</td></tr>';
+                        }).join('');
+                    }
+                }
+                if (bsVer) bsVer.show();
+                return;
+            }
+            var bAbo = ev.target && ev.target.closest ? ev.target.closest('.btn-abonar-ele') : null;
+            if (bAbo) {
+                var fidA = document.getElementById('eleFacturaId');
+                if (fidA) fidA.value = bAbo.getAttribute('data-factura-id') || '';
+                var tA = document.getElementById('eleAbonoTitle');
+                if (tA) tA.textContent = 'Registrar abono';
+                var rA = document.getElementById('eleAbonoResumen');
+                if (rA) rA.textContent = bAbo.getAttribute('data-label') || '';
+                var pA = document.getElementById('eleAbonoPendiente');
+                var pendA = bAbo.getAttribute('data-pendiente') || '0';
+                if (pA) pA.textContent = 'Saldo pendiente: ' + fmtEle(pendA);
+                var mA = document.getElementById('eleMontoPago');
+                if (mA) { mA.value = ''; mA.readOnly = false; }
+                bsAbono.show();
+                return;
+            }
+            var bTot = ev.target && ev.target.closest ? ev.target.closest('.btn-pago-total-ele') : null;
+            if (bTot) {
+                var fidT = document.getElementById('eleFacturaId');
+                if (fidT) fidT.value = bTot.getAttribute('data-factura-id') || '';
+                var tT = document.getElementById('eleAbonoTitle');
+                if (tT) tT.textContent = 'Pago total';
+                var rT = document.getElementById('eleAbonoResumen');
+                if (rT) rT.textContent = bTot.getAttribute('data-label') || '';
+                var pT = document.getElementById('eleAbonoPendiente');
+                var pendT = bTot.getAttribute('data-pendiente') || '0';
+                if (pT) pT.textContent = 'Se registrará el saldo completo: ' + fmtEle(pendT);
+                var mT = document.getElementById('eleMontoPago');
+                if (mT) { mT.value = pendT; mT.readOnly = true; }
+                bsAbono.show();
+            }
+        });
+        mAbono.addEventListener('hidden.bs.modal', function() {
+            var el = document.getElementById('eleMontoPago');
+            if (el) el.readOnly = false;
+        });
     })();
 
 });

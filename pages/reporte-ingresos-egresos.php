@@ -88,7 +88,36 @@ try {
     $combIng = [];
 }
 
-$todasIng = array_merge($ingFilas, $manIng, $combIng);
+$eleIng = [];
+try {
+    $ep = [$desde, $hasta];
+    $ec = '';
+    if ($cuenta_id > 0) {
+        $ec = ' AND ep.cuenta_id = ? ';
+        $ep[] = $cuenta_id;
+    }
+    $stEl = $pdo->prepare("
+        SELECT ep.fecha_pago AS fecha,
+               ep.monto AS monto,
+               CONCAT('Electricidad — Contrato #', co.id) AS concepto,
+               TRIM(COALESCE(NULLIF(ep.referencia, ''), '')) AS referencia,
+               cl.nombre AS cliente_nombre,
+               'Electricidad (contrato)' AS grupo_nombre,
+               '' AS slip_o_inmueble
+        FROM contrato_electricidad_pagos ep
+        JOIN contrato_electricidad_facturas f ON f.id = ep.factura_id
+        JOIN contratos co ON co.id = f.contrato_id
+        JOIN clientes cl ON cl.id = co.cliente_id
+        WHERE ep.fecha_pago BETWEEN ? AND ?
+          $ec
+    ");
+    $stEl->execute($ep);
+    $eleIng = $stEl->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable $e) {
+    $eleIng = [];
+}
+
+$todasIng = array_merge($ingFilas, $manIng, $combIng, $eleIng);
 
 $agrupadoIngresos = [];
 foreach ($todasIng as $r) {
@@ -106,19 +135,20 @@ uksort($agrupadoIngresos, 'strnatcasecmp');
 $gParams = [$desde, $hasta];
 $gWhere = '';
 if ($cuenta_id > 0) {
-    $gWhere = ' AND g.cuenta_id = ? ';
+    $gWhere = ' AND gp.cuenta_id = ? ';
     $gParams[] = $cuenta_id;
 }
 $st = $pdo->prepare("
-    SELECT g.fecha_gasto AS fecha,
-           g.monto AS monto,
+    SELECT gp.fecha_pago AS fecha,
+           gp.monto AS monto,
            CONCAT('Gasto — ', p.nombre) AS concepto,
-           COALESCE(g.referencia, '') AS referencia,
+           COALESCE(gp.referencia, '') AS referencia,
            pr.nombre AS proveedor_nombre
-    FROM gastos g
+    FROM gasto_pagos gp
+    JOIN gastos g ON g.id = gp.gasto_id
     JOIN partidas p ON p.id = g.partida_id
     JOIN proveedores pr ON pr.id = g.proveedor_id
-    WHERE g.fecha_gasto BETWEEN ? AND ?
+    WHERE gp.fecha_pago BETWEEN ? AND ?
     $gWhere
 ");
 $st->execute($gParams);
