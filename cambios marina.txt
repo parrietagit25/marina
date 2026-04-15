@@ -1,0 +1,46 @@
+marina
+
+- movimiento bancario, un botón de eliminar y que se revierta
+- eliminar la columna de cuenta en los movimientos bancarios
+- ver movimiento de cuenta por cuenta en movimientos bancarios 
+por filtro de cuenta, obligado el filtro no puede salir todo junto 
+- estado de cuenta colocar ingreso y debido
+- estado de cuenta achicar mas la columnas para que quepa mejor lo nuevo debito y crédito ajustar según el campo
+
+- saldos de cuentas bancarias, mas centrado
+
+- validar en proveedores por rut o cedula
+- colocar el botón de eliminar en facturas abonos, que revierta y que valide
+
+- eliminar la cuenta en el estado de cuenta del proveedor 
+transacciones
+- partidas colocarla en costos
+- tipo de movimiento colocarlo en banco 
+- ingreso/costo solocarlo en reporte
+por ende se elimina la opccopn de transacciones
+
+- a marina menú colocar marina ingresos
+- ingresos costos acomodar esa pantalla, quieren ver los detalles 
+bien acomodado
+- en registro de clientes, validar el nombre del cliente 
+- registro de cliente numero de documento validar que no se repita en el registro 
+
+en contratos de alquileres, quitar la cuenta y ajustar tamaños
+
+- el conceptp que se muetsre en las cuotas en el pago también 
+ver el tema bien de los contratos y cuotas 
+
+en el reporte de cuotas un nuevo filtro que sea 
+pendiente + vencida
+
+reporte de ingreso, filtrar por m1, m2, m3 etc, que este detallado y también otro reporte agrupado
+
+- también el de egresos, detrallado, por grupo 
+- reporte marina contrato, quitar la cuenta 
+- en reporte de reporte manira -> ocntratos, en vez de terminados colocar liberados 
+
+
+- programa viejo, cuando exporta a Excel no permite sumar bien
+y detallar de donde viene cada cuota, el reporte es alquileres, vercuotas de alquileres
+
+ver pantalla de captura que tome, ese reporte colocar lo ingreso por mes según rango y totales también, ese mismo reporte tiene totales abajos 
