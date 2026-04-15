@@ -351,6 +351,18 @@ form select {
 
 .reportes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
 
+/* Reporte ingresos/egresos (p=reportes): paneles a todo el ancho del contenido */
+.reportes-ingresos-page {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.reportes-creditos-debitos-row > [class*="col-"] > .card {
+  min-width: 0;
+}
+.reportes-creditos-debitos-row .table-responsive {
+  max-width: 100%;
+}
+
 /* Dashboard (Power BI-like) */
 .kpi-grid {
   display: grid;

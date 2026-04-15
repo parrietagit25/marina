@@ -31,15 +31,15 @@ $u = function (string $p, string $label): string {
         <div id="manualIntro" class="accordion-collapse collapse show" data-bs-parent="#manualAccordion">
             <div class="accordion-body">
                 <p>Marina centraliza la operación de la marina: <strong>clientes y contratos</strong> (amarres, inmuebles),
-                    <strong>ingresos por cuotas y electricidad</strong>, <strong>gastos y proveedores</strong>,
+                    <strong>créditos por cuotas y electricidad</strong>, <strong>gastos y proveedores</strong>,
                     <strong>cuentas bancarias</strong> y <strong>reportes</strong>.</p>
                 <ul>
                     <li>Debe iniciar sesión con un usuario válido. La sesión se cierra con <strong>Salir</strong>.</li>
                     <li>Muchos listados permiten ordenar y buscar; en tablas con DataTables use el cuadro de búsqueda y el orden por columnas.</li>
-                    <li>Los <strong>ingresos bancarios</strong> pueden registrarse de tres maneras: pagos de <strong>cuotas</strong> de contratos,
+                    <li>Los <strong>créditos bancarios</strong> pueden registrarse de tres maneras: pagos de <strong>cuotas</strong> de contratos,
                         pagos de <strong>facturas de electricidad</strong> por contrato, y <strong>movimientos bancarios manuales</strong>
-                        (otros ingresos o costos que no vienen de cuotas ni electricidad ni del módulo de gastos).</li>
-                    <li>Los <strong>gastos</strong> (proveedores) generan egresos al registrarse pagos; también pueden verse en movimiento bancario y reportes.</li>
+                        (otros <?= e(marina_ui_credito()) ?> o <?= e(marina_ui_debito()) ?> que no vienen de cuotas ni electricidad ni del módulo de gastos).</li>
+                    <li>Los <strong>gastos</strong> (proveedores) generan débitos al registrarse pagos; también pueden verse en movimiento bancario y reportes.</li>
                 </ul>
             </div>
         </div>
@@ -53,8 +53,8 @@ $u = function (string $p, string $label): string {
         </h2>
         <div id="manualInicio" class="accordion-collapse collapse" data-bs-parent="#manualAccordion">
             <div class="accordion-body">
-                <p>Pantalla <?= $u('dashboard', 'Inicio') ?>: resumen del mes en curso con totales de ingresos y costos,
-                    gráficas por día, distribución por cuenta bancaria y, cuando aplica, costos por partida contable.</p>
+                <p>Pantalla <?= $u('dashboard', 'Inicio') ?>: resumen del mes en curso con totales de créditos y débitos,
+                    gráficas por día, distribución por cuenta bancaria y, cuando aplica, débitos por partida contable.</p>
                 <p>Sirve para una vista rápida del flujo de caja y la actividad reciente sin entrar aún a cada módulo.</p>
             </div>
         </div>
@@ -93,12 +93,14 @@ $u = function (string $p, string $label): string {
                 <dl class="row mb-0">
                     <dt class="col-sm-3"><?= $u('movimiento-bancario', 'Registrar movimientos bancarios') ?></dt>
                     <dd class="col-sm-9">Línea de tiempo de movimientos: cuotas pagadas, electricidad cobrada, gastos pagados y movimientos manuales.
-                        Use <strong>Registrar movimiento bancario</strong> para ingresos o costos que no se originan en otro módulo.
+                        Use <strong>Registrar movimiento bancario</strong> para <?= e(marina_ui_credito()) ?> o <?= e(marina_ui_debito()) ?> que no se originan en otro módulo.
                         Solo las filas <strong>manuales</strong> tienen botón <strong>Editar</strong>; el resto se modifica en su módulo de origen.</dd>
                     <dt class="col-sm-3"><?= $u('reporte-estado-cuenta-bancarias', 'Estado de cuenta bancaria') ?></dt>
                     <dd class="col-sm-9">Detalle por cuenta y rango de fechas, alineado con los mismos conceptos que el listado de movimientos.</dd>
                     <dt class="col-sm-3"><?= $u('saldos-cuentas-bancarias', 'Saldos de cuentas bancarias') ?></dt>
-                    <dd class="col-sm-9">Saldo acumulado por cuenta según ingresos y costos registrados en el sistema.</dd>
+                    <dd class="col-sm-9">Saldo acumulado por cuenta según créditos y débitos registrados en el sistema.</dd>
+                    <dt class="col-sm-3"><?= $u('formas-pago', 'Tipo de movimientos') ?></dt>
+                    <dd class="col-sm-9">Formas de pago clasificadas como <?= e(marina_ui_credito()) ?> o <?= e(marina_ui_debito()) ?>; se usan en movimientos bancarios manuales y en pagos.</dd>
                 </dl>
             </div>
         </div>
@@ -117,29 +119,11 @@ $u = function (string $p, string $label): string {
                     <dd class="col-sm-9">Proveedores de bienes y servicios; base para registrar facturas y pagos.</dd>
                     <dt class="col-sm-3"><?= $u('gastos', 'Factura / Pagar') ?></dt>
                     <dd class="col-sm-9">Registro de facturas de gasto, partida contable, abonos y saldo pendiente o pagado.
-                        Los pagos impactan bancos y reportes de egresos.</dd>
+                        Los pagos impactan bancos y reportes de débitos.</dd>
                     <dt class="col-sm-3"><?= $u('reporte-proveedores-estado-cuenta', 'Estado de cuenta proveedor') ?></dt>
                     <dd class="col-sm-9">Historial y saldo por proveedor en un período.</dd>
-                </dl>
-            </div>
-        </div>
-    </div>
-
-    <div class="accordion-item">
-        <h2 class="accordion-header">
-            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#manualTrans">
-                Transacciones
-            </button>
-        </h2>
-        <div id="manualTrans" class="accordion-collapse collapse" data-bs-parent="#manualAccordion">
-            <div class="accordion-body">
-                <dl class="row mb-0">
-                    <dt class="col-sm-3"><?= $u('formas-pago', 'Tipo de movimientos') ?></dt>
-                    <dd class="col-sm-9">Formas de pago clasificadas como ingreso o costo; se usan en movimientos bancarios manuales y en pagos.</dd>
                     <dt class="col-sm-3"><?= $u('partidas', 'Partidas') ?></dt>
                     <dd class="col-sm-9">Categorías contables para agrupar gastos y alimentar reportes por partida.</dd>
-                    <dt class="col-sm-3"><?= $u('reportes', 'Ingresos / Costos') ?></dt>
-                    <dd class="col-sm-9">Reporte transaccional de ingresos y costos según los criterios definidos en el sistema.</dd>
                 </dl>
             </div>
         </div>
@@ -148,7 +132,7 @@ $u = function (string $p, string $label): string {
     <div class="accordion-item">
         <h2 class="accordion-header">
             <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#manualMarina">
-                Marina
+                Marina Ingresos
             </button>
         </h2>
         <div id="manualMarina" class="accordion-collapse collapse" data-bs-parent="#manualAccordion">
@@ -173,7 +157,7 @@ $u = function (string $p, string $label): string {
                         Los contratos pueden estar <strong>activos</strong> o <strong>terminados</strong>; un terminado limita ciertas acciones (por ejemplo eliminar).
                         Desde la lista puede abrir la gestión de <strong>electricidad por contrato</strong> cuando aplique.</dd>
                     <dt class="col-sm-3"><?= $u('contratos-electricidad', 'Electricidad (contrato)') ?></dt>
-                    <dd class="col-sm-9">Facturas y cobros de electricidad ligados a un contrato; los pagos aparecen como ingresos bancarios en reportes y movimiento bancario.</dd>
+                    <dd class="col-sm-9">Facturas y cobros de electricidad ligados a un contrato; los pagos aparecen como créditos bancarios en reportes y movimiento bancario.</dd>
                     <dt class="col-sm-3">Combustible</dt>
                     <dd class="col-sm-9">
                         <?= $u('combustible-pedidos', 'Pedidos') ?> (compras y recepción),
@@ -195,9 +179,10 @@ $u = function (string $p, string $label): string {
         <div id="manualRep" class="accordion-collapse collapse" data-bs-parent="#manualAccordion">
             <div class="accordion-body">
                 <ul class="mb-0">
-                    <li><?= $u('reporte-cuotas', 'Cuotas') ?> — estado y cobros de cuotas.</li>
-                    <li><?= $u('reporte-ingresos', 'Ingreso') ?> y <?= $u('reporte-egresos', 'Egresos') ?> — concentrados por tipo.</li>
-                    <li><?= $u('reporte-ingresos-egresos', 'Ingresos / Egresos') ?> — visión conjunta.</li>
+                    <li><?= $u('reporte-cuotas', 'Reporte de cuotas') ?> — cuotas por vencimiento, estado (pagada / pendiente / vencida), marina (muelle/slip) o inmueble (grupo/inmueble).</li>
+                    <li><?= $u('reporte-ingresos', 'Reporte de ingreso') ?> y <?= $u('reporte-egresos', 'Reporte de egresos') ?> — concentrados por tipo.</li>
+                    <li><?= $u('reportes', 'Reporte de ingresos y egresos') ?> — resumen del período (totales por cuenta y por partida).</li>
+                    <li><?= $u('reporte-ingresos-egresos', 'Ingresos y egresos (detalle)') ?> — listado conjunto con filtros (cuenta, vista agrupada, etc.).</li>
                     <li><?= $u('reporte-marina-contratos', 'Reporte Marina → contratos') ?> — relación muelle/slip y contratos.</li>
                     <li><?= $u('reporte-inmuebles-contratos', 'Reporte Inmuebles → contratos') ?> — relación grupo/inmueble y contratos.</li>
                     <li><?= $u('reporte-combustible', 'Combustible') ?> — operación e inventario de combustible.</li>

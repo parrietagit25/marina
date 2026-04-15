@@ -1,43 +1,45 @@
 marina
 
-- movimiento bancario, un botón de eliminar y que se revierta
-- eliminar la columna de cuenta en los movimientos bancarios
-- ver movimiento de cuenta por cuenta en movimientos bancarios 
+- movimiento bancario, un botón de eliminar y que se revierta - listo
+- eliminar la columna de cuenta en los movimientos bancarios - listo 
+- ver movimiento de cuenta por cuenta en movimientos bancarios - listo 
 por filtro de cuenta, obligado el filtro no puede salir todo junto 
-- estado de cuenta colocar ingreso y debido
-- estado de cuenta achicar mas la columnas para que quepa mejor lo nuevo debito y crédito ajustar según el campo
 
-- saldos de cuentas bancarias, mas centrado
+- estado de cuenta colocar ingreso y debido - listo 
+- estado de cuenta achicar mas la columnas para que quepa mejor lo nuevo debito y crédito ajustar según el campo - listo
 
-- validar en proveedores por rut o cedula
-- colocar el botón de eliminar en facturas abonos, que revierta y que valide
+- saldos de cuentas bancarias, mas centrado - listo 
 
-- eliminar la cuenta en el estado de cuenta del proveedor 
+- validar en proveedores por rut o cedula - listo
+- colocar el botón de eliminar en facturas abonos, que revierta y que valide - listo 
+
+- eliminar la cuenta en el estado de cuenta del proveedor - ? 
+
 transacciones
-- partidas colocarla en costos
-- tipo de movimiento colocarlo en banco 
-- ingreso/costo solocarlo en reporte
-por ende se elimina la opccopn de transacciones
+- partidas colocarla en costos - listo 
+- tipo de movimiento colocarlo en banco - listo 
+- ingreso/costo solocarlo en reporte - listo 
+por ende se elimina la opccopn de transacciones -listo 
 
-- a marina menú colocar marina ingresos
-- ingresos costos acomodar esa pantalla, quieren ver los detalles 
+- a marina menú colocar marina ingresos - listo 
+- ingresos costos acomodar esa pantalla, quieren ver los detalles  - listo 
 bien acomodado
-- en registro de clientes, validar el nombre del cliente 
-- registro de cliente numero de documento validar que no se repita en el registro 
+- en registro de clientes, validar el nombre del cliente - listo 
+- registro de cliente numero de documento validar que no se repita en el registro - listo  
 
-en contratos de alquileres, quitar la cuenta y ajustar tamaños
+en contratos de alquileres, quitar la cuenta y ajustar tamaños - listo 
 
 - el conceptp que se muetsre en las cuotas en el pago también 
-ver el tema bien de los contratos y cuotas 
+ver el tema bien de los contratos y cuotas - listo 
 
 en el reporte de cuotas un nuevo filtro que sea 
-pendiente + vencida
+pendiente + vencida - listo 
 
-reporte de ingreso, filtrar por m1, m2, m3 etc, que este detallado y también otro reporte agrupado
+reporte de ingreso, filtrar por m1, m2, m3 etc, que este detallado y también otro reporte agrupado - listo 
 
-- también el de egresos, detrallado, por grupo 
-- reporte marina contrato, quitar la cuenta 
-- en reporte de reporte manira -> ocntratos, en vez de terminados colocar liberados 
+- también el de egresos, detrallado, por grupo - listo 
+- reporte marina contrato, quitar la cuenta - listo 
+- en reporte de reporte manira -> ocntratos, en vez de terminados colocar liberados - listo 
 
 
 - programa viejo, cuando exporta a Excel no permite sumar bien

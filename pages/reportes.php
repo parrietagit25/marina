@@ -4,7 +4,7 @@
  * Ingresos = cuotas pagadas (acreditadas a cuentas).
  * Costos = gastos por partida.
  */
-$titulo = 'Ingresos y costos';
+$titulo = 'Reporte de ingresos y egresos';
 require_once __DIR__ . '/../includes/export_excel.php';
 
 $pdo = getDb();
@@ -130,23 +130,23 @@ $diferencia = $total_ingresos - $total_gastos;
 if (obtener('export') === 'excel') {
     $rows = [];
     foreach ($ingresos_por_cuenta as $r) {
-        $rows[] = ['Ingreso por cuenta', $r['cuenta_nombre'] ?? '', (float) ($r['total'] ?? 0)];
+        $rows[] = ['Crédito por cuenta', $r['cuenta_nombre'] ?? '', (float) ($r['total'] ?? 0)];
     }
     foreach ($gastos_por_partida as $r) {
-        $rows[] = ['Costo por partida', $r['partida_nombre'] ?? '', (float) ($r['total'] ?? 0)];
+        $rows[] = ['Débito por partida', $r['partida_nombre'] ?? '', (float) ($r['total'] ?? 0)];
     }
     $pie = [
-        ['Total ingresos', '', $total_ingresos],
-        ['Total costos', '', $total_gastos],
-        ['Diferencia (ingresos − costos)', '', $diferencia],
+        ['Total créditos', '', $total_ingresos],
+        ['Total débitos', '', $total_gastos],
+        ['Diferencia (créditos − débitos)', '', $diferencia],
     ];
     exportarExcel('reporte_ingresos_costos', ['Seccion', 'Concepto', 'Total'], $rows, $pie);
 }
 
 require_once __DIR__ . '/../includes/layout.php';
 ?>
-<h1>Ingresos y costos</h1>
-<p class="text-muted small mb-2">Los despachos de combustible se suman en ingresos por cuenta. Los costos por partida suman los <strong>abonos</strong> a facturas de gasto (fecha de pago) y el costo de pedidos de combustible recibidos. <a href="<?= MARINA_URL ?>/index.php?p=reporte-combustible">Reporte detallado de combustible</a></p>
+<h1 class="h4 mb-2">Reporte de ingresos y egresos</h1>
+<p class="text-muted small mb-3">Resumen del período: totales de <strong>ingresos</strong> por cuenta (cuotas, despacho de combustible y electricidad) y de <strong>egresos</strong> por partida (abonos a gastos y pedidos de combustible recibidos). En el detalle numérico de abajo se usan las etiquetas <?= e(marina_ui_credito()) ?> y <?= e(marina_ui_debito()) ?>. <a href="<?= MARINA_URL ?>/index.php?p=reporte-combustible">Reporte detallado de combustible</a></p>
 <form method="get" class="toolbar" style="margin-bottom:1rem">
     <input type="hidden" name="p" value="reportes">
     <div class="row g-2 align-items-end">
@@ -167,57 +167,83 @@ require_once __DIR__ . '/../includes/layout.php';
     </div>
 </form>
 
-<div class="reportes-grid">
-    <div class="card p-3 mb-3">
-        <h2 class="h5 mb-3">Resumen (<?= fechaFormato($desde) ?> – <?= fechaFormato($hasta) ?>)</h2>
-        <p><strong>Total ingresos:</strong> <?= dinero($total_ingresos) ?></p>
-        <p><strong>Total costos:</strong> <?= dinero($total_gastos) ?></p>
-        <p><strong>Diferencia:</strong> <span style="color:<?= $diferencia >= 0 ? 'green' : 'red' ?>"><?= dinero($diferencia) ?></span></p>
+<div class="reportes-ingresos-page w-100 mw-100">
+<div class="row g-3 mb-3">
+    <div class="col-12">
+        <div class="card p-4">
+            <h2 class="h5 mb-3">Resumen (<?= fechaFormato($desde) ?> – <?= fechaFormato($hasta) ?>)</h2>
+            <div class="row g-3">
+                <div class="col-12 col-sm-4">
+                    <div class="rounded-3 border bg-light p-3 h-100">
+                        <div class="small text-muted text-uppercase fw-semibold mb-1">Total créditos</div>
+                        <div class="fs-4 fw-bold text-success"><?= dinero($total_ingresos) ?></div>
+                    </div>
+                </div>
+                <div class="col-12 col-sm-4">
+                    <div class="rounded-3 border bg-light p-3 h-100">
+                        <div class="small text-muted text-uppercase fw-semibold mb-1">Total débitos</div>
+                        <div class="fs-4 fw-bold text-danger"><?= dinero($total_gastos) ?></div>
+                    </div>
+                </div>
+                <div class="col-12 col-sm-4">
+                    <div class="rounded-3 border bg-light p-3 h-100">
+                        <div class="small text-muted text-uppercase fw-semibold mb-1">Diferencia</div>
+                        <div class="fs-4 fw-bold <?= $diferencia >= 0 ? 'text-success' : 'text-danger' ?>"><?= dinero($diferencia) ?></div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
-<div class="card p-3 mb-3">
-    <h2 class="h5 mb-3">Ingresos por cuenta (cuotas pagadas y despacho combustible)</h2>
-    <div class="table-responsive">
-        <table class="table">
-            <thead>
-                <tr><th>Cuenta</th><th>Total</th></tr>
-            </thead>
-            <tbody>
-            <?php foreach ($ingresos_por_cuenta as $row): ?>
-                <tr>
-                    <td><?= e($row['cuenta_nombre']) ?></td>
-                    <td><?= dinero($row['total']) ?></td>
-                </tr>
-            <?php endforeach; ?>
-            <?php if (empty($ingresos_por_cuenta)): ?>
-                <tr><td colspan="2">No hay ingresos en el período.</td></tr>
-            <?php endif; ?>
-            </tbody>
-        </table>
+<div class="row g-3 gx-lg-4 reportes-creditos-debitos-row mb-3">
+    <div class="col-12 col-lg-6 d-flex min-w-0">
+        <div class="card p-4 flex-fill w-100 min-w-0">
+            <h2 class="h5 mb-3">Créditos por cuenta (cuotas pagadas y despacho combustible)</h2>
+            <div class="table-responsive w-100">
+                <table class="table table-lg align-middle w-100 mb-0">
+                    <thead>
+                        <tr><th>Cuenta</th><th class="text-end">Total</th></tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($ingresos_por_cuenta as $row): ?>
+                        <tr>
+                            <td><?= e($row['cuenta_nombre']) ?></td>
+                            <td class="text-end text-nowrap"><?= dinero($row['total']) ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($ingresos_por_cuenta)): ?>
+                        <tr><td colspan="2" class="text-muted">No hay créditos en el período.</td></tr>
+                    <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-lg-6 d-flex min-w-0">
+        <div class="card p-4 flex-fill w-100 min-w-0">
+            <h2 class="h5 mb-3">Débitos por partida</h2>
+            <div class="table-responsive w-100">
+                <table class="table table-lg align-middle w-100 mb-0">
+                    <thead>
+                        <tr><th>Partida</th><th class="text-end">Total</th></tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($gastos_por_partida as $row): ?>
+                        <tr>
+                            <td><?= e($row['partida_nombre']) ?></td>
+                            <td class="text-end text-nowrap"><?= dinero($row['total']) ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($gastos_por_partida)): ?>
+                        <tr><td colspan="2" class="text-muted">No hay gastos en el período.</td></tr>
+                    <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 </div>
-
-<div class="card p-3 mb-3">
-    <h2 class="h5 mb-3">Costos por partida</h2>
-    <div class="table-responsive">
-        <table class="table">
-            <thead>
-                <tr><th>Partida</th><th>Total</th></tr>
-            </thead>
-            <tbody>
-            <?php foreach ($gastos_por_partida as $row): ?>
-                <tr>
-                    <td><?= e($row['partida_nombre']) ?></td>
-                    <td><?= dinero($row['total']) ?></td>
-                </tr>
-            <?php endforeach; ?>
-            <?php if (empty($gastos_por_partida)): ?>
-                <tr><td colspan="2">No hay gastos en el período.</td></tr>
-            <?php endif; ?>
-            </tbody>
-        </table>
-    </div>
 </div>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

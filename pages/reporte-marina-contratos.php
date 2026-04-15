@@ -14,13 +14,10 @@ $muellesOpts = $pdo->query('SELECT id, nombre FROM muelles ORDER BY nombre')->fe
 $sql = "
     SELECT co.id, co.fecha_inicio, co.fecha_fin, co.monto_total, co.activo, COALESCE(co.estado, 'activo') AS estado,
            cl.nombre AS cliente,
-           CONCAT(b.nombre, ' - ', cu.nombre) AS cuenta_nombre,
            mu.nombre AS muelle_nombre,
            sl.nombre AS slip_nombre
     FROM contratos co
     JOIN clientes cl ON cl.id = co.cliente_id
-    JOIN cuentas cu ON cu.id = co.cuenta_id
-    JOIN bancos b ON b.id = cu.banco_id
     LEFT JOIN muelles mu ON mu.id = co.muelle_id
     LEFT JOIN slips sl ON sl.id = co.slip_id
     WHERE co.slip_id IS NOT NULL
@@ -49,18 +46,17 @@ if (obtener('export') === 'excel') {
             $r['muelle_nombre'] ?? '',
             $r['slip_nombre'] ?? '',
             $r['cliente'] ?? '',
-            $r['cuenta_nombre'] ?? '',
             $r['fecha_inicio'] ?? '',
             $r['fecha_fin'] ?? '',
             (float) ($r['monto_total'] ?? 0),
-            ((string) ($r['estado'] ?? 'activo') === 'activo') ? 'Activo' : 'Terminado',
+            ((string) ($r['estado'] ?? 'activo') === 'activo') ? 'Activo' : 'Liberado',
         ];
     }
     $sumMontos = array_sum(array_map(static function ($r) {
         return (float) ($r['monto_total'] ?? 0);
     }, $filas));
-    $pie = [['Total', '', '', '', '', '', '', $sumMontos, '']];
-    exportarExcel('reporte_marina_contratos', ['ID', 'Muelle', 'Slip', 'Cliente', 'Cuenta', 'Inicio', 'Fin', 'Monto total', 'Estado'], $rows, $pie);
+    $pie = [['Total', '', '', '', '', '', $sumMontos, '']];
+    exportarExcel('reporte_marina_contratos', ['ID', 'Muelle', 'Slip', 'Cliente', 'Inicio', 'Fin', 'Monto total', 'Estado'], $rows, $pie);
 }
 
 require_once __DIR__ . '/../includes/layout.php';
@@ -84,7 +80,7 @@ require_once __DIR__ . '/../includes/layout.php';
             <select class="form-select" name="activo">
                 <option value="" <?= $activo === '' ? 'selected' : '' ?>>Todos</option>
                 <option value="1" <?= $activo === '1' ? 'selected' : '' ?>>Activos</option>
-                <option value="0" <?= $activo === '0' ? 'selected' : '' ?>>Terminados</option>
+                <option value="0" <?= $activo === '0' ? 'selected' : '' ?>>Liberados</option>
             </select>
         </div>
         <div class="col-12 col-md-auto">
@@ -94,6 +90,7 @@ require_once __DIR__ . '/../includes/layout.php';
             <button type="submit" class="btn btn-success" name="export" value="excel">Exportar Excel</button>
         </div>
     </div>
+    <p class="text-muted small mb-0 mt-2">Al <strong>liberar</strong> se conserva el último muelle/slip en el contrato para este reporte; el mapa sigue tomando solo contratos <strong>activos</strong> como ocupados. Contratos liberados muy antiguos pueden tener slip vacío y no listarse.</p>
 </form>
 
 <div class="card p-3">
@@ -105,7 +102,6 @@ require_once __DIR__ . '/../includes/layout.php';
                     <th>Muelle</th>
                     <th>Slip</th>
                     <th>Cliente</th>
-                    <th>Cuenta</th>
                     <th>Inicio</th>
                     <th>Fin</th>
                     <th class="text-end">Monto total</th>
@@ -120,16 +116,15 @@ require_once __DIR__ . '/../includes/layout.php';
                     <td><?= e($r['muelle_nombre'] ?? '—') ?></td>
                     <td><?= e($r['slip_nombre'] ?? '—') ?></td>
                     <td><?= e($r['cliente'] ?? '') ?></td>
-                    <td><?= e($r['cuenta_nombre'] ?? '') ?></td>
                     <td><?= fechaFormato($r['fecha_inicio']) ?></td>
                     <td><?= fechaFormato($r['fecha_fin']) ?></td>
                     <td class="text-end"><?= dinero((float) ($r['monto_total'] ?? 0)) ?></td>
-                    <td><?= (string)($r['estado'] ?? 'activo') === 'activo' ? 'Activo' : 'Terminado' ?></td>
+                    <td><?= (string)($r['estado'] ?? 'activo') === 'activo' ? 'Activo' : 'Liberado' ?></td>
                     <td><a class="btn btn-sm btn-outline-primary" href="<?= MARINA_URL ?>/index.php?p=contratos&amp;accion=editar&amp;id=<?= (int) $r['id'] ?>">Ver</a></td>
                 </tr>
             <?php endforeach; ?>
             <?php if (empty($filas)): ?>
-                <tr><td colspan="10" class="text-muted">No hay contratos con slip asignado.</td></tr>
+                <tr><td colspan="9" class="text-muted">No hay contratos con slip asignado.</td></tr>
             <?php endif; ?>
             </tbody>
         </table>

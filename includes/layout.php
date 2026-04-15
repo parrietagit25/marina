@@ -17,13 +17,12 @@ if (function_exists('getDb')) {
 }
 
 $seccionMantenimiento = in_array($p, ['usuarios', 'bancos', 'cuentas', 'configuracion'], true);
-$seccionBanco = in_array($p, ['movimiento-bancario', 'reporte-estado-cuenta-bancarias', 'saldos-cuentas-bancarias'], true);
-$seccionCostoGastos = in_array($p, ['proveedores', 'gastos', 'reporte-proveedores-estado-cuenta'], true);
-$seccionTransacciones = in_array($p, ['formas-pago', 'partidas', 'reportes'], true);
+$seccionBanco = in_array($p, ['movimiento-bancario', 'reporte-estado-cuenta-bancarias', 'saldos-cuentas-bancarias', 'formas-pago'], true);
+$seccionCostoGastos = in_array($p, ['proveedores', 'gastos', 'reporte-proveedores-estado-cuenta', 'partidas'], true);
 $paginasCombustible = ['combustible-pedidos', 'combustible-despacho', 'combustible-ajuste', 'combustible-precios'];
 $seccionCombustibleSub = in_array($p, $paginasCombustible, true);
 $seccionMarina = in_array($p, array_merge(['clientes', 'muelles', 'slips', 'grupos', 'inmuebles', 'mapa-marina', 'mapa-grupos', 'contratos', 'contratos-electricidad'], $paginasCombustible), true);
-$seccionReportes = in_array($p, ['reporte-cuotas', 'reporte-ingresos', 'reporte-egresos', 'reporte-ingresos-egresos', 'reporte-marina-contratos', 'reporte-inmuebles-contratos', 'reporte-combustible'], true);
+$seccionReportes = in_array($p, ['reporte-cuotas', 'reporte-ingresos', 'reporte-egresos', 'reporte-ingresos-egresos', 'reporte-marina-contratos', 'reporte-inmuebles-contratos', 'reporte-combustible', 'reportes'], true);
 ?>
 <!DOCTYPE html>
 <html lang='es' style='font-size: <?= (int) $marinaFontSizePct ?>%;'>
@@ -70,6 +69,7 @@ $seccionReportes = in_array($p, ['reporte-cuotas', 'reporte-ingresos', 'reporte-
           <a class='list-group-item list-group-item-action <?= ($p === 'movimiento-bancario') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=movimiento-bancario'><i data-lucide='banknote' class='menu-ico'></i>Registrar movimientos bancarios</a>
           <a class='list-group-item list-group-item-action <?= ($p === 'reporte-estado-cuenta-bancarias') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reporte-estado-cuenta-bancarias'><i data-lucide='file-text' class='menu-ico'></i>Estado de cuenta bancaria</a>
           <a class='list-group-item list-group-item-action <?= ($p === 'saldos-cuentas-bancarias') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=saldos-cuentas-bancarias'><i data-lucide='landmark' class='menu-ico'></i>Saldos de cuentas bancarias</a>
+          <a class='list-group-item list-group-item-action <?= ($p === 'formas-pago') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=formas-pago'><i data-lucide='arrow-right-left' class='menu-ico'></i>Tipo de movimientos</a>
         </div>
 
         <button class="menu-section-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#menuCostoDesktop" aria-expanded="<?= $seccionCostoGastos ? 'true' : 'false' ?>">
@@ -79,19 +79,11 @@ $seccionReportes = in_array($p, ['reporte-cuotas', 'reporte-ingresos', 'reporte-
           <a class='list-group-item list-group-item-action <?= ($p === 'proveedores') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=proveedores'><i data-lucide='truck' class='menu-ico'></i>Proveedores</a>
           <a class='list-group-item list-group-item-action <?= ($p === 'gastos') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=gastos'><i data-lucide='receipt' class='menu-ico'></i>Factura / Pagar</a>
           <a class='list-group-item list-group-item-action <?= ($p === 'reporte-proveedores-estado-cuenta') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reporte-proveedores-estado-cuenta'><i data-lucide='file-text' class='menu-ico'></i>Estado de cuenta proveedor</a>
-        </div>
-
-        <button class="menu-section-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#menuTransDesktop" aria-expanded="<?= $seccionTransacciones ? 'true' : 'false' ?>">
-          Transacciones
-        </button>
-        <div id="menuTransDesktop" class="collapse <?= $seccionTransacciones ? 'show' : '' ?>" data-bs-parent="#sidebarAccordionDesktop">
-          <a class='list-group-item list-group-item-action <?= ($p === 'formas-pago') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=formas-pago'><i data-lucide='arrow-right-left' class='menu-ico'></i>Tipo de movimientos</a>
           <a class='list-group-item list-group-item-action <?= ($p === 'partidas') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=partidas'><i data-lucide='network' class='menu-ico'></i>Partidas</a>
-          <a class='list-group-item list-group-item-action <?= ($p === 'reportes') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reportes'><i data-lucide='bar-chart-3' class='menu-ico'></i>Ingresos / Costos</a>
         </div>
 
         <button class="menu-section-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#menuMarinaDesktop" aria-expanded="<?= $seccionMarina ? 'true' : 'false' ?>">
-          Marina
+          Marina Ingresos
         </button>
         <div id="menuMarinaDesktop" class="collapse <?= $seccionMarina ? 'show' : '' ?>" data-bs-parent="#sidebarAccordionDesktop">
           <a class='list-group-item list-group-item-action <?= ($p === 'clientes') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=clientes'><i data-lucide='user-round' class='menu-ico'></i>Clientes</a>
@@ -117,10 +109,11 @@ $seccionReportes = in_array($p, ['reporte-cuotas', 'reporte-ingresos', 'reporte-
           Reportes
         </button>
         <div id="menuRepDesktop" class="collapse <?= $seccionReportes ? 'show' : '' ?>" data-bs-parent="#sidebarAccordionDesktop">
-          <a class='list-group-item list-group-item-action <?= ($p === 'reporte-cuotas') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reporte-cuotas'>Cuotas</a>
-          <a class='list-group-item list-group-item-action <?= ($p === 'reporte-ingresos') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reporte-ingresos'>Ingreso</a>
-          <a class='list-group-item list-group-item-action <?= ($p === 'reporte-egresos') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reporte-egresos'>Egresos</a>
-          <a class='list-group-item list-group-item-action <?= ($p === 'reporte-ingresos-egresos') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reporte-ingresos-egresos'>Ingresos / Egresos</a>
+          <a class='list-group-item list-group-item-action <?= ($p === 'reporte-cuotas') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reporte-cuotas'>Reporte de cuotas</a>
+          <a class='list-group-item list-group-item-action <?= ($p === 'reporte-ingresos') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reporte-ingresos'>Reporte de ingreso</a>
+          <a class='list-group-item list-group-item-action <?= ($p === 'reporte-egresos') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reporte-egresos'>Reporte de egresos</a>
+          <a class='list-group-item list-group-item-action <?= ($p === 'reportes') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reportes'><i data-lucide='bar-chart-3' class='menu-ico'></i>Reporte de ingresos y egresos</a>
+          <a class='list-group-item list-group-item-action <?= ($p === 'reporte-ingresos-egresos') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reporte-ingresos-egresos'>Ingresos y egresos (detalle)</a>
           <a class='list-group-item list-group-item-action <?= ($p === 'reporte-marina-contratos') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reporte-marina-contratos'>Reporte Marina -> contratos</a>
           <a class='list-group-item list-group-item-action <?= ($p === 'reporte-inmuebles-contratos') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reporte-inmuebles-contratos'>Reporte Inmuebles -> contratos</a>
           <a class='list-group-item list-group-item-action <?= ($p === 'reporte-combustible') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reporte-combustible'>Combustible</a>
@@ -178,6 +171,7 @@ $seccionReportes = in_array($p, ['reporte-cuotas', 'reporte-ingresos', 'reporte-
                 <a class='list-group-item list-group-item-action <?= ($p === 'movimiento-bancario') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=movimiento-bancario'>Registrar movimientos bancarios</a>
                 <a class='list-group-item list-group-item-action <?= ($p === 'reporte-estado-cuenta-bancarias') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reporte-estado-cuenta-bancarias'>Estado de cuenta bancaria</a>
                 <a class='list-group-item list-group-item-action <?= ($p === 'saldos-cuentas-bancarias') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=saldos-cuentas-bancarias'>Saldos de cuentas bancarias</a>
+                <a class='list-group-item list-group-item-action <?= ($p === 'formas-pago') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=formas-pago'>Tipo de movimientos</a>
               </div>
 
               <button class="menu-section-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#menuCostoMobile" aria-expanded="<?= $seccionCostoGastos ? 'true' : 'false' ?>">
@@ -187,19 +181,11 @@ $seccionReportes = in_array($p, ['reporte-cuotas', 'reporte-ingresos', 'reporte-
                 <a class='list-group-item list-group-item-action <?= ($p === 'proveedores') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=proveedores'>Proveedores</a>
                 <a class='list-group-item list-group-item-action <?= ($p === 'gastos') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=gastos'>Factura / Pagar</a>
                 <a class='list-group-item list-group-item-action <?= ($p === 'reporte-proveedores-estado-cuenta') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reporte-proveedores-estado-cuenta'>Estado de cuenta proveedor</a>
-              </div>
-
-              <button class="menu-section-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#menuTransMobile" aria-expanded="<?= $seccionTransacciones ? 'true' : 'false' ?>">
-                Transacciones
-              </button>
-              <div id="menuTransMobile" class="collapse <?= $seccionTransacciones ? 'show' : '' ?>" data-bs-parent="#sidebarAccordionMobile">
-                <a class='list-group-item list-group-item-action <?= ($p === 'formas-pago') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=formas-pago'>Tipo de movimientos</a>
                 <a class='list-group-item list-group-item-action <?= ($p === 'partidas') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=partidas'>Partidas</a>
-                <a class='list-group-item list-group-item-action <?= ($p === 'reportes') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reportes'>Ingresos / Costos</a>
               </div>
 
               <button class="menu-section-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#menuMarinaMobile" aria-expanded="<?= $seccionMarina ? 'true' : 'false' ?>">
-                Marina
+                Marina Ingresos
               </button>
               <div id="menuMarinaMobile" class="collapse <?= $seccionMarina ? 'show' : '' ?>" data-bs-parent="#sidebarAccordionMobile">
                 <a class='list-group-item list-group-item-action <?= ($p === 'clientes') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=clientes'>Clientes</a>
@@ -225,10 +211,11 @@ $seccionReportes = in_array($p, ['reporte-cuotas', 'reporte-ingresos', 'reporte-
                 Reportes
               </button>
               <div id="menuRepMobile" class="collapse <?= $seccionReportes ? 'show' : '' ?>" data-bs-parent="#sidebarAccordionMobile">
-                <a class='list-group-item list-group-item-action <?= ($p === 'reporte-cuotas') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reporte-cuotas'>Cuotas</a>
-                <a class='list-group-item list-group-item-action <?= ($p === 'reporte-ingresos') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reporte-ingresos'>Ingreso</a>
-                <a class='list-group-item list-group-item-action <?= ($p === 'reporte-egresos') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reporte-egresos'>Egresos</a>
-                <a class='list-group-item list-group-item-action <?= ($p === 'reporte-ingresos-egresos') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reporte-ingresos-egresos'>Ingresos / Egresos</a>
+                <a class='list-group-item list-group-item-action <?= ($p === 'reporte-cuotas') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reporte-cuotas'>Reporte de cuotas</a>
+                <a class='list-group-item list-group-item-action <?= ($p === 'reporte-ingresos') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reporte-ingresos'>Reporte de ingreso</a>
+                <a class='list-group-item list-group-item-action <?= ($p === 'reporte-egresos') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reporte-egresos'>Reporte de egresos</a>
+                <a class='list-group-item list-group-item-action <?= ($p === 'reportes') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reportes'>Reporte de ingresos y egresos</a>
+                <a class='list-group-item list-group-item-action <?= ($p === 'reporte-ingresos-egresos') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reporte-ingresos-egresos'>Ingresos y egresos (detalle)</a>
                 <a class='list-group-item list-group-item-action <?= ($p === 'reporte-marina-contratos') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reporte-marina-contratos'>Reporte Marina -> contratos</a>
                 <a class='list-group-item list-group-item-action <?= ($p === 'reporte-inmuebles-contratos') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reporte-inmuebles-contratos'>Reporte Inmuebles -> contratos</a>
                 <a class='list-group-item list-group-item-action <?= ($p === 'reporte-combustible') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reporte-combustible'>Combustible</a>

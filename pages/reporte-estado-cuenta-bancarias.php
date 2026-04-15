@@ -22,6 +22,9 @@ if ($cuenta_id > 0) {
     $cuentaTitulo = $cuentasOpts[$cuenta_id] ?? '';
 }
 
+$labCred = marina_ui_credito();
+$labDeb = marina_ui_debito();
+
 $params = [$desde, $hasta];
 $cuentaFiltro = '';
 if ($cuenta_id > 0) {
@@ -31,7 +34,7 @@ if ($cuenta_id > 0) {
 
 $ing = $pdo->prepare("
     SELECT mo.fecha_pago AS fecha,
-           'Ingreso' AS tipo,
+           '{$labCred}' AS tipo,
            mo.monto AS monto,
            COALESCE(NULLIF(TRIM(mo.concepto), ''), CONCAT('Cuota #', cu.numero_cuota, ' — Contrato #', co.id)) AS concepto,
            TRIM(COALESCE(NULLIF(co.numero_recibo, ''), NULLIF(mo.referencia, ''), '')) AS referencia,
@@ -56,7 +59,7 @@ if ($cuenta_id > 0) {
 try {
     $ingEle = $pdo->prepare("
         SELECT ep.fecha_pago AS fecha,
-               'Ingreso' AS tipo,
+               '{$labCred}' AS tipo,
                ep.monto AS monto,
                CONCAT('Electricidad — Contrato #', co.id) AS concepto,
                TRIM(COALESCE(NULLIF(co.numero_recibo, ''), NULLIF(ep.referencia, ''), '')) AS referencia,
@@ -84,7 +87,7 @@ try {
     }
     $ic = $pdo->prepare("
         SELECT cd.fecha AS fecha,
-               'Ingreso' AS tipo,
+               '{$labCred}' AS tipo,
                cd.monto_total AS monto,
                CONCAT('Combustible — ', UPPER(SUBSTRING(cd.tipo_combustible, 1, 1)), SUBSTRING(cd.tipo_combustible, 2), ' — ', cd.embarcacion) AS concepto,
                '' AS referencia,
@@ -107,7 +110,7 @@ if ($cuenta_id > 0) {
 }
 $cos = $pdo->prepare("
     SELECT gp.fecha_pago AS fecha,
-           'Egreso' AS tipo,
+           '{$labDeb}' AS tipo,
            gp.monto AS monto,
            CONCAT('Gasto — ', p.nombre) AS concepto,
            COALESCE(gp.referencia, '') AS referencia,
@@ -132,7 +135,7 @@ try {
     }
     $mov = $pdo->prepare("
         SELECT mb.fecha_movimiento AS fecha,
-               CASE WHEN mb.tipo_movimiento = 'costo' THEN 'Egreso' ELSE 'Ingreso' END AS tipo,
+               CASE WHEN mb.tipo_movimiento = 'costo' THEN '{$labDeb}' ELSE '{$labCred}' END AS tipo,
                mb.monto AS monto,
                CONCAT('Mov. manual — ', fp.nombre) AS concepto,
                COALESCE(mb.referencia, '') AS referencia,
@@ -161,7 +164,7 @@ usort($movs, function ($a, $b) {
 $acum = 0.0;
 foreach ($movs as &$m) {
     $val = (float) ($m['monto'] ?? 0);
-    if (($m['tipo'] ?? '') === 'Egreso') {
+    if (($m['tipo'] ?? '') === $labDeb) {
         $acum -= $val;
     } else {
         $acum += $val;
@@ -174,7 +177,7 @@ $totIng = 0.0;
 $totEgr = 0.0;
 foreach ($movs as $m) {
     $val = (float) ($m['monto'] ?? 0);
-    if (($m['tipo'] ?? '') === 'Egreso') {
+    if (($m['tipo'] ?? '') === $labDeb) {
         $totEgr += $val;
     } else {
         $totIng += $val;
@@ -184,24 +187,35 @@ foreach ($movs as $m) {
 if (obtener('export') === 'excel') {
     $rows = [];
     foreach ($movs as $m) {
+        $tipoRow = $m['tipo'] ?? '';
+        $valRow = (float) ($m['monto'] ?? 0);
+        $isCredRow = ($tipoRow === $labCred);
         $rows[] = [
             $m['fecha'] ?? '',
-            $m['tipo'] ?? '',
             $m['concepto'] ?? '',
             $m['referencia'] ?? '',
             $m['cliente_o_proveedor'] ?? '',
-            (float) ($m['monto'] ?? 0),
+            $isCredRow ? $valRow : '',
+            $isCredRow ? '' : $valRow,
             (float) ($m['acumulado'] ?? 0),
         ];
     }
     $neto = $totIng - $totEgr;
     $acumFinal = $movs === [] ? 0.0 : (float) ($movs[array_key_last($movs)]['acumulado'] ?? 0);
     $pie = [
-        ['Total ingresos del período', '', '', '', '', $totIng, ''],
-        ['Total egresos del período', '', '', '', '', $totEgr, ''],
-        ['Neto del período', '', '', '', '', $neto, $acumFinal],
+        ['Total créditos del período', '', '', '', $totIng, '', ''],
+        ['Total débitos del período', '', '', '', '', $totEgr, ''],
+        [
+            'Neto del período',
+            '',
+            '',
+            '',
+            $neto >= 0 ? $neto : '',
+            $neto < 0 ? abs($neto) : '',
+            $acumFinal,
+        ],
     ];
-    exportarExcel('reporte_estado_cuenta_bancaria', ['Fecha', 'Tipo', 'Concepto', 'Referencia', 'Cliente / Proveedor', 'Monto', 'Acumulado'], $rows, $pie);
+    exportarExcel('reporte_estado_cuenta_bancaria', ['Fecha', 'Concepto', 'Referencia', 'Cliente / Proveedor', 'Crédito', 'Débito', 'Acumulado'], $rows, $pie);
 }
 
 $netoPeriodo = $totIng - $totEgr;
@@ -250,11 +264,11 @@ require_once __DIR__ . '/../includes/layout.php';
                 <span class="text-muted">Todas las cuentas (los movimientos pueden corresponder a distintas cuentas según su origen).</span>
             <?php endif; ?>
         </div>
-        <div class="col-md-4"><strong>Total ingresos:</strong> <?= dinero($totIng) ?></div>
-        <div class="col-md-4"><strong>Total egresos:</strong> <?= dinero($totEgr) ?></div>
+        <div class="col-md-4"><strong>Total créditos:</strong> <?= dinero($totIng) ?></div>
+        <div class="col-md-4"><strong>Total débitos:</strong> <?= dinero($totEgr) ?></div>
         <div class="col-md-4"><strong>Neto período:</strong> <span class="<?= ($totIng - $totEgr) >= 0 ? 'text-success' : 'text-danger' ?>"><?= dinero($totIng - $totEgr) ?></span></div>
     </div>
-    <p class="text-muted small mb-0 mt-2">El acumulado es dentro del período filtrado (no incluye saldo anterior). En ingresos por cuota, la <strong>referencia</strong> muestra el <strong>número de recibo del contrato</strong> cuando está cargado en el contrato.</p>
+    <p class="text-muted small mb-0 mt-2">El acumulado es dentro del período filtrado (no incluye saldo anterior). En créditos por cuota, la <strong>referencia</strong> muestra el <strong>número de recibo del contrato</strong> cuando está cargado en el contrato.</p>
 </div>
 
 <div class="card p-3">
@@ -263,11 +277,11 @@ require_once __DIR__ . '/../includes/layout.php';
             <thead>
                 <tr>
                     <th>Fecha</th>
-                    <th>Tipo</th>
                     <th style="min-width:200px">Concepto</th>
                     <th>Referencia</th>
                     <th>Cliente / Proveedor</th>
-                    <th class="text-end">Monto</th>
+                    <th class="text-end">Crédito</th>
+                    <th class="text-end">Débito</th>
                     <th class="text-end">Acumulado</th>
                 </tr>
             </thead>
@@ -275,15 +289,16 @@ require_once __DIR__ . '/../includes/layout.php';
             <?php foreach ($movs as $m): ?>
                 <?php
                 $tipo = $m['tipo'] ?? '';
-                $color = $tipo === 'Ingreso' ? '#137333' : '#b42318';
+                $valM = (float) ($m['monto'] ?? 0);
+                $esCred = ($tipo === $labCred);
                 ?>
                 <tr>
                     <td><?= fechaFormato($m['fecha']) ?></td>
-                    <td><span class="fw-semibold" style="color:<?= $color ?>"><?= e($tipo) ?></span></td>
                     <td><?= e($m['concepto'] ?? '') ?></td>
                     <td><?= e($m['referencia'] ?? '') ?></td>
                     <td><?= e($m['cliente_o_proveedor'] ?? '') ?: '—' ?></td>
-                    <td class="text-end"><?= dinero((float) ($m['monto'] ?? 0)) ?></td>
+                    <td class="text-end <?= $esCred ? 'text-success' : 'text-muted' ?>"><?= $esCred ? dinero($valM) : '—' ?></td>
+                    <td class="text-end <?= !$esCred ? 'text-danger' : 'text-muted' ?>"><?= !$esCred ? dinero($valM) : '—' ?></td>
                     <td class="text-end"><?= dinero((float) ($m['acumulado'] ?? 0)) ?></td>
                 </tr>
             <?php endforeach; ?>
@@ -299,18 +314,26 @@ require_once __DIR__ . '/../includes/layout.php';
                 </tr>
             <?php else: ?>
                 <tr class="table-light fw-semibold border-top border-2">
-                    <td colspan="5" class="text-end">Total ingresos del período</td>
+                    <td colspan="4" class="text-end">Total créditos del período</td>
                     <td class="text-end text-success"><?= dinero($totIng) ?></td>
+                    <td class="text-end text-muted">—</td>
                     <td class="text-end text-muted">—</td>
                 </tr>
                 <tr class="table-light fw-semibold">
-                    <td colspan="5" class="text-end">Total egresos del período</td>
+                    <td colspan="4" class="text-end">Total débitos del período</td>
+                    <td class="text-end text-muted">—</td>
                     <td class="text-end text-danger"><?= dinero($totEgr) ?></td>
                     <td class="text-end text-muted">—</td>
                 </tr>
                 <tr class="table-secondary fw-bold">
-                    <td colspan="5" class="text-end">Neto del período</td>
-                    <td class="text-end <?= $netoPeriodo >= 0 ? 'text-success' : 'text-danger' ?>"><?= dinero($netoPeriodo) ?></td>
+                    <td colspan="4" class="text-end">Neto del período</td>
+                    <?php if ($netoPeriodo >= 0): ?>
+                        <td class="text-end text-success"><?= dinero($netoPeriodo) ?></td>
+                        <td class="text-end text-muted">—</td>
+                    <?php else: ?>
+                        <td class="text-end text-muted">—</td>
+                        <td class="text-end text-danger"><?= dinero(abs($netoPeriodo)) ?></td>
+                    <?php endif; ?>
                     <td class="text-end"><?= dinero($acumFinal) ?></td>
                 </tr>
             <?php endif; ?>

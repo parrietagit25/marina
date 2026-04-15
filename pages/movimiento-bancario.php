@@ -1,6 +1,6 @@
 <?php
 /**
- * Movimiento bancario: línea de tiempo de ingresos/costos
+ * Movimiento bancario: línea de tiempo de créditos/débitos
  * (cuotas, electricidad por contrato, gastos y movimientos manuales).
  */
 $titulo = 'Movimiento bancario';
@@ -9,6 +9,12 @@ $pdo = getDb();
 $desde = obtener('desde', date('Y-m-01'));
 $hasta = obtener('hasta', date('Y-m-d'));
 $cuenta_id = (int) obtener('cuenta_id', 0);
+$movBancarioQueryListado = http_build_query([
+    'p' => 'movimiento-bancario',
+    'desde' => $desde,
+    'hasta' => $hasta,
+    'cuenta_id' => (string) $cuenta_id,
+]);
 $mensaje = '';
 $mostrarModal = false;
 
@@ -45,6 +51,26 @@ $formData = [
 ];
 
 $accionPost = enviado() ? trim((string) ($_POST['accion'] ?? '')) : '';
+
+if (enviado() && $accionPost === 'eliminar_movimiento_bancario') {
+    $delId = (int) ($_POST['movimiento_id'] ?? 0);
+    $baseListado = MARINA_URL . '/index.php?' . $movBancarioQueryListado;
+    if ($delId <= 0) {
+        redirigir($baseListado . '&err=' . rawurlencode('Movimiento no válido.'));
+    }
+    $stEx = $pdo->prepare('SELECT id FROM movimientos_bancarios WHERE id = ? LIMIT 1');
+    $stEx->execute([$delId]);
+    if (!$stEx->fetch()) {
+        redirigir($baseListado . '&err=' . rawurlencode('El movimiento ya no existe.'));
+    }
+    try {
+        $pdo->prepare('DELETE FROM movimientos_bancarios WHERE id = ?')->execute([$delId]);
+        redirigir($baseListado . '&ok=' . rawurlencode('Movimiento eliminado'));
+    } catch (Throwable $e) {
+        redirigir($baseListado . '&err=' . rawurlencode('No se pudo eliminar el movimiento.'));
+    }
+}
+
 if (enviado() && ($accionPost === 'crear_movimiento_bancario' || $accionPost === 'actualizar_movimiento_bancario')) {
     $formData = [
         'movimiento_id' => $accionPost === 'actualizar_movimiento_bancario' ? (int) ($_POST['movimiento_id'] ?? 0) : 0,
@@ -149,14 +175,16 @@ if ($cuenta_id > 0) {
     $params[] = $cuenta_id;
 }
 
-// Ingresos por pagos/abonos de cuotas
+$labCred = marina_ui_credito();
+$labDeb = marina_ui_debito();
+
+// Créditos por pagos/abonos de cuotas
 $ing = $pdo->prepare("
     SELECT mo.fecha_pago AS fecha,
-           'Ingreso' AS tipo,
+           '{$labCred}' AS tipo,
            mo.tipo AS origen,
            mo.monto AS monto,
            CONCAT('Cuota #', cu.numero_cuota) AS concepto,
-           CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre,
            COALESCE(mo.referencia, '') AS referencia,
            '' AS descripcion,
            NULL AS movimiento_manual_id,
@@ -165,8 +193,6 @@ $ing = $pdo->prepare("
     FROM cuotas_movimientos mo
     JOIN cuotas cu ON mo.cuota_id = cu.id
     JOIN contratos co ON cu.contrato_id = co.id
-    JOIN cuentas c ON co.cuenta_id = c.id
-    JOIN bancos b ON c.banco_id = b.id
     WHERE mo.fecha_pago BETWEEN ? AND ?
       AND mo.tipo IN ('pago','abono')
       $cuentaFiltro
@@ -184,11 +210,10 @@ $ingresosEle = [];
 try {
     $ingEle = $pdo->prepare("
         SELECT ep.fecha_pago AS fecha,
-               'Ingreso' AS tipo,
+               '{$labCred}' AS tipo,
                'electricidad' AS origen,
                ep.monto AS monto,
                CONCAT('Electricidad — Contrato #', co.id) AS concepto,
-               CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre,
                COALESCE(ep.referencia, '') AS referencia,
                COALESCE(ep.observaciones, '') AS descripcion,
                NULL AS movimiento_manual_id,
@@ -197,8 +222,6 @@ try {
         FROM contrato_electricidad_pagos ep
         JOIN contrato_electricidad_facturas f ON f.id = ep.factura_id
         JOIN contratos co ON co.id = f.contrato_id
-        JOIN cuentas c ON c.id = ep.cuenta_id
-        JOIN bancos b ON c.banco_id = b.id
         WHERE ep.fecha_pago BETWEEN ? AND ?
           $ingEleFiltro
     ");
@@ -208,7 +231,7 @@ try {
     $ingresosEle = [];
 }
 
-// Costos por gastos
+// Débitos por gastos
 $gastosParams = [$desde, $hasta];
 $gastoCuentaFiltro = '';
 if ($cuenta_id > 0) {
@@ -218,11 +241,10 @@ if ($cuenta_id > 0) {
 
 $cos = $pdo->prepare("
     SELECT gp.fecha_pago AS fecha,
-           'Costo' AS tipo,
+           '{$labDeb}' AS tipo,
            'gasto' AS origen,
            gp.monto AS monto,
            CONCAT('Gasto - ', p.nombre) AS concepto,
-           CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre,
            COALESCE(gp.referencia, '') AS referencia,
            COALESCE(gp.observaciones, '') AS descripcion,
            NULL AS movimiento_manual_id,
@@ -231,8 +253,6 @@ $cos = $pdo->prepare("
     FROM gasto_pagos gp
     JOIN gastos g ON gp.gasto_id = g.id
     JOIN partidas p ON g.partida_id = p.id
-    LEFT JOIN cuentas c ON gp.cuenta_id = c.id
-    LEFT JOIN bancos b ON c.banco_id = b.id
     WHERE gp.fecha_pago BETWEEN ? AND ?
       $gastoCuentaFiltro
 ");
@@ -250,19 +270,16 @@ try {
     }
     $mov = $pdo->prepare("
         SELECT mb.fecha_movimiento AS fecha,
-               CASE WHEN mb.tipo_movimiento = 'costo' THEN 'Costo' ELSE 'Ingreso' END AS tipo,
+               CASE WHEN mb.tipo_movimiento = 'costo' THEN '{$labDeb}' ELSE '{$labCred}' END AS tipo,
                'manual' AS origen,
                mb.monto AS monto,
                CONCAT('Movimiento - ', fp.nombre) AS concepto,
-               CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre,
                COALESCE(mb.referencia, '') AS referencia,
                COALESCE(mb.descripcion, '') AS descripcion,
                mb.id AS movimiento_manual_id,
                mb.cuenta_id AS manual_cuenta_id,
                mb.forma_pago_id AS manual_forma_pago_id
         FROM movimientos_bancarios mb
-        JOIN cuentas c ON mb.cuenta_id = c.id
-        JOIN bancos b ON c.banco_id = b.id
         JOIN formas_pago fp ON mb.forma_pago_id = fp.id
         WHERE mb.fecha_movimiento BETWEEN ? AND ?
           $manualCuentaFiltro
@@ -288,9 +305,9 @@ $totalCostos = 0.0;
 foreach ($movs as $m) {
     $tipo = $m['tipo'] ?? '';
     $val = (float) ($m['monto'] ?? 0);
-    if ($tipo === 'Ingreso') {
+    if ($tipo === $labCred) {
         $totalIngresos += $val;
-    } elseif ($tipo === 'Costo') {
+    } elseif ($tipo === $labDeb) {
         $totalCostos += $val;
     }
 }
@@ -313,6 +330,9 @@ $modalDataJson = json_encode([
 
 <?php if ($ok = obtener('ok')): ?>
     <div class="alert alert-success"><?= e($ok) ?></div>
+<?php endif; ?>
+<?php if ($err = obtener('err')): ?>
+    <div class="alert alert-danger"><?= e($err) ?></div>
 <?php endif; ?>
 
 <form method="get" class="toolbar mb-3">
@@ -343,8 +363,8 @@ $modalDataJson = json_encode([
 
 <div class="card p-3 mb-3">
     <div class="d-flex flex-wrap gap-2">
-        <div class="me-3"><strong>Total ingresos:</strong> <?= dinero($totalIngresos) ?></div>
-        <div class="me-3"><strong>Total costos:</strong> <?= dinero($totalCostos) ?></div>
+        <div class="me-3"><strong>Total créditos:</strong> <?= dinero($totalIngresos) ?></div>
+        <div class="me-3"><strong>Total débitos:</strong> <?= dinero($totalCostos) ?></div>
         <div><strong>Diferencia:</strong> <span style="color:<?= $diferencia >= 0 ? 'green' : '#b42318' ?>"><?= dinero($diferencia) ?></span></div>
     </div>
 </div>
@@ -358,7 +378,6 @@ $modalDataJson = json_encode([
                 <th>Fecha</th>
                 <th>Tipo</th>
                 <th>Concepto</th>
-                <th>Cuenta</th>
                 <th>Referencia</th>
                 <th>Comentario</th>
                 <th>Monto</th>
@@ -367,13 +386,13 @@ $modalDataJson = json_encode([
             </thead>
             <tbody>
             <?php if (empty($movs)): ?>
-                <tr><td colspan="8">No hay movimientos en el período.</td></tr>
+                <tr><td colspan="7">No hay movimientos en el período.</td></tr>
             <?php else: ?>
                 <?php foreach ($movs as $m): ?>
                     <?php
                     $tipo = $m['tipo'] ?? '';
                     $monto = (float) ($m['monto'] ?? 0);
-                    $color = $tipo === 'Ingreso' ? '#137333' : '#b42318';
+                    $color = $tipo === $labCred ? '#137333' : '#b42318';
                     $midManual = isset($m['movimiento_manual_id']) ? (int) $m['movimiento_manual_id'] : 0;
                     $editPayload = null;
                     if ($midManual > 0) {
@@ -381,7 +400,7 @@ $modalDataJson = json_encode([
                             'movimiento_id' => $midManual,
                             'cuenta_id' => (int) ($m['manual_cuenta_id'] ?? 0),
                             'forma_pago_id' => (int) ($m['manual_forma_pago_id'] ?? 0),
-                            'tipo_movimiento' => $tipo === 'Costo' ? 'costo' : 'ingreso',
+                            'tipo_movimiento' => $tipo === $labDeb ? 'costo' : 'ingreso',
                             'fecha_movimiento' => (string) ($m['fecha'] ?? ''),
                             'monto' => number_format($monto, 2, '.', ''),
                             'referencia' => (string) ($m['referencia'] ?? ''),
@@ -393,16 +412,23 @@ $modalDataJson = json_encode([
                         <td><?= fechaFormato($m['fecha']) ?></td>
                         <td><span class="fw-semibold" style="color:<?= $color ?>"><?= e($tipo) ?></span></td>
                         <td><?= e($m['concepto'] ?? '') ?></td>
-                        <td><?= e($m['cuenta_nombre'] ?? '—') ?></td>
                         <td><?= e($m['referencia'] ?? '') ?></td>
                         <td><?= e($m['descripcion'] ?? '') ?></td>
                         <td><?= dinero($monto) ?></td>
                         <td class="text-end">
                             <?php if ($editPayload !== null): ?>
-                                <button type="button" class="btn btn-sm btn-outline-primary btn-editar-mov-bancario"
-                                    data-mov="<?= htmlspecialchars(json_encode($editPayload, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>">
-                                    Editar
-                                </button>
+                                <div class="btn-group btn-group-sm" role="group" aria-label="Acciones movimiento">
+                                    <button type="button" class="btn btn-outline-primary btn-editar-mov-bancario"
+                                        data-mov="<?= htmlspecialchars(json_encode($editPayload, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>">
+                                        Editar
+                                    </button>
+                                    <button type="button" class="btn btn-outline-danger btn-eliminar-mov-bancario"
+                                        data-id="<?= (int) $midManual ?>"
+                                        data-resumen="<?= e(fechaFormato($m['fecha'] ?? '') . ' · ' . $tipo . ' · ' . dinero($monto)) ?>"
+                                    >
+                                        Eliminar
+                                    </button>
+                                </div>
                             <?php else: ?>
                                 <span class="text-muted small">—</span>
                             <?php endif; ?>
@@ -442,8 +468,8 @@ $modalDataJson = json_encode([
                         <div class="col-12 col-md-6">
                             <label class="form-label">Tipo</label>
                             <select class="form-select" name="tipo_movimiento" id="movBancarioTipo" required>
-                                <option value="ingreso">Ingreso</option>
-                                <option value="costo">Costo</option>
+                                <option value="ingreso"><?= e(marina_ui_credito()) ?></option>
+                                <option value="costo"><?= e(marina_ui_debito()) ?></option>
                             </select>
                         </div>
                         <div class="col-12 col-md-6">
@@ -461,7 +487,7 @@ $modalDataJson = json_encode([
                                 data-tipo-mov="<?= e($fRow['tipo_movimiento']) ?>"
                                 data-nombre="<?= e($fRow['nombre']) ?>"
                             >
-                                <?= e($fRow['nombre']) ?> (<?= e($fRow['tipo_movimiento'] === 'costo' ? 'Costo' : 'Ingreso') ?>)
+                                <?= e($fRow['nombre']) ?> (<?= e($fRow['tipo_movimiento'] === 'costo' ? marina_ui_debito() : marina_ui_credito()) ?>)
                             </option>
                         <?php endforeach; ?>
                     </select>
@@ -484,9 +510,46 @@ $modalDataJson = json_encode([
     </div>
 </div>
 
+<div class="modal fade" id="confirmEliminarMovBancarioModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="post" action="<?= e(MARINA_URL . '/index.php?' . $movBancarioQueryListado) ?>">
+                <input type="hidden" name="accion" value="eliminar_movimiento_bancario">
+                <input type="hidden" name="movimiento_id" id="movBancarioDeleteId" value="">
+                <div class="modal-header">
+                    <h5 class="modal-title">Eliminar movimiento</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0">¿Eliminar este movimiento bancario manual? Esta acción no se puede deshacer.</p>
+                    <p class="small text-muted mt-2 mb-0" id="movBancarioDeleteResumen"></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger">Eliminar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script>
 window.__movBancarioModal = <?= $modalDataJson ?: '{"mostrar":false,"error":"","datos":{}}' ?>;
 window.addEventListener('load', function() {
+    var delModalEl = document.getElementById('confirmEliminarMovBancarioModal');
+    var delModal = (delModalEl && typeof bootstrap !== 'undefined') ? new bootstrap.Modal(delModalEl) : null;
+    var delIdInput = document.getElementById('movBancarioDeleteId');
+    var delResumen = document.getElementById('movBancarioDeleteResumen');
+    document.addEventListener('click', function(ev) {
+        var btnDel = ev.target && ev.target.closest ? ev.target.closest('.btn-eliminar-mov-bancario') : null;
+        if (!btnDel || !delModal || !delIdInput) return;
+        var id = btnDel.getAttribute('data-id');
+        if (!id) return;
+        delIdInput.value = id;
+        if (delResumen) delResumen.textContent = btnDel.getAttribute('data-resumen') || '';
+        delModal.show();
+    });
+
     var el = document.getElementById('movBancarioModal');
     if (!el) return;
 

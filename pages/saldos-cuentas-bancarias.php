@@ -119,21 +119,25 @@ foreach ($filas as $f) {
 
 require_once __DIR__ . '/../includes/layout.php';
 ?>
-<h1 class="h4 mb-3">Saldos de cuentas bancarias</h1>
-<p class="text-muted small mb-3">
-    Resumen al <?= fechaFormato($fechaRef) ?>: ingresos por cuotas (movimientos y compatibilidad con pago único),
-    ingresos por <a href="<?= MARINA_URL ?>/index.php?p=combustible-despacho">despacho de combustible</a>,
-    ingresos por pagos de <strong>electricidad</strong> en contratos,
-    menos gastos asignados a la cuenta, más ingresos manuales y menos costos manuales en <a href="<?= MARINA_URL ?>/index.php?p=movimiento-bancario">movimientos bancarios</a>.
+<div class="row justify-content-center">
+<div class="col-12 col-lg-10 col-xl-8">
+<h1 class="h4 mb-3 text-center text-lg-start">Saldos de cuentas bancarias</h1>
+<p class="text-muted small mb-3 text-center text-lg-start mx-auto" style="max-width: 42rem;">
+    Resumen al <?= fechaFormato($fechaRef) ?>: créditos por cuotas (movimientos y compatibilidad con pago único),
+    créditos por <a href="<?= MARINA_URL ?>/index.php?p=combustible-despacho">despacho de combustible</a>,
+    créditos por pagos de <strong>electricidad</strong> en contratos,
+    menos gastos asignados a la cuenta, más créditos manuales y menos débitos manuales en <a href="<?= MARINA_URL ?>/index.php?p=movimiento-bancario">movimientos bancarios</a>.
     Para el detalle por fechas use <a href="<?= MARINA_URL ?>/index.php?p=reporte-estado-cuenta-bancarias">Estado de cuenta bancaria</a>.
 </p>
 
 <div class="card p-3 mb-3">
-    <div class="row g-2">
-        <div class="col-md-6"><strong>Total consolidado:</strong>
+    <div class="d-flex flex-column flex-sm-row align-items-center justify-content-center gap-1 gap-sm-3 text-center">
+        <div>
+            <strong>Total consolidado:</strong>
             <span class="<?= $totalSaldo >= 0 ? 'text-success' : 'text-danger' ?>"><?= dinero($totalSaldo) ?></span>
         </div>
-        <div class="col-md-6 text-md-end small text-muted"><?= count($filas) ?> cuenta(s)</div>
+        <span class="text-muted small d-none d-sm-inline">·</span>
+        <div class="small text-muted"><?= count($filas) ?> cuenta(s)</div>
     </div>
 </div>
 
@@ -143,7 +147,7 @@ require_once __DIR__ . '/../includes/layout.php';
             <thead>
                 <tr>
                     <th>Cuenta</th>
-                    <th class="text-end">Saldo</th>
+                    <th class="text-end" style="width: 11rem; white-space: nowrap">Saldo</th>
                 </tr>
             </thead>
             <tbody>
@@ -163,6 +167,8 @@ require_once __DIR__ . '/../includes/layout.php';
             </tbody>
         </table>
     </div>
+</div>
+</div>
 </div>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

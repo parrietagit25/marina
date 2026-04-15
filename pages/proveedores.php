@@ -32,14 +32,24 @@ if (enviado() && ($accion === 'crear' || $accion === 'editar')) {
     if ($nombre === '') {
         $mensaje = 'Nombre obligatorio.';
     } else {
-        if ($accion === 'editar' && $id > 0) {
-            $pdo->prepare('UPDATE proveedores SET nombre=?, documento=?, telefono=?, email=?, direccion=?, updated_by=? WHERE id=?')
-                ->execute([$nombre, $documento, $telefono, $email, $direccion, $uid, $id]);
-            redirigir(MARINA_URL . '/index.php?p=proveedores&ok=Actualizado');
-        } else {
-            $pdo->prepare('INSERT INTO proveedores (nombre, documento, telefono, email, direccion, created_by, updated_by) VALUES (?,?,?,?,?,?,?)')
-                ->execute([$nombre, $documento, $telefono, $email, $direccion, $uid, $uid]);
-            redirigir(MARINA_URL . '/index.php?p=proveedores&ok=Creado');
+        $docNorm = marina_normalizar_documento_identidad($documento);
+        $excluirDup = ($accion === 'editar' && $id > 0) ? $id : 0;
+        if ($docNorm !== '') {
+            $dup = marina_proveedor_documento_duplicado($pdo, $docNorm, $excluirDup);
+            if ($dup !== null) {
+                $mensaje = 'Ya existe un proveedor con el mismo RUC o cédula: «' . ($dup['nombre'] ?? '') . '» (ID ' . (int) ($dup['id'] ?? 0) . ').';
+            }
+        }
+        if ($mensaje === '') {
+            if ($accion === 'editar' && $id > 0) {
+                $pdo->prepare('UPDATE proveedores SET nombre=?, documento=?, telefono=?, email=?, direccion=?, updated_by=? WHERE id=?')
+                    ->execute([$nombre, $documento, $telefono, $email, $direccion, $uid, $id]);
+                redirigir(MARINA_URL . '/index.php?p=proveedores&ok=Actualizado');
+            } else {
+                $pdo->prepare('INSERT INTO proveedores (nombre, documento, telefono, email, direccion, created_by, updated_by) VALUES (?,?,?,?,?,?,?)')
+                    ->execute([$nombre, $documento, $telefono, $email, $direccion, $uid, $uid]);
+                redirigir(MARINA_URL . '/index.php?p=proveedores&ok=Creado');
+            }
         }
     }
 }
@@ -56,6 +66,7 @@ $ok = obtener('ok');
 $err = obtener('err');
 $mostrarModal = enviado() && ($accion === 'crear' || $accion === 'editar') && $mensaje !== '';
 $modalDatos = [
+    'formAccion' => $accion,
     'id' => $id,
     'nombre' => $registro['nombre'] ?? ($_POST['nombre'] ?? ''),
     'documento' => $registro['documento'] ?? ($_POST['documento'] ?? ''),

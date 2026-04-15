@@ -18,6 +18,35 @@ $st = $pdo->query("
 ");
 $partidas_hoja = $st->fetchAll(PDO::FETCH_KEY_PAIR);
 
+if ($accion === 'eliminar_abono' && enviado()) {
+    $pago_id = (int) ($_POST['pago_id'] ?? 0);
+    $gasto_id_ab = (int) ($_POST['gasto_id'] ?? 0);
+    if ($pago_id < 1 || $gasto_id_ab < 1) {
+        redirigir(MARINA_URL . '/index.php?p=gastos&err=' . rawurlencode('Solicitud no válida.'));
+    }
+    try {
+        $stChk = $pdo->prepare('SELECT id FROM gasto_pagos WHERE id = ? AND gasto_id = ? LIMIT 1');
+        $stChk->execute([$pago_id, $gasto_id_ab]);
+        if (!$stChk->fetch()) {
+            redirigir(MARINA_URL . '/index.php?p=gastos&err=' . rawurlencode('Abono no encontrado.'));
+        }
+        $pdo->beginTransaction();
+        $pdo->prepare('DELETE FROM gasto_pagos WHERE id = ? AND gasto_id = ?')->execute([$pago_id, $gasto_id_ab]);
+        marina_gasto_refrescar_estado($pdo, $gasto_id_ab);
+        $uidAb = usuarioId();
+        if ($uidAb !== null) {
+            $pdo->prepare('UPDATE gastos SET updated_by = ? WHERE id = ?')->execute([$uidAb, $gasto_id_ab]);
+        }
+        $pdo->commit();
+        redirigir(MARINA_URL . '/index.php?p=gastos&ok=' . rawurlencode('Abono eliminado; el pendiente de la factura se actualizó.'));
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        redirigir(MARINA_URL . '/index.php?p=gastos&err=' . rawurlencode('No se pudo eliminar el abono.'));
+    }
+}
+
 if ($accion === 'eliminar' && $id > 0 && enviado()) {
     $pag = marina_gasto_total_pagado($pdo, $id);
     if ($pag > 0.001) {
@@ -262,6 +291,7 @@ $modalAbonoDatos = [
                 $abonosPorGasto[$gid] = [];
             }
             $abonosPorGasto[$gid][] = [
+                'id' => (int) ($a['id'] ?? 0),
                 'fecha_pago' => (string) ($a['fecha_pago'] ?? ''),
                 'monto' => (float) ($a['monto'] ?? 0),
                 'cuenta_nombre' => trim((string) ($a['cuenta_nombre'] ?? '')) !== '' ? trim((string) $a['cuenta_nombre']) : '—',
@@ -402,6 +432,7 @@ $modalAbonoDatos = [
                                 <th>Forma de pago</th>
                                 <th>Referencia</th>
                                 <th>Observaciones</th>
+                                <th class="text-end" style="width: 6rem">Acción</th>
                             </tr>
                         </thead>
                         <tbody id="gastoVerAbonosTbody"></tbody>
@@ -456,6 +487,30 @@ $modalAbonoDatos = [
                 <div class="modal-footer">
                     <button type="submit" class="btn btn-primary">Registrar abono</button>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="confirmEliminarAbonoGastoModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+            <form method="post" action="?p=gastos">
+                <input type="hidden" name="accion" value="eliminar_abono">
+                <input type="hidden" name="pago_id" id="gastoAbonoDeletePagoId" value="">
+                <input type="hidden" name="gasto_id" id="gastoAbonoDeleteGastoId" value="">
+                <div class="modal-header">
+                    <h5 class="modal-title">Eliminar abono</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small mb-0" id="gastoAbonoDeleteTexto"></p>
+                    <p class="small text-muted mt-2 mb-0">El monto vuelve al saldo pendiente de la factura (ya no contará como pagado).</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger">Eliminar abono</button>
                 </div>
             </form>
         </div>

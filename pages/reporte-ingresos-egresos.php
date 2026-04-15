@@ -2,10 +2,13 @@
 /**
  * Reporte Ingresos / Egresos — detalle sin banco/cuenta en ingresos; opción agrupado (ingresos por grupo).
  */
-$titulo = 'Reporte — Ingresos / Egresos';
+$titulo = 'Reporte de ingresos y egresos';
 $pdo = getDb();
 require_once __DIR__ . '/../includes/reportes_queries.php';
 require_once __DIR__ . '/../includes/export_excel.php';
+
+$labCred = marina_ui_credito();
+$labDeb = marina_ui_debito();
 
 $desde = obtener('desde', date('Y-m-01'));
 $hasta = obtener('hasta', date('Y-m-d'));
@@ -221,10 +224,10 @@ $totEgr = array_sum(array_map(static function ($x) {
 
 $lineas = [];
 foreach ($lineasIng as $L) {
-    $lineas[] = array_merge($L, ['naturaleza' => 'Ingreso']);
+    $lineas[] = array_merge($L, ['naturaleza' => $labCred]);
 }
 foreach ($lineasEgr as $L) {
-    $lineas[] = array_merge($L, ['naturaleza' => 'Egreso', 'grupo' => '', 'slip' => '']);
+    $lineas[] = array_merge($L, ['naturaleza' => $labDeb, 'grupo' => '', 'slip' => '']);
 }
 usort($lineas, function ($a, $b) {
     return strcmp((string) $a['fecha'], (string) $b['fecha']);
@@ -232,7 +235,7 @@ usort($lineas, function ($a, $b) {
 
 $acum = 0.0;
 foreach ($lineas as &$L) {
-    if ($L['naturaleza'] === 'Ingreso') {
+    if ($L['naturaleza'] === $labCred) {
         $acum += $L['monto'];
     } else {
         $acum -= $L['monto'];
@@ -245,11 +248,11 @@ if (obtener('export') === 'excel') {
     if ($vista === 'agrupado') {
         $rows = [];
         foreach ($agrupadoIngresos as $nom => $m) {
-            $rows[] = ['Ingreso (por grupo)', $nom, '', '', (float) $m];
+            $rows[] = ['Crédito (por grupo)', $nom, '', '', (float) $m];
         }
         foreach ($lineasEgr as $E) {
             $rows[] = [
-                'Egreso',
+                $labDeb,
                 $E['fecha'] ?? '',
                 $E['concepto'] ?? '',
                 $E['tercero'] ?? '',
@@ -257,8 +260,8 @@ if (obtener('export') === 'excel') {
             ];
         }
         $pie = [
-            ['Totales', 'Ingresos', '', '', $totIng],
-            ['Totales', 'Egresos', '', '', $totEgr],
+            ['Totales', 'Créditos', '', '', $totIng],
+            ['Totales', 'Débitos', '', '', $totEgr],
             ['Neto', '', '', '', $totIng - $totEgr],
         ];
         exportarExcel('reporte_ingresos_egresos', ['Tipo', 'Grupo o fecha', 'Concepto', 'Proveedor / —', 'Monto'], $rows, $pie);
@@ -278,8 +281,8 @@ if (obtener('export') === 'excel') {
             ];
         }
         $pie = [
-            ['Totales ingresos', '', '', '', '', '', '', $totIng, ''],
-            ['Totales egresos', '', '', '', '', '', '', $totEgr, ''],
+            ['Totales créditos', '', '', '', '', '', '', $totIng, ''],
+            ['Totales débitos', '', '', '', '', '', '', $totEgr, ''],
             ['Neto del período', '', '', '', '', '', '', $totIng - $totEgr, ''],
             ['Saldo acumulado final', '', '', '', '', '', '', '', $acum],
         ];
@@ -295,7 +298,8 @@ $cuentasOpts = $pdo->query("
 
 require_once __DIR__ . '/../includes/layout.php';
 ?>
-<h1 class="h4 mb-3">Reporte — Ingresos / Egresos</h1>
+<h1 class="h4 mb-2">Reporte de ingresos y egresos</h1>
+<p class="text-muted small mb-3">Vista combinada del período: columnas y totales usan <?= e(marina_ui_credito()) ?> y <?= e(marina_ui_debito()) ?> según el tipo de movimiento.</p>
 
 <form method="get" class="toolbar mb-3">
     <input type="hidden" name="p" value="reporte-ingresos-egresos">
@@ -336,8 +340,8 @@ require_once __DIR__ . '/../includes/layout.php';
 
 <div class="card p-3 mb-3">
     <div class="row g-2 small">
-        <div class="col-md-4"><strong>Total ingresos:</strong> <?= dinero($totIng) ?></div>
-        <div class="col-md-4"><strong>Total egresos:</strong> <?= dinero($totEgr) ?></div>
+        <div class="col-md-4"><strong>Total créditos:</strong> <?= dinero($totIng) ?></div>
+        <div class="col-md-4"><strong>Total débitos:</strong> <?= dinero($totEgr) ?></div>
         <div class="col-md-4"><strong>Neto:</strong> <span class="<?= ($totIng - $totEgr) >= 0 ? 'text-success' : 'text-danger' ?>"><?= dinero($totIng - $totEgr) ?></span></div>
     </div>
     <?php if ($vista === 'detallado'): ?>
@@ -347,7 +351,7 @@ require_once __DIR__ . '/../includes/layout.php';
 
 <?php if ($vista === 'agrupado'): ?>
 <div class="card p-3 mb-3">
-    <h2 class="h6 mb-3">Ingresos por grupo / origen</h2>
+    <h2 class="h6 mb-3">Créditos por grupo / origen</h2>
     <div class="table-responsive">
         <table class="table table-sm table-hover align-middle mb-0">
             <thead>
@@ -364,14 +368,14 @@ require_once __DIR__ . '/../includes/layout.php';
                 </tr>
             <?php endforeach; ?>
             <?php if (empty($agrupadoIngresos)): ?>
-                <tr><td colspan="2" class="text-muted">No hay ingresos en el período.</td></tr>
+                <tr><td colspan="2" class="text-muted">No hay créditos en el período.</td></tr>
             <?php endif; ?>
             </tbody>
         </table>
     </div>
 </div>
 <div class="card p-3">
-    <h2 class="h6 mb-3">Egresos del período</h2>
+    <h2 class="h6 mb-3">Débitos del período</h2>
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
             <thead>
@@ -394,7 +398,7 @@ require_once __DIR__ . '/../includes/layout.php';
                 </tr>
             <?php endforeach; ?>
             <?php if (empty($lineasEgr)): ?>
-                <tr><td colspan="5" class="text-muted">No hay egresos en el período.</td></tr>
+                <tr><td colspan="5" class="text-muted">No hay débitos en el período.</td></tr>
             <?php endif; ?>
             </tbody>
         </table>
@@ -419,7 +423,7 @@ require_once __DIR__ . '/../includes/layout.php';
             </thead>
             <tbody>
             <?php foreach ($lineas as $L): ?>
-                <?php $col = $L['naturaleza'] === 'Ingreso' ? '#137333' : '#b42318'; ?>
+                <?php $col = $L['naturaleza'] === $labCred ? '#137333' : '#b42318'; ?>
                 <tr>
                     <td><?= fechaFormato($L['fecha']) ?></td>
                     <td><span class="fw-semibold" style="color:<?= $col ?>"><?= e($L['naturaleza']) ?></span></td>

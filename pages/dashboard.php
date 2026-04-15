@@ -362,14 +362,14 @@ require_once __DIR__ . '/../includes/layout.php';
 
 <div class="kpi-grid mb-4">
     <div class="kpi-card">
-        <div class="kpi-title"><i data-lucide="trending-up" class="menu-ico"></i>Ingresos total</div>
+        <div class="kpi-title"><i data-lucide="trending-up" class="menu-ico"></i>Total créditos</div>
         <div class="kpi-value"><?= dinero((float) $ingresos_total) ?></div>
-        <div class="text-muted small mt-1">Cuotas + despacho combustible + ingresos manuales en banco</div>
+        <div class="text-muted small mt-1">Cuotas + despacho combustible + créditos manuales en banco</div>
     </div>
     <div class="kpi-card">
-        <div class="kpi-title"><i data-lucide="trending-down" class="menu-ico"></i>Costos total</div>
+        <div class="kpi-title"><i data-lucide="trending-down" class="menu-ico"></i>Total débitos</div>
         <div class="kpi-value"><?= dinero((float) $costos_total) ?></div>
-        <div class="text-muted small mt-1">Gastos (partidas) + costos manuales en banco</div>
+        <div class="text-muted small mt-1">Gastos (partidas) + débitos manuales en banco</div>
     </div>
     <div class="kpi-card">
         <div class="kpi-title"><i data-lucide="sigma" class="menu-ico"></i>Diferencia</div>
@@ -425,10 +425,10 @@ require_once __DIR__ . '/../includes/layout.php';
         </div>
         <div class="col-12 col-md-4">
             <strong class="d-block mb-1">Finanzas y reportes</strong>
-            <a class="d-block" href="<?= MARINA_URL ?>/index.php?p=reportes">Ingresos y costos</a>
-            <a class="d-block" href="<?= MARINA_URL ?>/index.php?p=reporte-ingresos">Reporte ingresos</a>
-            <a class="d-block" href="<?= MARINA_URL ?>/index.php?p=reporte-egresos">Reporte egresos</a>
-            <a class="d-block" href="<?= MARINA_URL ?>/index.php?p=reporte-ingresos-egresos">Ingresos / egresos</a>
+            <a class="d-block" href="<?= MARINA_URL ?>/index.php?p=reportes">Reporte de ingresos y egresos</a>
+            <a class="d-block" href="<?= MARINA_URL ?>/index.php?p=reporte-ingresos">Reporte de ingreso</a>
+            <a class="d-block" href="<?= MARINA_URL ?>/index.php?p=reporte-egresos">Reporte de egresos</a>
+            <a class="d-block" href="<?= MARINA_URL ?>/index.php?p=reporte-ingresos-egresos">Reporte de ingresos y egresos</a>
             <a class="d-block" href="<?= MARINA_URL ?>/index.php?p=gastos">Factura / Pagar</a>
             <a class="d-block" href="<?= MARINA_URL ?>/index.php?p=movimiento-bancario">Movimientos bancarios</a>
         </div>
@@ -436,20 +436,20 @@ require_once __DIR__ . '/../includes/layout.php';
             <strong class="d-block mb-1">Marina</strong>
             <a class="d-block" href="<?= MARINA_URL ?>/index.php?p=contratos">Contratos</a>
             <a class="d-block" href="<?= MARINA_URL ?>/index.php?p=clientes">Clientes</a>
-            <a class="d-block" href="<?= MARINA_URL ?>/index.php?p=reporte-cuotas">Reporte cuotas</a>
+            <a class="d-block" href="<?= MARINA_URL ?>/index.php?p=reporte-cuotas">Reporte de cuotas</a>
         </div>
     </div>
 </div>
 
 <div class="charts-grid">
     <div class="card p-3">
-        <h2 class="h5 mb-2">Ingresos vs costos por día</h2>
-        <p class="text-muted small mb-2">Incluye cuotas, combustible despachado e ingresos manuales; costos incluyen gastos y movimientos tipo costo.</p>
+        <h2 class="h5 mb-2">Créditos vs débitos por día</h2>
+        <p class="text-muted small mb-2">Incluye cuotas, combustible despachado y créditos manuales; los débitos incluyen gastos y movimientos manuales tipo <?= e(marina_ui_debito()) ?>.</p>
         <canvas id="chartIngresosCostos" height="110"></canvas>
     </div>
     <div class="card p-3">
-        <h2 class="h5 mb-2">Ingresos por cuenta (top 5)</h2>
-        <p class="text-muted small mb-2">Misma base que el reporte de ingresos y costos (cuotas + combustible + manuales).</p>
+        <h2 class="h5 mb-2">Créditos por cuenta (top 5)</h2>
+        <p class="text-muted small mb-2">Misma base que el reporte de créditos y débitos (cuotas + combustible + manuales).</p>
         <canvas id="chartIngresosCuenta" height="110"></canvas>
     </div>
     <div class="card p-3">
@@ -467,7 +467,7 @@ require_once __DIR__ . '/../includes/layout.php';
 </div>
 
 <div class="mt-4 text-muted small">
-    Los totales del mes siguen la misma lógica que <a href="<?= MARINA_URL ?>/index.php?p=reportes">Ingresos / Costos</a> y los <a href="<?= MARINA_URL ?>/index.php?p=reporte-ingresos">reportes de ingreso</a>. El egreso por compra de combustible queda en gastos con partida Combustible al recibir el pedido.
+    Los totales del mes siguen la misma lógica que el <a href="<?= MARINA_URL ?>/index.php?p=reportes">reporte de ingresos y egresos</a> y el <a href="<?= MARINA_URL ?>/index.php?p=reporte-ingresos">reporte de ingreso</a>. El <?= e(marina_ui_debito()) ?> por compra de combustible queda en gastos con partida Combustible al recibir el pedido.
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous"></script>
@@ -541,8 +541,8 @@ foreach (MARINA_COMB_TIPOS as $k => $lab) {
             data: {
                 labels: labelsDias,
                 datasets: [
-                    { label: 'Ingresos', data: ingresosSerie, borderWidth: 2, borderColor: 'rgba(13,110,253,1)', backgroundColor: 'rgba(13,110,253,0.15)', tension: 0.25 },
-                    { label: 'Costos', data: costosSerie, borderWidth: 2, borderColor: 'rgba(220,53,69,1)', backgroundColor: 'rgba(220,53,69,0.15)', tension: 0.25 }
+                    { label: 'Créditos', data: ingresosSerie, borderWidth: 2, borderColor: 'rgba(13,110,253,1)', backgroundColor: 'rgba(13,110,253,0.15)', tension: 0.25 },
+                    { label: 'Débitos', data: costosSerie, borderWidth: 2, borderColor: 'rgba(220,53,69,1)', backgroundColor: 'rgba(220,53,69,0.15)', tension: 0.25 }
                 ]
             },
             options: commonOptions
@@ -556,7 +556,7 @@ foreach (MARINA_COMB_TIPOS as $k => $lab) {
             data: {
                 labels: labelsCuenta,
                 datasets: [
-                    { label: 'Ingresos', data: dataCuenta, backgroundColor: 'rgba(13,110,253,0.5)', borderColor: 'rgba(13,110,253,1)', borderWidth: 1 }
+                    { label: 'Créditos', data: dataCuenta, backgroundColor: 'rgba(13,110,253,0.5)', borderColor: 'rgba(13,110,253,1)', borderWidth: 1 }
                 ]
             },
             options: commonOptions

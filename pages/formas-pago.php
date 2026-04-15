@@ -76,7 +76,7 @@ $modalDatos = [
         <tr>
             <td><?= (int)$r['id'] ?></td>
             <td><?= e($r['nombre']) ?></td>
-            <td><?= e($r['tipo_movimiento'] === 'costo' ? 'Costo' : 'Ingreso') ?></td>
+            <td><?= e($r['tipo_movimiento'] === 'costo' ? marina_ui_debito() : marina_ui_credito()) ?></td>
             <td><?= fechaHoraFormato($r['created_at']) ?></td>
             <td><?= e($r['creado_por'] ?? '—') ?></td>
             <td class="acciones">
@@ -104,8 +104,8 @@ $modalDatos = [
                     <input type="text" class="form-control" id="formaPagoNombre" name="nombre" required placeholder="Ej: Efectivo, Transferencia">
                     <label class="mt-2">Tipo de movimiento</label>
                     <select class="form-select" id="formaPagoTipoMovimiento" name="tipo_movimiento" required>
-                        <option value="ingreso">Ingreso</option>
-                        <option value="costo">Costo</option>
+                        <option value="ingreso"><?= e(marina_ui_credito()) ?></option>
+                        <option value="costo"><?= e(marina_ui_debito()) ?></option>
                     </select>
                 </div>
                 <div class="modal-footer">

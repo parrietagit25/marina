@@ -33,14 +33,21 @@ if (enviado() && ($accion === 'crear' || $accion === 'editar')) {
     if ($nombre === '') {
         $mensaje = 'Nombre obligatorio.';
     } else {
-        if ($accion === 'editar' && $id > 0) {
-            $pdo->prepare('UPDATE clientes SET nombre=?, documento=?, telefono=?, email=?, direccion=?, dueno_capitan=?, updated_by=? WHERE id=?')
-                ->execute([$nombre, $documento, $telefono, $email, $direccion, $dueno_capitan !== '' ? $dueno_capitan : null, $uid, $id]);
-            redirigir(MARINA_URL . '/index.php?p=clientes&ok=Actualizado');
-        } else {
-            $pdo->prepare('INSERT INTO clientes (nombre, documento, telefono, email, direccion, dueno_capitan, created_by, updated_by) VALUES (?,?,?,?,?,?,?,?)')
-                ->execute([$nombre, $documento, $telefono, $email, $direccion, $dueno_capitan !== '' ? $dueno_capitan : null, $uid, $uid]);
-            redirigir(MARINA_URL . '/index.php?p=clientes&ok=Creado');
+        $excluirDup = ($accion === 'editar' && $id > 0) ? $id : 0;
+        $dupMsg = marina_cliente_mensaje_si_duplicado($pdo, $nombre, $documento, $telefono, $email, $excluirDup);
+        if ($dupMsg !== null) {
+            $mensaje = $dupMsg;
+        }
+        if ($mensaje === '') {
+            if ($accion === 'editar' && $id > 0) {
+                $pdo->prepare('UPDATE clientes SET nombre=?, documento=?, telefono=?, email=?, direccion=?, dueno_capitan=?, updated_by=? WHERE id=?')
+                    ->execute([$nombre, $documento, $telefono, $email, $direccion, $dueno_capitan !== '' ? $dueno_capitan : null, $uid, $id]);
+                redirigir(MARINA_URL . '/index.php?p=clientes&ok=Actualizado');
+            } else {
+                $pdo->prepare('INSERT INTO clientes (nombre, documento, telefono, email, direccion, dueno_capitan, created_by, updated_by) VALUES (?,?,?,?,?,?,?,?)')
+                    ->execute([$nombre, $documento, $telefono, $email, $direccion, $dueno_capitan !== '' ? $dueno_capitan : null, $uid, $uid]);
+                redirigir(MARINA_URL . '/index.php?p=clientes&ok=Creado');
+            }
         }
     }
 }
@@ -57,6 +64,7 @@ $ok = obtener('ok');
 $err = obtener('err');
 $mostrarModal = enviado() && ($accion === 'crear' || $accion === 'editar') && $mensaje !== '';
 $modalDatos = [
+    'formAccion' => $accion,
     'id' => $id,
     'nombre' => $registro['nombre'] ?? ($_POST['nombre'] ?? ''),
     'documento' => $registro['documento'] ?? ($_POST['documento'] ?? ''),

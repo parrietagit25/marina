@@ -18,6 +18,12 @@
         var $table = $(this);
         if ($table.hasClass('no-datatable')) return;
         if ($table.attr('data-dt-ready') === '1') return;
+        /* TN/18: DataTables no admite filas con colspan en tbody (p. ej. “sin datos”). */
+        if ($table.find('tbody td[colspan], tbody th[colspan]').filter(function() {
+          return (parseInt($(this).attr('colspan'), 10) || 1) > 1;
+        }).length) {
+          return;
+        }
         if ($.fn.dataTable.isDataTable(this)) {
           $table.attr('data-dt-ready', '1');
           return;

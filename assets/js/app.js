@@ -360,7 +360,13 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         if (window.__clienteModal && window.__clienteModal.mostrar && window.__clienteModal.datos) {
             var w = window.__clienteModal;
-            title.textContent = 'Editar cliente'; accion.value = 'editar'; fid.value = w.datos.id || ''; fillForm(w.datos); setErr(w.error || ''); modal.show();
+            var fa = (w.datos.formAccion || 'editar');
+            if (fa === 'crear') {
+                title.textContent = 'Nuevo cliente'; accion.value = 'crear'; fid.value = '';
+            } else {
+                title.textContent = 'Editar cliente'; accion.value = 'editar'; fid.value = w.datos.id || '';
+            }
+            fillForm(w.datos); setErr(w.error || ''); modal.show();
         }
     })();
 
@@ -401,7 +407,13 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         if (window.__proveedorModal && window.__proveedorModal.mostrar && window.__proveedorModal.datos) {
             var w = window.__proveedorModal;
-            title.textContent = 'Editar proveedor'; accion.value = 'editar'; fid.value = w.datos.id || ''; fillForm(w.datos); setErr(w.error || ''); modal.show();
+            var fa = (w.datos.formAccion || 'editar');
+            if (fa === 'crear') {
+                title.textContent = 'Nuevo proveedor'; accion.value = 'crear'; fid.value = '';
+            } else {
+                title.textContent = 'Editar proveedor'; accion.value = 'editar'; fid.value = w.datos.id || '';
+            }
+            fillForm(w.datos); setErr(w.error || ''); modal.show();
         }
     })();
 
@@ -586,7 +598,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!items.length) {
                 var tr0 = document.createElement('tr');
                 var td0 = document.createElement('td');
-                td0.colSpan = 6;
+                td0.colSpan = 7;
                 td0.className = 'text-muted text-center py-3';
                 td0.textContent = 'No hay abonos registrados para esta factura.';
                 tr0.appendChild(td0);
@@ -613,10 +625,44 @@ document.addEventListener('DOMContentLoaded', function () {
                     var tdo = document.createElement('td');
                     tdo.textContent = row.observaciones || '';
                     tr.appendChild(tdo);
+                    var tdAct = document.createElement('td');
+                    tdAct.className = 'text-end';
+                    if (row.id) {
+                        var btnDelAb = document.createElement('button');
+                        btnDelAb.type = 'button';
+                        btnDelAb.className = 'btn btn-outline-danger btn-sm btn-eliminar-abono-gasto';
+                        btnDelAb.setAttribute('data-pago-id', String(row.id));
+                        btnDelAb.setAttribute('data-gasto-id', String(fid));
+                        btnDelAb.setAttribute('data-fecha-fmt', gastoFmtFechaAbono(row.fecha_pago));
+                        btnDelAb.setAttribute('data-monto-fmt', gastoFmtMontoAbono(row.monto));
+                        btnDelAb.textContent = 'Eliminar';
+                        tdAct.appendChild(btnDelAb);
+                    }
+                    tr.appendChild(tdAct);
                     tbodyVerAbonos.appendChild(tr);
                 });
             }
             mVerAbonos.show();
+        });
+
+        var elDelAbono = document.getElementById('confirmEliminarAbonoGastoModal');
+        var mDelAbono = elDelAbono ? new bootstrap.Modal(elDelAbono) : null;
+        document.addEventListener('click', function(ev) {
+            var bDelAb = ev.target && ev.target.closest ? ev.target.closest('.btn-eliminar-abono-gasto') : null;
+            if (!bDelAb || !mDelAbono) return;
+            var hidP = document.getElementById('gastoAbonoDeletePagoId');
+            var hidG = document.getElementById('gastoAbonoDeleteGastoId');
+            var txtDel = document.getElementById('gastoAbonoDeleteTexto');
+            if (hidP) hidP.value = bDelAb.getAttribute('data-pago-id') || '';
+            if (hidG) hidG.value = bDelAb.getAttribute('data-gasto-id') || '';
+            if (txtDel) {
+                txtDel.textContent = '¿Eliminar el abono del ' + (bDelAb.getAttribute('data-fecha-fmt') || '') + ' por ' + (bDelAb.getAttribute('data-monto-fmt') || '') + '?';
+            }
+            if (elVerAbonos) {
+                var instVer = bootstrap.Modal.getInstance(elVerAbonos);
+                if (instVer) instVer.hide();
+            }
+            mDelAbono.show();
         });
 
         if (elAbono) {
@@ -672,6 +718,14 @@ document.addEventListener('DOMContentLoaded', function () {
             var n = parseFloat((v + '').replace(',', '.'));
             if (isNaN(n)) return v;
             return n.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+        function escHtmlMovs(s) {
+            if (s == null || String(s).trim() === '') return '—';
+            return String(s)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
         }
 
         // --- Agregar cuota
@@ -813,7 +867,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (!window.__cuotasMovimientos || !verCuotaActual) return;
                 var data = window.__cuotasMovimientos[verCuotaActual];
                 if (!data) {
-                    tablaBody.innerHTML = '<tr><td class="text-muted">No hay datos.</td><td></td><td></td><td></td></tr>';
+                    tablaBody.innerHTML = '<tr><td class="text-muted" colspan="5">No hay datos.</td></tr>';
                     return;
                 }
                 var tipo = (tipoFiltro && tipoFiltro.value) ? tipoFiltro.value : 'todos';
@@ -821,18 +875,20 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (tipo !== 'todos') movimientos = movimientos.filter(function(m) { return (m.tipo || '') === tipo; });
 
                 if (!movimientos.length) {
-                    tablaBody.innerHTML = '<tr><td class="text-muted">No hay movimientos.</td><td></td><td></td><td></td></tr>';
+                    tablaBody.innerHTML = '<tr><td class="text-muted" colspan="5">No hay movimientos.</td></tr>';
                     return;
                 }
 
                 var rows = movimientos.map(function(m) {
-                    var fecha = m.fecha_pago ? m.fecha_pago : '—';
+                    var fecha = m.fecha_pago ? escHtmlMovs(m.fecha_pago) : '—';
                     var monto = (m.monto !== undefined && m.monto !== null) ? formatMoney(m.monto) : '—';
-                    var forma = m.forma_pago_nombre ? m.forma_pago_nombre : '—';
-                    var ref = m.referencia ? m.referencia : '—';
+                    var concepto = escHtmlMovs(m.concepto);
+                    var forma = escHtmlMovs(m.forma_pago_nombre);
+                    var ref = escHtmlMovs(m.referencia);
                     return '<tr>' +
                         '<td>' + fecha + '</td>' +
-                        '<td>' + monto + '</td>' +
+                        '<td class="text-end">' + monto + '</td>' +
+                        '<td>' + concepto + '</td>' +
                         '<td>' + forma + '</td>' +
                         '<td>' + ref + '</td>' +
                         '</tr>';
