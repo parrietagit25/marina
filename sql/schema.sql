@@ -325,6 +325,7 @@ CREATE TABLE IF NOT EXISTS gasto_pagos (
 -- Movimientos bancarios manuales (no ligados a cuota/gasto)
 CREATE TABLE movimientos_bancarios (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  cliente_id INT UNSIGNED NULL,
   cuenta_id INT UNSIGNED NOT NULL,
   forma_pago_id INT UNSIGNED NOT NULL,
   tipo_movimiento VARCHAR(20) NOT NULL COMMENT 'ingreso | costo',
@@ -336,10 +337,12 @@ CREATE TABLE movimientos_bancarios (
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   created_by INT UNSIGNED NULL,
   updated_by INT UNSIGNED NULL,
+  FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE SET NULL,
   FOREIGN KEY (cuenta_id) REFERENCES cuentas(id) ON DELETE RESTRICT,
   FOREIGN KEY (forma_pago_id) REFERENCES formas_pago(id) ON DELETE RESTRICT,
   FOREIGN KEY (created_by) REFERENCES usuarios(id),
   FOREIGN KEY (updated_by) REFERENCES usuarios(id),
+  INDEX idx_mov_banc_cliente_fecha (cliente_id, fecha_movimiento),
   INDEX idx_mov_banc_fecha (fecha_movimiento),
   INDEX idx_mov_banc_cuenta_fecha (cuenta_id, fecha_movimiento),
   INDEX idx_mov_banc_tipo_fecha (tipo_movimiento, fecha_movimiento)

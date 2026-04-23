@@ -143,11 +143,12 @@ if (enviado() && ($accionPost === 'crear_movimiento_bancario' || $accionPost ===
             } else {
                 $sqlInsert = "
                     INSERT INTO movimientos_bancarios
-                        (cuenta_id, forma_pago_id, tipo_movimiento, monto, fecha_movimiento, referencia, descripcion, created_by, updated_by)
+                        (cliente_id, cuenta_id, forma_pago_id, tipo_movimiento, monto, fecha_movimiento, referencia, descripcion, created_by, updated_by)
                     VALUES
-                        (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ";
                 $pdo->prepare($sqlInsert)->execute([
+                    null,
                     $formData['cuenta_id'],
                     $formData['forma_pago_id'],
                     $formData['tipo_movimiento'],
@@ -463,7 +464,6 @@ $modalDataJson = json_encode([
                             </option>
                         <?php endforeach; ?>
                     </select>
-
                     <div class="row g-2 mt-1">
                         <div class="col-12 col-md-6">
                             <label class="form-label">Tipo</label>

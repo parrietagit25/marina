@@ -227,6 +227,17 @@ if ($accion === 'cuotas' && $registro) {
         ];
     }
 
+    // Totales de cuotas para validar contra el monto total del contrato
+    $totalCuotasRegistradas = 0.0;
+    foreach ($cuotas as $cTot) {
+        $totalCuotasRegistradas += (float) ($cTot['monto'] ?? 0);
+    }
+    $montoContrato = (float) ($registro['monto_total'] ?? 0);
+    $saldoDisponibleParaCuotas = $montoContrato - $totalCuotasRegistradas;
+    if ($saldoDisponibleParaCuotas < 0) {
+        $saldoDisponibleParaCuotas = 0.0;
+    }
+
     // Default para agregar cuota
     $cuotaAgregarDatos = ['numero_cuota' => count($cuotas) + 1, 'monto_cuota' => '', 'fecha_vencimiento' => ''];
 
@@ -246,11 +257,55 @@ if ($accion === 'cuotas' && $registro) {
                 'monto_cuota' => $_POST['monto_cuota'] ?? '',
                 'fecha_vencimiento' => $venc
             ];
+        } elseif ($saldoDisponibleParaCuotas <= 0.00001) {
+            $mensaje = 'No se puede registrar una nueva cuota: el total de cuotas ya alcanzó el monto del contrato (' . dinero($montoContrato) . ').';
+            $mostrarModalAgregarCuota = true;
+            $cuotaAgregarDatos = [
+                'numero_cuota' => $num ?: (count($cuotas) + 1),
+                'monto_cuota' => $_POST['monto_cuota'] ?? '',
+                'fecha_vencimiento' => $venc
+            ];
+        } elseif (($totalCuotasRegistradas + $monto) > ($montoContrato + 0.00001)) {
+            $exceso = ($totalCuotasRegistradas + $monto) - $montoContrato;
+            $mensaje = 'No se puede registrar la cuota: el total superaría el monto del contrato por ' . dinero($exceso) . '. Disponible para cuotas: ' . dinero($saldoDisponibleParaCuotas) . '.';
+            $mostrarModalAgregarCuota = true;
+            $cuotaAgregarDatos = [
+                'numero_cuota' => $num ?: (count($cuotas) + 1),
+                'monto_cuota' => $_POST['monto_cuota'] ?? '',
+                'fecha_vencimiento' => $venc
+            ];
         } else {
             $pdo->prepare('INSERT INTO cuotas (contrato_id, numero_cuota, monto, fecha_vencimiento, created_by, updated_by) VALUES (?,?,?,?,?,?)')
                 ->execute([$id, $num, $monto, $venc, usuarioId(), usuarioId()]);
             redirigir(MARINA_URL . '/index.php?p=contratos&accion=cuotas&id=' . $id . '&ok=Cuota+agregada');
         }
+    }
+
+    // --- Manejo POST: eliminar cuota (solo si no tiene abonos)
+    if (enviado() && isset($_POST['eliminar_cuota'])) {
+        if ($contratoTerminado) {
+            redirigir(MARINA_URL . '/index.php?p=contratos&accion=cuotas&id=' . $id . '&err=' . rawurlencode('Contrato liberado: no se pueden eliminar cuotas.'));
+        }
+        $cuotaEliminarId = (int) ($_POST['cuota_eliminar_id'] ?? 0);
+        if ($cuotaEliminarId < 1) {
+            redirigir(MARINA_URL . '/index.php?p=contratos&accion=cuotas&id=' . $id . '&err=' . rawurlencode('Cuota no válida.'));
+        }
+
+        $stCuota = $pdo->prepare('SELECT id FROM cuotas WHERE id = ? AND contrato_id = ? LIMIT 1');
+        $stCuota->execute([$cuotaEliminarId, $id]);
+        if (!$stCuota->fetch()) {
+            redirigir(MARINA_URL . '/index.php?p=contratos&accion=cuotas&id=' . $id . '&err=' . rawurlencode('La cuota no pertenece al contrato seleccionado.'));
+        }
+
+        $stAbonos = $pdo->prepare("SELECT COUNT(*) FROM cuotas_movimientos WHERE cuota_id = ? AND tipo = 'abono'");
+        $stAbonos->execute([$cuotaEliminarId]);
+        $totalAbonos = (int) $stAbonos->fetchColumn();
+        if ($totalAbonos > 0) {
+            redirigir(MARINA_URL . '/index.php?p=contratos&accion=cuotas&id=' . $id . '&err=' . rawurlencode('No se puede eliminar la cuota porque tiene abonos registrados.'));
+        }
+
+        $pdo->prepare('DELETE FROM cuotas WHERE id = ?')->execute([$cuotaEliminarId]);
+        redirigir(MARINA_URL . '/index.php?p=contratos&accion=cuotas&id=' . $id . '&ok=' . rawurlencode('Cuota eliminada.'));
     }
 
     // --- Manejo POST: pagar/abonar (movimiento)
@@ -380,10 +435,18 @@ if ($accion === 'cuotas' && $registro) {
     <div class="alert alert-secondary mb-3">Este contrato está <strong>liberado</strong>: solo puede ver cuotas y movimientos. No se pueden agregar cuotas, registrar pagos ni eliminar el contrato.</div>
     <?php endif; ?>
 
-    <?php if (!$contratoTerminado): ?>
+    <p class="text-muted small mb-3">
+        <strong>Total cuotas registradas:</strong> <?= dinero($totalCuotasRegistradas) ?> |
+        <strong>Monto contrato:</strong> <?= dinero($montoContrato) ?> |
+        <strong>Disponible:</strong> <?= dinero($saldoDisponibleParaCuotas) ?>
+    </p>
+
+    <?php if (!$contratoTerminado && $saldoDisponibleParaCuotas > 0.00001): ?>
     <div class="toolbar d-flex gap-2 mb-3" data-proxima-cuota="<?= count($cuotas) + 1 ?>">
         <button type="button" class="btn btn-primary" id="btnAgregarCuota">Registrar cuota</button>
     </div>
+    <?php elseif (!$contratoTerminado): ?>
+    <div class="alert alert-info mb-3">No se pueden registrar más cuotas porque el total de cuotas ya es igual al monto del contrato.</div>
     <?php endif; ?>
 
     <table class="no-datatable">
@@ -427,6 +490,14 @@ if ($accion === 'cuotas' && $registro) {
                         </div>
                     <?php else: ?>
                         <span class="text-muted">Pagada</span>
+                    <?php endif; ?>
+                    <?php $tienePagosRegistrados = ((float)($pagadoTotalPorCuota[$cid] ?? 0.0)) > 0.00001; ?>
+                    <?php if (!$contratoTerminado && !$tienePagosRegistrados): ?>
+                        <form method="post" action="?p=contratos&accion=cuotas&id=<?= $id ?>" class="d-inline-block mt-2" onsubmit="return confirm('¿Eliminar la cuota #<?= (int)$c['numero_cuota'] ?>? Solo se permite si no tiene abonos.');">
+                            <input type="hidden" name="eliminar_cuota" value="1">
+                            <input type="hidden" name="cuota_eliminar_id" value="<?= $cid ?>">
+                            <button type="submit" class="btn btn-outline-danger btn-sm">Eliminar cuota</button>
+                        </form>
                     <?php endif; ?>
                 </td>
                 <td>

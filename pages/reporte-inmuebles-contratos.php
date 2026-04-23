@@ -14,13 +14,10 @@ $gruposOpts = $pdo->query('SELECT id, nombre FROM grupos ORDER BY nombre')->fetc
 $sql = "
     SELECT co.id, co.fecha_inicio, co.fecha_fin, co.monto_total, co.activo, COALESCE(co.estado, 'activo') AS estado,
            cl.nombre AS cliente,
-           CONCAT(b.nombre, ' - ', cu.nombre) AS cuenta_nombre,
            gr.nombre AS grupo_nombre,
            im.nombre AS inmueble_nombre
     FROM contratos co
     JOIN clientes cl ON cl.id = co.cliente_id
-    JOIN cuentas cu ON cu.id = co.cuenta_id
-    JOIN bancos b ON b.id = cu.banco_id
     LEFT JOIN grupos gr ON gr.id = co.grupo_id
     LEFT JOIN inmuebles im ON im.id = co.inmueble_id
     WHERE co.inmueble_id IS NOT NULL
@@ -49,7 +46,6 @@ if (obtener('export') === 'excel') {
             $r['grupo_nombre'] ?? '',
             $r['inmueble_nombre'] ?? '',
             $r['cliente'] ?? '',
-            $r['cuenta_nombre'] ?? '',
             $r['fecha_inicio'] ?? '',
             $r['fecha_fin'] ?? '',
             (float) ($r['monto_total'] ?? 0),
@@ -59,8 +55,8 @@ if (obtener('export') === 'excel') {
     $sumMontos = array_sum(array_map(static function ($r) {
         return (float) ($r['monto_total'] ?? 0);
     }, $filas));
-    $pie = [['Total', '', '', '', '', '', '', $sumMontos, '']];
-    exportarExcel('reporte_inmuebles_contratos', ['ID', 'Grupo', 'Inmueble', 'Cliente', 'Cuenta', 'Inicio', 'Fin', 'Monto total', 'Estado'], $rows, $pie);
+    $pie = [['Total', '', '', '', '', '', $sumMontos, '']];
+    exportarExcel('reporte_inmuebles_contratos', ['ID', 'Grupo', 'Inmueble', 'Cliente', 'Inicio', 'Fin', 'Monto total', 'Estado'], $rows, $pie);
 }
 
 require_once __DIR__ . '/../includes/layout.php';
@@ -105,7 +101,6 @@ require_once __DIR__ . '/../includes/layout.php';
                     <th>Grupo</th>
                     <th>Inmueble</th>
                     <th>Cliente</th>
-                    <th>Cuenta</th>
                     <th>Inicio</th>
                     <th>Fin</th>
                     <th class="text-end">Monto total</th>
@@ -120,7 +115,6 @@ require_once __DIR__ . '/../includes/layout.php';
                     <td><?= e($r['grupo_nombre'] ?? '—') ?></td>
                     <td><?= e($r['inmueble_nombre'] ?? '—') ?></td>
                     <td><?= e($r['cliente'] ?? '') ?></td>
-                    <td><?= e($r['cuenta_nombre'] ?? '') ?></td>
                     <td><?= fechaFormato($r['fecha_inicio']) ?></td>
                     <td><?= fechaFormato($r['fecha_fin']) ?></td>
                     <td class="text-end"><?= dinero((float) ($r['monto_total'] ?? 0)) ?></td>
@@ -129,7 +123,7 @@ require_once __DIR__ . '/../includes/layout.php';
                 </tr>
             <?php endforeach; ?>
             <?php if (empty($filas)): ?>
-                <tr><td colspan="10" class="text-muted">No hay contratos con inmueble asignado.</td></tr>
+                <tr><td colspan="9" class="text-muted">No hay contratos con inmueble asignado.</td></tr>
             <?php endif; ?>
             </tbody>
         </table>

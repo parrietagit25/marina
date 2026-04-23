@@ -15,12 +15,23 @@ function marina_ensure_schema(PDO $pdo): void
         "ALTER TABLE contratos ADD COLUMN numero_recibo VARCHAR(100) NULL DEFAULT NULL COMMENT 'Número de recibo al cliente' AFTER observaciones",
         "ALTER TABLE cuotas_movimientos ADD COLUMN concepto VARCHAR(255) NULL DEFAULT NULL COMMENT 'Término / descripción del pago de cuota' AFTER referencia",
         "ALTER TABLE clientes ADD COLUMN dueno_capitan VARCHAR(150) NULL DEFAULT NULL COMMENT 'Dueño / Capitán' AFTER direccion",
+        "ALTER TABLE movimientos_bancarios ADD COLUMN cliente_id INT UNSIGNED NULL DEFAULT NULL AFTER id",
     ];
     foreach ($stmts as $sql) {
         try {
             $pdo->exec($sql);
         } catch (Throwable $e) {
             // Columna duplicada u otro entorno ya migrado
+        }
+    }
+    foreach ([
+        "ALTER TABLE movimientos_bancarios ADD CONSTRAINT fk_mov_banc_cliente FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE SET NULL",
+        "ALTER TABLE movimientos_bancarios ADD INDEX idx_mov_banc_cliente_fecha (cliente_id, fecha_movimiento)",
+    ] as $sqlMovBanc) {
+        try {
+            $pdo->exec($sqlMovBanc);
+        } catch (Throwable $e) {
+            // FK o índice ya existente
         }
     }
 

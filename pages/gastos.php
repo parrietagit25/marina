@@ -398,7 +398,7 @@ $modalAbonoDatos = [
                         <div class="col-md-6">
                             <label>Referencia</label>
                             <input type="text" class="form-control" id="gastoReferencia" name="referencia">
-                            <label class="mt-2">Observaciones</label>
+                            <label class="mt-2">Concepto</label>
                             <textarea class="form-control" id="gastoObservaciones" name="observaciones" rows="4"></textarea>
                         </div>
                     </div>
