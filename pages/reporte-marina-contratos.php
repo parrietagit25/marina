@@ -56,7 +56,7 @@ if (obtener('export') === 'excel') {
         return (float) ($r['monto_total'] ?? 0);
     }, $filas));
     $pie = [['Total', '', '', '', '', '', $sumMontos, '']];
-    exportarExcel('reporte_marina_contratos', ['ID', 'Muelle', 'Slip', 'Cliente', 'Inicio', 'Fin', 'Monto total', 'Estado'], $rows, $pie);
+    exportarExcel('reporte_marina_contratos', ['ID', 'Muelle', 'Slip', 'Cliente', 'Inicio', 'Fin', 'Monto total', 'Estado'], $rows, $pie, $titulo);
 }
 
 require_once __DIR__ . '/../includes/layout.php';

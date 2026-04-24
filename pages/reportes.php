@@ -140,7 +140,7 @@ if (obtener('export') === 'excel') {
         ['Total débitos', '', $total_gastos],
         ['Diferencia (créditos − débitos)', '', $diferencia],
     ];
-    exportarExcel('reporte_ingresos_costos', ['Seccion', 'Concepto', 'Total'], $rows, $pie);
+    exportarExcel('reporte_ingresos_costos', ['Seccion', 'Concepto', 'Total'], $rows, $pie, $titulo);
 }
 
 require_once __DIR__ . '/../includes/layout.php';

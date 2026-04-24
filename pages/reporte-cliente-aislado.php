@@ -98,7 +98,7 @@ if (obtener('export') === 'excel') {
         'Referencia',
         'Descripcion',
         'Monto',
-    ], $rows, $pie);
+    ], $rows, $pie, $titulo);
 }
 
 require_once __DIR__ . '/../includes/layout.php';

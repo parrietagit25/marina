@@ -215,7 +215,11 @@ if (obtener('export') === 'excel') {
             $acumFinal,
         ],
     ];
-    exportarExcel('reporte_estado_cuenta_bancaria', ['Fecha', 'Concepto', 'Referencia', 'Cliente / Proveedor', 'Crédito', 'Débito', 'Acumulado'], $rows, $pie);
+    $excelTitulo = $titulo;
+    if ($cuenta_id > 0 && $cuentaTitulo !== '') {
+        $excelTitulo .= ' — ' . $cuentaTitulo;
+    }
+    exportarExcel('reporte_estado_cuenta_bancaria', ['Fecha', 'Concepto', 'Referencia', 'Cliente / Proveedor', 'Crédito', 'Débito', 'Acumulado'], $rows, $pie, $excelTitulo);
 }
 
 $netoPeriodo = $totIng - $totEgr;

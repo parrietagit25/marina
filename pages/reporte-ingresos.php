@@ -226,7 +226,7 @@ if (obtener('export') === 'excel') {
             $rows[] = [$nom, $m];
         }
         $pie = [['Total', $total]];
-        exportarExcel('reporte_ingresos_agrupado', ['Grupo / origen', 'Monto'], $rows, $pie);
+        exportarExcel('reporte_ingresos_agrupado', ['Muelle / grupo', 'Monto'], $rows, $pie, $titulo . ' — Agrupado (totales por muelle / grupo)');
     } else {
         $rows = [];
         foreach ($filas as $r) {
@@ -241,7 +241,7 @@ if (obtener('export') === 'excel') {
             ];
         }
         $pie = [['Total', '', '', '', '', '', $total]];
-        exportarExcel('reporte_ingresos', ['Fecha', 'Cliente', 'Grupo', 'Slip / inmueble', 'Concepto', 'Referencia', 'Monto'], $rows, $pie);
+        exportarExcel('reporte_ingresos', ['Fecha', 'Cliente', 'Grupo', 'Slip / inmueble', 'Concepto', 'Referencia', 'Monto'], $rows, $pie, $titulo . ' — Detallado');
     }
 }
 
@@ -338,7 +338,7 @@ require_once __DIR__ . '/../includes/layout.php';
             <label class="form-label mb-1">Vista</label>
             <select class="form-select" name="vista">
                 <option value="detallado" <?= $vista === 'detallado' ? 'selected' : '' ?>>Detallado</option>
-                <option value="agrupado" <?= $vista === 'agrupado' ? 'selected' : '' ?>>Agrupado (totales por grupo)</option>
+                <option value="agrupado" <?= $vista === 'agrupado' ? 'selected' : '' ?>>Agrupado (totales por muelle / grupo)</option>
             </select>
         </div>
         <div class="col-12 col-md-auto d-flex flex-wrap gap-2">
@@ -359,7 +359,7 @@ require_once __DIR__ . '/../includes/layout.php';
         <table class="table table-hover align-middle">
             <thead>
                 <tr>
-                    <th>Grupo / origen</th>
+                <th>Muelle / grupo</th>
                     <th class="text-end">Total crédito</th>
                 </tr>
             </thead>
@@ -372,6 +372,11 @@ require_once __DIR__ . '/../includes/layout.php';
             <?php endforeach; ?>
             <?php if (empty($agrupadoPorGrupo)): ?>
                 <tr><td colspan="2" class="text-muted">No hay créditos en el período.</td></tr>
+            <?php else: ?>
+                <tr class="table-light fw-bold">
+                    <td>Total general</td>
+                    <td class="text-end"><?= dinero($total) ?></td>
+                </tr>
             <?php endif; ?>
             </tbody>
         </table>

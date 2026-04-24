@@ -119,7 +119,7 @@ if (obtener('export') === 'excel') {
             $rows[] = [$nom, $m];
         }
         $pie = [['Total', $total]];
-        exportarExcel('reporte_egresos_agrupado', ['Partida / origen', 'Monto'], $rows, $pie);
+        exportarExcel('reporte_egresos_agrupado', ['Partida / origen', 'Monto'], $rows, $pie, $titulo . ' — Agrupado (totales por partida / manual)');
     } else {
         $rows = [];
         foreach ($filas as $r) {
@@ -133,7 +133,7 @@ if (obtener('export') === 'excel') {
             ];
         }
         $pie = [['Total', '', '', '', '', $total]];
-        exportarExcel('reporte_egresos', ['Fecha', 'Origen', 'Concepto', 'Proveedor', 'Referencia', 'Monto'], $rows, $pie);
+        exportarExcel('reporte_egresos', ['Fecha', 'Origen', 'Concepto', 'Proveedor', 'Referencia', 'Monto'], $rows, $pie, $titulo . ' — Detallado');
     }
 }
 

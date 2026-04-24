@@ -71,7 +71,7 @@ if ($vista === 'pedidos') {
                 ($r['estado_pago'] ?? '') === 'pagado' ? 'Pagado' : 'Por pagar',
             ];
         }
-        exportarExcel('reporte_combustible_pedidos', $encabezados, $rows, []);
+        exportarExcel('reporte_combustible_pedidos', $encabezados, $rows, [], 'Reporte — Combustible (Pedidos)');
     }
 } elseif ($vista === 'despachos') {
     $st = $pdo->prepare("
@@ -99,7 +99,7 @@ if ($vista === 'pedidos') {
                 $r['cuenta_nombre'] ?? '',
             ];
         }
-        exportarExcel('reporte_combustible_despachos', $encabezados, $rows, []);
+        exportarExcel('reporte_combustible_despachos', $encabezados, $rows, [], 'Reporte — Combustible (Despachos)');
     }
 } else {
     try {
@@ -126,7 +126,7 @@ if ($vista === 'pedidos') {
                 $r['motivo'] ?? '',
             ];
         }
-        exportarExcel('reporte_combustible_ajustes', $encabezados, $rows, []);
+        exportarExcel('reporte_combustible_ajustes', $encabezados, $rows, [], 'Reporte — Combustible (Ajustes)');
     }
 }
 

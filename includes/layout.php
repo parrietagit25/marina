@@ -22,7 +22,7 @@ $seccionCostoGastos = in_array($p, ['proveedores', 'gastos', 'reporte-proveedore
 $paginasCombustible = ['combustible-pedidos', 'combustible-despacho', 'combustible-ajuste', 'combustible-precios'];
 $seccionCombustibleSub = in_array($p, $paginasCombustible, true);
 $seccionMarina = in_array($p, array_merge(['clientes', 'muelles', 'slips', 'grupos', 'inmuebles', 'mapa-marina', 'mapa-grupos', 'contratos', 'contratos-electricidad'], $paginasCombustible), true);
-$seccionReportes = in_array($p, ['reporte-cuotas', 'reporte-ingresos', 'reporte-egresos', 'reporte-ingresos-egresos', 'reporte-marina-contratos', 'reporte-inmuebles-contratos', 'reporte-combustible', 'reporte-cliente-aislado', 'reportes'], true);
+$seccionReportes = in_array($p, ['reporte-cuotas', 'reporte-ingresos', 'reporte-egresos', 'reporte-ingresos-egresos', 'reporte-electricidad', 'reporte-ocupacion', 'reporte-marina-contratos', 'reporte-inmuebles-contratos', 'reporte-combustible', 'reporte-cliente-aislado', 'reportes'], true);
 ?>
 <!DOCTYPE html>
 <html lang='es' style='font-size: <?= (int) $marinaFontSizePct ?>%;'>
@@ -118,6 +118,8 @@ $seccionReportes = in_array($p, ['reporte-cuotas', 'reporte-ingresos', 'reporte-
           <a class='list-group-item list-group-item-action <?= ($p === 'reporte-inmuebles-contratos') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reporte-inmuebles-contratos'>Reporte Inmuebles -> contratos</a>
           <a class='list-group-item list-group-item-action <?= ($p === 'reporte-cliente-aislado') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reporte-cliente-aislado'>Reporte Cliente Aislado</a>
           <a class='list-group-item list-group-item-action <?= ($p === 'reporte-combustible') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reporte-combustible'>Combustible</a>
+          <a class='list-group-item list-group-item-action <?= ($p === 'reporte-electricidad') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reporte-electricidad'>Electricidad (contratos)</a>
+          <a class='list-group-item list-group-item-action <?= ($p === 'reporte-ocupacion') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reporte-ocupacion'>Reporte de Ocupación</a>
         </div>
       </div>
 
@@ -221,6 +223,8 @@ $seccionReportes = in_array($p, ['reporte-cuotas', 'reporte-ingresos', 'reporte-
                 <a class='list-group-item list-group-item-action <?= ($p === 'reporte-inmuebles-contratos') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reporte-inmuebles-contratos'>Reporte Inmuebles -> contratos</a>
                 <a class='list-group-item list-group-item-action <?= ($p === 'reporte-cliente-aislado') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reporte-cliente-aislado'>Reporte Cliente Aislado</a>
                 <a class='list-group-item list-group-item-action <?= ($p === 'reporte-combustible') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reporte-combustible'>Combustible</a>
+                <a class='list-group-item list-group-item-action <?= ($p === 'reporte-electricidad') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reporte-electricidad'>Electricidad (contratos)</a>
+                <a class='list-group-item list-group-item-action <?= ($p === 'reporte-ocupacion') ? 'active' : '' ?>' href='<?= MARINA_URL ?>/index.php?p=reporte-ocupacion'>Reporte de Ocupación</a>
               </div>
             </div>
 

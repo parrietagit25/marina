@@ -264,7 +264,7 @@ if (obtener('export') === 'excel') {
             ['Totales', 'Débitos', '', '', $totEgr],
             ['Neto', '', '', '', $totIng - $totEgr],
         ];
-        exportarExcel('reporte_ingresos_egresos', ['Tipo', 'Grupo o fecha', 'Concepto', 'Proveedor / —', 'Monto'], $rows, $pie);
+        exportarExcel('reporte_ingresos_egresos', ['Tipo', 'Grupo o fecha', 'Concepto', 'Proveedor / —', 'Monto'], $rows, $pie, $titulo . ' — Agrupado (ingresos por grupo + egresos en detalle)');
     } else {
         $rows = [];
         foreach ($lineas as $L) {
@@ -286,7 +286,7 @@ if (obtener('export') === 'excel') {
             ['Neto del período', '', '', '', '', '', '', $totIng - $totEgr, ''],
             ['Saldo acumulado final', '', '', '', '', '', '', '', $acum],
         ];
-        exportarExcel('reporte_ingresos_egresos', ['Fecha', 'Naturaleza', 'Grupo', 'Slip / inmueble', 'Concepto', 'Cliente / Proveedor', 'Referencia', 'Monto', 'Acumulado'], $rows, $pie);
+        exportarExcel('reporte_ingresos_egresos', ['Fecha', 'Naturaleza', 'Grupo', 'Slip / inmueble', 'Concepto', 'Cliente / Proveedor', 'Referencia', 'Monto', 'Acumulado'], $rows, $pie, $titulo . ' — Detallado (línea a línea)');
     }
 }
 

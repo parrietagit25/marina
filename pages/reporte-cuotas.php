@@ -209,7 +209,7 @@ if (obtener('export') === 'excel') {
         'Vencimiento',
         'Estado cuota',
         'Estado contrato',
-    ], $rows, $pie);
+    ], $rows, $pie, $titulo);
 }
 
 require_once __DIR__ . '/../includes/layout.php';
