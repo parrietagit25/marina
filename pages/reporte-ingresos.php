@@ -61,7 +61,7 @@ if ($cuenta_id > 0) {
     $params[] = $cuenta_id;
 }
 
-$sql = 'SELECT * FROM (' . reportesSqlIngresosDetalle($cuentaCond, $fragCo, $fragCo) . ') x ORDER BY x.fecha, x.cliente_nombre, x.grupo_nombre';
+$sql = 'SELECT * FROM (' . reportesSqlIngresosDetalle($cuentaCond, $fragCo, $fragCo) . ') x ORDER BY x.grupo_nombre, x.slip_o_inmueble, x.fecha, x.cliente_nombre';
 $st = $pdo->prepare($sql);
 $st->execute($params);
 $filas = $st->fetchAll(PDO::FETCH_ASSOC);
@@ -113,28 +113,30 @@ if (!$omitirSinContrato) {
         $cParams = [$desde, $hasta];
         $cCuenta = '';
         if ($cuenta_id > 0) {
-            $cCuenta = ' AND cd.cuenta_id = ? ';
+            $cCuenta = ' AND p.cuenta_id = ? ';
             $cParams[] = $cuenta_id;
         }
         $combSt = $pdo->prepare("
-        SELECT cd.fecha AS fecha,
-               cd.monto_total AS monto,
+        SELECT p.fecha_pago AS fecha,
+               p.monto AS monto,
                '{$labCred}' AS tipo_linea,
-               CONCAT('Combustible — ', UPPER(SUBSTRING(cd.tipo_combustible, 1, 1)), SUBSTRING(cd.tipo_combustible, 2), ' — ', cd.embarcacion) AS concepto,
-               '' AS cuenta_nombre,
-               cd.cuenta_id,
+               CONCAT('Combustible — ', UPPER(SUBSTRING(cd.tipo_combustible, 1, 1)), SUBSTRING(cd.tipo_combustible, 2), ' — ', cd.embarcacion, ' (desp. #', cd.id, ')') AS concepto,
+               CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre,
+               p.cuenta_id,
                cd.embarcacion AS cliente_nombre,
                NULL AS contrato_id,
                NULL AS cuota_id,
                NULL AS numero_cuota,
-               '' AS referencia,
-               '' AS forma_pago_nombre,
+               COALESCE(p.referencia, '') AS referencia,
+               COALESCE(fp.nombre, '') AS forma_pago_nombre,
                'Combustible (despacho)' AS grupo_nombre,
                '' AS slip_o_inmueble
-        FROM combustible_despachos cd
-        JOIN cuentas c ON c.id = cd.cuenta_id
+        FROM combustible_despacho_pagos p
+        JOIN combustible_despachos cd ON cd.id = p.despacho_id
+        JOIN cuentas c ON c.id = p.cuenta_id
         JOIN bancos b ON b.id = c.banco_id
-        WHERE cd.fecha BETWEEN ? AND ?
+        LEFT JOIN formas_pago fp ON fp.id = p.forma_pago_id
+        WHERE p.fecha_pago BETWEEN ? AND ?
         $cCuenta
     ");
         $combSt->execute($cParams);
@@ -196,8 +198,40 @@ if ($allowedCuotaIds !== null) {
         return $cid > 0 && isset($set[$cid]);
     }));
 }
-usort($filas, function ($a, $b) {
-    return strcmp((string) ($a['fecha'] ?? ''), (string) ($b['fecha'] ?? ''));
+$gruposEspecialesIngresos = ['Movimientos manuales', 'Combustible (despacho)', 'Electricidad (contrato)'];
+$esGrupoEspecialIngresos = static function (string $nombre) use ($gruposEspecialesIngresos): bool {
+    return in_array($nombre, $gruposEspecialesIngresos, true);
+};
+usort($filas, static function (array $a, array $b) use ($esGrupoEspecialIngresos): int {
+    $ga = trim((string) ($a['grupo_nombre'] ?? ''));
+    $gb = trim((string) ($b['grupo_nombre'] ?? ''));
+    if ($ga === '') {
+        $ga = 'Sin ubicación';
+    }
+    if ($gb === '') {
+        $gb = 'Sin ubicación';
+    }
+    $ea = $esGrupoEspecialIngresos($ga) ? 1 : 0;
+    $eb = $esGrupoEspecialIngresos($gb) ? 1 : 0;
+    if ($ea !== $eb) {
+        return $ea <=> $eb;
+    }
+    $cmp = strnatcasecmp($ga, $gb);
+    if ($cmp !== 0) {
+        return $cmp;
+    }
+    $ua = trim((string) ($a['slip_o_inmueble'] ?? ''));
+    $ub = trim((string) ($b['slip_o_inmueble'] ?? ''));
+    $cmp = strnatcasecmp($ua, $ub);
+    if ($cmp !== 0) {
+        return $cmp;
+    }
+    $cmp = strcmp((string) ($a['fecha'] ?? ''), (string) ($b['fecha'] ?? ''));
+    if ($cmp !== 0) {
+        return $cmp;
+    }
+
+    return strnatcasecmp((string) ($a['cliente_nombre'] ?? ''), (string) ($b['cliente_nombre'] ?? ''));
 });
 
 $total = array_sum(array_map(static function ($r) {
@@ -216,7 +250,15 @@ if ($vista === 'agrupado') {
         }
         $agrupadoPorGrupo[$g] += (float) ($r['monto'] ?? 0);
     }
-    uksort($agrupadoPorGrupo, 'strnatcasecmp');
+    uksort($agrupadoPorGrupo, static function (string $ka, string $kb) use ($esGrupoEspecialIngresos): int {
+        $ea = $esGrupoEspecialIngresos($ka) ? 1 : 0;
+        $eb = $esGrupoEspecialIngresos($kb) ? 1 : 0;
+        if ($ea !== $eb) {
+            return $ea <=> $eb;
+        }
+
+        return strnatcasecmp($ka, $kb);
+    });
 }
 
 if (obtener('export') === 'excel') {
@@ -398,7 +440,22 @@ require_once __DIR__ . '/../includes/layout.php';
                 </tr>
             </thead>
             <tbody>
-            <?php foreach ($filas as $r): ?>
+            <?php
+            $prevGrupoCabecera = null;
+            foreach ($filas as $r):
+                $gCab = trim((string) ($r['grupo_nombre'] ?? ''));
+                if ($gCab === '') {
+                    $gCab = 'Sin ubicación';
+                }
+                if ($gCab !== $prevGrupoCabecera):
+                    $prevGrupoCabecera = $gCab;
+                    ?>
+                <tr class="table-light">
+                    <td colspan="7" class="fw-bold py-2 border-top border-secondary-subtle"><?= e($gCab) ?></td>
+                </tr>
+                    <?php
+                endif;
+                ?>
                 <tr>
                     <td><?= fechaFormato($r['fecha']) ?></td>
                     <td><?= e($r['cliente_nombre'] ?? '') ?></td>

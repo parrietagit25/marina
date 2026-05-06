@@ -141,6 +141,63 @@ function marina_combustible_inventario_por_tipo(PDO $pdo): array
 /**
  * Inventario disponible para validar un ajuste de salida al editar (excluye el efecto del registro actual).
  */
+/**
+ * GLS disponibles para un despacho (mismo tipo que el registro a editar suma de vuelta su consumo).
+ */
+function marina_combustible_disponible_despacho_tipo(PDO $pdo, string $tipoNuevo, ?int $editDespachoId): float
+{
+    $tipoNuevo = strtolower(trim($tipoNuevo));
+    $inv = marina_combustible_inventario_por_tipo($pdo);
+    $avail = $inv[$tipoNuevo] ?? 0.0;
+    if ($editDespachoId === null || $editDespachoId < 1) {
+        return $avail;
+    }
+    try {
+        $st = $pdo->prepare('SELECT tipo_combustible, gls FROM combustible_despachos WHERE id = ?');
+        $st->execute([$editDespachoId]);
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+        if ($row) {
+            $oldT = strtolower(trim((string) ($row['tipo_combustible'] ?? '')));
+            $oldG = (float) ($row['gls'] ?? 0);
+            if ($oldT === $tipoNuevo) {
+                $avail += $oldG;
+            }
+        }
+    } catch (Throwable $e) {
+        // ignorar
+    }
+
+    return $avail;
+}
+
+/**
+ * Una sola vez: crea un cobro por cada despacho previo al modelo factura+cobros (sin tabla de pagos).
+ * Después de ejecutarse no vuelve a insertar: las facturas nuevas solo cobran desde la pantalla «Cobrar».
+ */
+function marina_combustible_migrar_despacho_pagos_legacy(PDO $pdo): void
+{
+    try {
+        $chk = $pdo->prepare("SELECT 1 FROM marina_config WHERE clave = 'migration_combustible_despacho_cobros_v1' LIMIT 1");
+        $chk->execute();
+        if ($chk->fetchColumn()) {
+            return;
+        }
+
+        $pdo->exec("
+            INSERT INTO combustible_despacho_pagos (despacho_id, tipo, monto, fecha_pago, cuenta_id, forma_pago_id, referencia, concepto, created_by, updated_by)
+            SELECT d.id, 'pago', d.monto_total, d.fecha, d.cuenta_id, NULL, NULL, 'Migración: cobro único (sistema anterior)', d.created_by, d.updated_by
+            FROM combustible_despachos d
+            WHERE d.cuenta_id IS NOT NULL
+              AND d.monto_total > 0
+              AND NOT EXISTS (SELECT 1 FROM combustible_despacho_pagos p WHERE p.despacho_id = d.id)
+        ");
+
+        $pdo->exec("INSERT IGNORE INTO marina_config (clave, valor) VALUES ('migration_combustible_despacho_cobros_v1', '1')");
+    } catch (Throwable $e) {
+        // tabla inexistente o permisos
+    }
+}
+
 function marina_combustible_inventario_efectivo_para_ajuste(PDO $pdo, string $tipo, ?int $editAjusteId): float
 {
     $tipo = strtolower($tipo);

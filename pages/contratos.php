@@ -281,7 +281,7 @@ if ($accion === 'cuotas' && $registro) {
         }
     }
 
-    // --- Manejo POST: eliminar cuota (solo si no tiene abonos)
+    // --- Manejo POST: eliminar cuota (también borra pagos y abonos en cuotas_movimientos)
     if (enviado() && isset($_POST['eliminar_cuota'])) {
         if ($contratoTerminado) {
             redirigir(MARINA_URL . '/index.php?p=contratos&accion=cuotas&id=' . $id . '&err=' . rawurlencode('Contrato liberado: no se pueden eliminar cuotas.'));
@@ -297,15 +297,18 @@ if ($accion === 'cuotas' && $registro) {
             redirigir(MARINA_URL . '/index.php?p=contratos&accion=cuotas&id=' . $id . '&err=' . rawurlencode('La cuota no pertenece al contrato seleccionado.'));
         }
 
-        $stAbonos = $pdo->prepare("SELECT COUNT(*) FROM cuotas_movimientos WHERE cuota_id = ? AND tipo = 'abono'");
-        $stAbonos->execute([$cuotaEliminarId]);
-        $totalAbonos = (int) $stAbonos->fetchColumn();
-        if ($totalAbonos > 0) {
-            redirigir(MARINA_URL . '/index.php?p=contratos&accion=cuotas&id=' . $id . '&err=' . rawurlencode('No se puede eliminar la cuota porque tiene abonos registrados.'));
+        try {
+            $pdo->beginTransaction();
+            $pdo->prepare('DELETE FROM cuotas_movimientos WHERE cuota_id = ?')->execute([$cuotaEliminarId]);
+            $pdo->prepare('DELETE FROM cuotas WHERE id = ? AND contrato_id = ?')->execute([$cuotaEliminarId, $id]);
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            redirigir(MARINA_URL . '/index.php?p=contratos&accion=cuotas&id=' . $id . '&err=' . rawurlencode('No se pudo eliminar la cuota.'));
         }
-
-        $pdo->prepare('DELETE FROM cuotas WHERE id = ?')->execute([$cuotaEliminarId]);
-        redirigir(MARINA_URL . '/index.php?p=contratos&accion=cuotas&id=' . $id . '&ok=' . rawurlencode('Cuota eliminada.'));
+        redirigir(MARINA_URL . '/index.php?p=contratos&accion=cuotas&id=' . $id . '&ok=' . rawurlencode('Cuota eliminada (incluye pagos y abonos).'));
     }
 
     // --- Manejo POST: pagar/abonar (movimiento)
@@ -491,9 +494,8 @@ if ($accion === 'cuotas' && $registro) {
                     <?php else: ?>
                         <span class="text-muted">Pagada</span>
                     <?php endif; ?>
-                    <?php $tienePagosRegistrados = ((float)($pagadoTotalPorCuota[$cid] ?? 0.0)) > 0.00001; ?>
-                    <?php if (!$contratoTerminado && !$tienePagosRegistrados): ?>
-                        <form method="post" action="?p=contratos&accion=cuotas&id=<?= $id ?>" class="d-inline-block mt-2" onsubmit="return confirm('¿Eliminar la cuota #<?= (int)$c['numero_cuota'] ?>? Solo se permite si no tiene abonos.');">
+                    <?php if (!$contratoTerminado): ?>
+                        <form method="post" action="?p=contratos&accion=cuotas&id=<?= $id ?>" class="d-inline-block mt-2" onsubmit="return confirm('¿Eliminar la cuota #<?= (int)$c['numero_cuota'] ?>? Se borrarán también todos los pagos y abonos registrados para esta cuota.');">
                             <input type="hidden" name="eliminar_cuota" value="1">
                             <input type="hidden" name="cuota_eliminar_id" value="<?= $cid ?>">
                             <button type="submit" class="btn btn-outline-danger btn-sm">Eliminar cuota</button>

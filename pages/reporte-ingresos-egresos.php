@@ -68,21 +68,22 @@ try {
     $cp = [$desde, $hasta];
     $cc = '';
     if ($cuenta_id > 0) {
-        $cc = ' AND cd.cuenta_id = ? ';
+        $cc = ' AND p.cuenta_id = ? ';
         $cp[] = $cuenta_id;
     }
     $cst = $pdo->prepare("
-        SELECT cd.fecha AS fecha,
-               cd.monto_total AS monto,
-               CONCAT('Combustible — ', cd.embarcacion) AS concepto,
-               '' AS referencia,
+        SELECT p.fecha_pago AS fecha,
+               p.monto AS monto,
+               CONCAT('Combustible — ', cd.embarcacion, ' (desp. #', cd.id, ')') AS concepto,
+               COALESCE(p.referencia, '') AS referencia,
                cd.embarcacion AS cliente_nombre,
                'Combustible (despacho)' AS grupo_nombre,
                '' AS slip_o_inmueble
-        FROM combustible_despachos cd
-        JOIN cuentas c ON c.id = cd.cuenta_id
+        FROM combustible_despacho_pagos p
+        JOIN combustible_despachos cd ON cd.id = p.despacho_id
+        JOIN cuentas c ON c.id = p.cuenta_id
         JOIN bancos b ON b.id = c.banco_id
-        WHERE cd.fecha BETWEEN ? AND ?
+        WHERE p.fecha_pago BETWEEN ? AND ?
         $cc
     ");
     $cst->execute($cp);

@@ -171,6 +171,43 @@ function marina_ensure_schema(PDO $pdo): void
         }
     }
 
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS combustible_despacho_pagos (
+          id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+          despacho_id INT UNSIGNED NOT NULL,
+          tipo VARCHAR(10) NOT NULL COMMENT 'pago|abono',
+          monto DECIMAL(14,2) NOT NULL,
+          fecha_pago DATE NOT NULL,
+          cuenta_id INT UNSIGNED NOT NULL,
+          forma_pago_id INT UNSIGNED NULL,
+          referencia VARCHAR(100) NULL,
+          concepto VARCHAR(255) NULL,
+          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          created_by INT UNSIGNED NULL,
+          updated_by INT UNSIGNED NULL,
+          KEY idx_cdp_despacho (despacho_id),
+          KEY idx_cdp_fecha (fecha_pago),
+          CONSTRAINT fk_cdp_despacho FOREIGN KEY (despacho_id) REFERENCES combustible_despachos(id) ON DELETE CASCADE,
+          CONSTRAINT fk_cdp_cuenta FOREIGN KEY (cuenta_id) REFERENCES cuentas(id) ON DELETE RESTRICT,
+          CONSTRAINT fk_cdp_forma FOREIGN KEY (forma_pago_id) REFERENCES formas_pago(id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    } catch (Throwable $e) {
+        // motor o FK
+    }
+
+    foreach ([
+        "ALTER TABLE combustible_despachos DROP FOREIGN KEY fk_cd_cuenta",
+        "ALTER TABLE combustible_despachos MODIFY cuenta_id INT UNSIGNED NULL DEFAULT NULL COMMENT 'Cuenta sugerida al cobrar'",
+        "ALTER TABLE combustible_despachos ADD CONSTRAINT fk_cd_cuenta FOREIGN KEY (cuenta_id) REFERENCES cuentas(id) ON DELETE SET NULL",
+    ] as $sqlAltCd) {
+        try {
+            $pdo->exec($sqlAltCd);
+        } catch (Throwable $e) {
+            // FK o columna ya ajustada
+        }
+    }
+
     $combustibleAlters = [
         "ALTER TABLE combustible_pedidos ADD COLUMN gasto_id INT UNSIGNED NULL DEFAULT NULL COMMENT 'Gasto egreso costo al recibir' AFTER cuenta_id",
         "ALTER TABLE combustible_pedidos ADD CONSTRAINT fk_cp_gasto FOREIGN KEY (gasto_id) REFERENCES gastos(id) ON DELETE SET NULL",
@@ -298,5 +335,10 @@ function marina_ensure_schema(PDO $pdo): void
         marina_combustible_seed_catalog($pdo);
     } catch (Throwable $e) {
         // sin permisos o catálogo ya existe
+    }
+    try {
+        marina_combustible_migrar_despacho_pagos_legacy($pdo);
+    } catch (Throwable $e) {
+        // sin tabla pagos
     }
 }

@@ -408,12 +408,33 @@ CREATE TABLE IF NOT EXISTS combustible_despachos (
   embarcacion VARCHAR(200) NOT NULL,
   gls DECIMAL(14,3) NOT NULL,
   monto_total DECIMAL(14,2) NOT NULL,
-  cuenta_id INT UNSIGNED NOT NULL,
+  cuenta_id INT UNSIGNED NULL COMMENT 'Cuenta sugerida al cobrar',
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   created_by INT UNSIGNED NULL,
   updated_by INT UNSIGNED NULL,
-  FOREIGN KEY (cuenta_id) REFERENCES cuentas(id) ON DELETE RESTRICT
+  FOREIGN KEY (cuenta_id) REFERENCES cuentas(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS combustible_despacho_pagos (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  despacho_id INT UNSIGNED NOT NULL,
+  tipo VARCHAR(10) NOT NULL COMMENT 'pago|abono',
+  monto DECIMAL(14,2) NOT NULL,
+  fecha_pago DATE NOT NULL,
+  cuenta_id INT UNSIGNED NOT NULL,
+  forma_pago_id INT UNSIGNED NULL,
+  referencia VARCHAR(100) NULL,
+  concepto VARCHAR(255) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_by INT UNSIGNED NULL,
+  updated_by INT UNSIGNED NULL,
+  KEY idx_cdp_despacho (despacho_id),
+  KEY idx_cdp_fecha (fecha_pago),
+  FOREIGN KEY (despacho_id) REFERENCES combustible_despachos(id) ON DELETE CASCADE,
+  FOREIGN KEY (cuenta_id) REFERENCES cuentas(id) ON DELETE RESTRICT,
+  FOREIGN KEY (forma_pago_id) REFERENCES formas_pago(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS combustible_ajustes (

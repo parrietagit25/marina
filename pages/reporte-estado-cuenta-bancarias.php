@@ -82,18 +82,19 @@ try {
     $icParams = [$desde, $hasta];
     $icFiltro = '';
     if ($cuenta_id > 0) {
-        $icFiltro = ' AND cd.cuenta_id = ? ';
+        $icFiltro = ' AND p.cuenta_id = ? ';
         $icParams[] = $cuenta_id;
     }
     $ic = $pdo->prepare("
-        SELECT cd.fecha AS fecha,
+        SELECT p.fecha_pago AS fecha,
                '{$labCred}' AS tipo,
-               cd.monto_total AS monto,
-               CONCAT('Combustible — ', UPPER(SUBSTRING(cd.tipo_combustible, 1, 1)), SUBSTRING(cd.tipo_combustible, 2), ' — ', cd.embarcacion) AS concepto,
-               '' AS referencia,
-               '' AS cliente_o_proveedor
-        FROM combustible_despachos cd
-        WHERE cd.fecha BETWEEN ? AND ?
+               p.monto AS monto,
+               CONCAT('Combustible — ', UPPER(SUBSTRING(cd.tipo_combustible, 1, 1)), SUBSTRING(cd.tipo_combustible, 2), ' — ', cd.embarcacion, ' (desp. #', cd.id, ')') AS concepto,
+               COALESCE(p.referencia, '') AS referencia,
+               cd.embarcacion AS cliente_o_proveedor
+        FROM combustible_despacho_pagos p
+        JOIN combustible_despachos cd ON cd.id = p.despacho_id
+        WHERE p.fecha_pago BETWEEN ? AND ?
         $icFiltro
     ");
     $ic->execute($icParams);

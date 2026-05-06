@@ -120,10 +120,10 @@ try {
 // --- Ingresos: despachos combustible + movimientos bancarios manuales (mismo criterio que reportes / reporte ingresos)
 try {
     $stCd = $pdo->prepare('
-        SELECT fecha, COALESCE(SUM(monto_total), 0) AS total
-        FROM combustible_despachos
-        WHERE fecha BETWEEN ? AND ?
-        GROUP BY fecha
+        SELECT fecha_pago AS fecha, COALESCE(SUM(monto), 0) AS total
+        FROM combustible_despacho_pagos
+        WHERE fecha_pago BETWEEN ? AND ?
+        GROUP BY fecha_pago
     ');
     $stCd->execute([$desde, $hasta]);
     while ($r = $stCd->fetch(PDO::FETCH_ASSOC)) {
@@ -180,11 +180,11 @@ $sqlTopCuentasIng = "
         WHERE cu.fecha_pago BETWEEN ? AND ?
           AND NOT EXISTS (SELECT 1 FROM cuotas_movimientos x WHERE x.cuota_id = cu.id)
         UNION ALL
-        SELECT cd.cuenta_id, CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre, cd.monto_total AS total
-        FROM combustible_despachos cd
-        JOIN cuentas c ON c.id = cd.cuenta_id
+        SELECT p.cuenta_id, CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre, p.monto AS total
+        FROM combustible_despacho_pagos p
+        JOIN cuentas c ON c.id = p.cuenta_id
         JOIN bancos b ON b.id = c.banco_id
-        WHERE cd.fecha BETWEEN ? AND ?
+        WHERE p.fecha_pago BETWEEN ? AND ?
         UNION ALL
         SELECT mb.cuenta_id, CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre, mb.monto AS total
         FROM movimientos_bancarios mb
@@ -302,18 +302,19 @@ $combustible_despacho_mes = 0.0;
 $combustible_por_tipo_mes = ['diesel' => 0.0, 'gasolina' => 0.0];
 try {
     $stComb = $pdo->prepare('
-        SELECT COALESCE(SUM(monto_total), 0) AS total
-        FROM combustible_despachos
-        WHERE fecha BETWEEN ? AND ?
+        SELECT COALESCE(SUM(monto), 0) AS total
+        FROM combustible_despacho_pagos
+        WHERE fecha_pago BETWEEN ? AND ?
     ');
     $stComb->execute([$desde, $hasta]);
     $combustible_despacho_mes = (float) $stComb->fetchColumn();
 
     $stCt = $pdo->prepare('
-        SELECT LOWER(TRIM(tipo_combustible)) AS t, COALESCE(SUM(monto_total), 0) AS total
-        FROM combustible_despachos
-        WHERE fecha BETWEEN ? AND ?
-        GROUP BY LOWER(TRIM(tipo_combustible))
+        SELECT LOWER(TRIM(d.tipo_combustible)) AS t, COALESCE(SUM(p.monto), 0) AS total
+        FROM combustible_despacho_pagos p
+        JOIN combustible_despachos d ON d.id = p.despacho_id
+        WHERE p.fecha_pago BETWEEN ? AND ?
+        GROUP BY LOWER(TRIM(d.tipo_combustible))
     ');
     $stCt->execute([$desde, $hasta]);
     while ($row = $stCt->fetch(PDO::FETCH_ASSOC)) {

@@ -27,7 +27,7 @@ if (!in_array($vista, $vistasOk, true)) {
         <div class="col-md-4">
             <a class="card h-100 text-decoration-none text-body p-4 border shadow-sm" href="<?= MARINA_URL ?>/index.php?p=reporte-combustible&vista=despachos">
                 <h2 class="h5">Despachos</h2>
-                <p class="text-muted small mb-0">Ventas por fecha, embarcación, GLS, monto y cuenta.</p>
+                <p class="text-muted small mb-0">Facturas de despacho por fecha: GLS, total, cobrado y saldo; cuenta sugerida.</p>
             </a>
         </div>
         <div class="col-md-4">
@@ -76,26 +76,35 @@ if ($vista === 'pedidos') {
 } elseif ($vista === 'despachos') {
     $st = $pdo->prepare("
         SELECT d.id, d.tipo_combustible, d.fecha, d.embarcacion, d.gls, d.monto_total,
+               COALESCE(x.pagado, 0) AS pagado_sum,
                CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre
         FROM combustible_despachos d
-        JOIN cuentas c ON c.id = d.cuenta_id
-        JOIN bancos b ON b.id = c.banco_id
+        LEFT JOIN (
+            SELECT despacho_id, SUM(monto) AS pagado FROM combustible_despacho_pagos GROUP BY despacho_id
+        ) x ON x.despacho_id = d.id
+        LEFT JOIN cuentas c ON c.id = d.cuenta_id
+        LEFT JOIN bancos b ON b.id = c.banco_id
         WHERE d.fecha BETWEEN ? AND ?
         ORDER BY d.fecha DESC, d.id DESC
     ");
     $st->execute([$desde, $hasta]);
     $filas = $st->fetchAll(PDO::FETCH_ASSOC);
-    $encabezados = ['Id', 'Tipo', 'Fecha', 'Embarcación', 'GLS', 'Monto', 'Cuenta'];
+    $encabezados = ['Id', 'Tipo', 'Fecha', 'Embarcación', 'GLS', 'Total factura', 'Pagado', 'Saldo', 'Cuenta sugerida'];
     if (obtener('export') === 'excel') {
         $rows = [];
         foreach ($filas as $r) {
+            $tot = (float) $r['monto_total'];
+            $pag = (float) ($r['pagado_sum'] ?? 0);
+            $sal = max(0.0, $tot - $pag);
             $rows[] = [
                 $r['id'],
                 MARINA_COMB_TIPOS[$r['tipo_combustible']] ?? $r['tipo_combustible'],
                 $r['fecha'],
                 $r['embarcacion'],
                 (float) $r['gls'],
-                (float) $r['monto_total'],
+                $tot,
+                $pag,
+                $sal,
                 $r['cuenta_nombre'] ?? '',
             ];
         }
@@ -188,14 +197,21 @@ require_once __DIR__ . '/../includes/layout.php';
                 <?php endforeach; ?>
             <?php elseif ($vista === 'despachos'): ?>
                 <?php foreach ($filas as $r): ?>
+                    <?php
+                    $tot = (float) $r['monto_total'];
+                    $pag = (float) ($r['pagado_sum'] ?? 0);
+                    $sal = max(0.0, $tot - $pag);
+                    ?>
                     <tr>
                         <td><?= (int) $r['id'] ?></td>
                         <td><?= e(MARINA_COMB_TIPOS[$r['tipo_combustible']] ?? $r['tipo_combustible']) ?></td>
                         <td><?= fechaFormato($r['fecha']) ?></td>
                         <td><?= e($r['embarcacion']) ?></td>
                         <td class="text-end"><?= e((string) $r['gls']) ?></td>
-                        <td class="text-end"><?= dinero((float) $r['monto_total']) ?></td>
-                        <td><?= e($r['cuenta_nombre'] ?? '') ?></td>
+                        <td class="text-end"><?= dinero($tot) ?></td>
+                        <td class="text-end"><?= dinero($pag) ?></td>
+                        <td class="text-end"><?= $sal > 0.00001 ? dinero($sal) : '—' ?></td>
+                        <td><?= e($r['cuenta_nombre'] ?? '') ?: '—' ?></td>
                     </tr>
                 <?php endforeach; ?>
             <?php else: ?>

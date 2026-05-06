@@ -54,7 +54,7 @@ $mbExpr = ' + COALESCE(mbi.s, 0) - COALESCE(mbc.s, 0)';
 
 $mbJoinComb = $mbJoin . "
 LEFT JOIN (
-    SELECT cuenta_id, SUM(monto_total) AS s FROM combustible_despachos GROUP BY cuenta_id
+    SELECT cuenta_id, SUM(monto) AS s FROM combustible_despacho_pagos GROUP BY cuenta_id
 ) cdin ON cdin.cuenta_id = c.id
 ";
 $mbExprComb = ' + COALESCE(mbi.s, 0) - COALESCE(mbc.s, 0) + COALESCE(cdin.s, 0)';
@@ -124,7 +124,7 @@ require_once __DIR__ . '/../includes/layout.php';
 <h1 class="h4 mb-3 text-center text-lg-start">Saldos de cuentas bancarias</h1>
 <p class="text-muted small mb-3 text-center text-lg-start mx-auto" style="max-width: 42rem;">
     Resumen al <?= fechaFormato($fechaRef) ?>: créditos por cuotas (movimientos y compatibilidad con pago único),
-    créditos por <a href="<?= MARINA_URL ?>/index.php?p=combustible-despacho">despacho de combustible</a>,
+    créditos por <a href="<?= MARINA_URL ?>/index.php?p=combustible-despacho">cobros de despacho de combustible</a>,
     créditos por pagos de <strong>electricidad</strong> en contratos,
     menos gastos asignados a la cuenta, más créditos manuales y menos débitos manuales en <a href="<?= MARINA_URL ?>/index.php?p=movimiento-bancario">movimientos bancarios</a>.
     Para el detalle por fechas use <a href="<?= MARINA_URL ?>/index.php?p=reporte-estado-cuenta-bancarias">Estado de cuenta bancaria</a>.

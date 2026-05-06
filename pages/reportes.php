@@ -60,11 +60,11 @@ $sqlIngresosConCombustible = "
 
         UNION ALL
 
-        SELECT cd.cuenta_id, CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre, cd.monto_total AS total
-        FROM combustible_despachos cd
-        JOIN cuentas c ON c.id = cd.cuenta_id
+        SELECT p.cuenta_id, CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre, p.monto AS total
+        FROM combustible_despacho_pagos p
+        JOIN cuentas c ON c.id = p.cuenta_id
         JOIN bancos b ON b.id = c.banco_id
-        WHERE cd.fecha BETWEEN ? AND ?
+        WHERE p.fecha_pago BETWEEN ? AND ?
     ) t
     GROUP BY t.cuenta_id, t.cuenta_nombre
 ";
