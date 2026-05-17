@@ -18,23 +18,6 @@ $tipoUnidad = in_array($tipoUnidad, ['', 'slip', 'inmueble'], true) ? $tipoUnida
 
 $muellesOpts = $pdo->query('SELECT id, nombre FROM muelles ORDER BY nombre')->fetchAll(PDO::FETCH_KEY_PAIR);
 
-/**
- * Días de estadía inclusive entre dos fechas (DATE).
- */
-function marina_contrato_dias_estadia(string $fechaInicio, string $fechaFin): int
-{
-    try {
-        $d1 = new DateTime($fechaInicio);
-        $d2 = new DateTime($fechaFin);
-    } catch (Exception $e) {
-        return 0;
-    }
-    if ($d2 < $d1) {
-        return 0;
-    }
-    return (int) $d1->diff($d2)->days + 1;
-}
-
 $sql = "
     SELECT co.id,
            co.fecha_inicio,

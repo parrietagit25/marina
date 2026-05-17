@@ -51,6 +51,21 @@ function dinero(float $n): string {
     return number_format($n, 2, ',', '.');
 }
 
+/** Días de estadía inclusive entre dos fechas (DATE). */
+function marina_contrato_dias_estadia(string $fechaInicio, string $fechaFin): int
+{
+    try {
+        $d1 = new DateTime($fechaInicio);
+        $d2 = new DateTime($fechaFin);
+    } catch (Exception $e) {
+        return 0;
+    }
+    if ($d2 < $d1) {
+        return 0;
+    }
+    return (int) $d1->diff($d2)->days + 1;
+}
+
 /** Etiqueta UI: acreditación / tipo_movimiento ingreso en BD (sigue siendo `ingreso`). */
 function marina_ui_credito(): string {
     return 'Crédito';

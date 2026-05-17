@@ -5,6 +5,40 @@
  */
 $titulo = 'Contratos';
 
+/**
+ * Cuotas enviadas al crear contrato (preview confirmado).
+ *
+ * @return array<int, array{numero:int,monto:float,vencimiento:string}>|null
+ */
+function marina_contrato_cuotas_desde_post(array $post): ?array
+{
+    if (($post['crear_con_cuotas'] ?? '') !== '1') {
+        return null;
+    }
+    $numeros = $post['cuota_numero'] ?? [];
+    $montos = $post['cuota_monto'] ?? [];
+    $vencs = $post['cuota_fecha_vencimiento'] ?? [];
+    if (!is_array($numeros) || !is_array($montos) || !is_array($vencs) || $numeros === []) {
+        return [];
+    }
+    $n = count($numeros);
+    if ($n !== count($montos) || $n !== count($vencs)) {
+        return [];
+    }
+    $out = [];
+    for ($i = 0; $i < $n; $i++) {
+        $num = (int) $numeros[$i];
+        $monto = (float) str_replace(',', '.', (string) ($montos[$i] ?? 0));
+        $venc = trim((string) ($vencs[$i] ?? ''));
+        if ($num < 1 || $monto <= 0 || $venc === '') {
+            continue;
+        }
+        $out[] = ['numero' => $num, 'monto' => $monto, 'vencimiento' => $venc];
+    }
+    usort($out, static fn($a, $b) => $a['numero'] <=> $b['numero']);
+    return $out;
+}
+
 $pdo = getDb();
 $accion = obtener('accion');
 $id = (int) obtener('id');
@@ -99,26 +133,58 @@ if (enviado() && ($accion === 'crear' || $accion === 'editar')) {
                 ]);
             redirigir(MARINA_URL . '/index.php?p=contratos&ok=Actualizado');
         } else {
-            $pdo->prepare('INSERT INTO contratos (cliente_id, cuenta_id, muelle_id, slip_id, grupo_id, inmueble_id, fecha_inicio, fecha_fin, monto_total, observaciones, numero_recibo, activo, estado, created_by, updated_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-                ->execute([
-                    $cliente_id,
-                    $cuenta_id,
-                    $muelle_id ?: null,
-                    $slip_id ?: null,
-                    $grupo_id ?: null,
-                    $inmueble_id ?: null,
-                    $fecha_inicio,
-                    $fecha_fin,
-                    $monto_total,
-                    $observaciones,
-                    $numero_recibo === '' ? null : $numero_recibo,
-                    1,
-                    'activo',
-                    $uid,
-                    $uid
-                ]);
-            $contrato_id = (int) $pdo->lastInsertId();
-            redirigir(MARINA_URL . '/index.php?p=contratos&accion=cuotas&id=' . $contrato_id);
+            $cuotasPlan = marina_contrato_cuotas_desde_post($_POST);
+            if ($cuotasPlan !== null) {
+                if ($cuotasPlan === []) {
+                    $mensaje = 'Indique al menos una cuota válida o deje vacío el número de cuotas.';
+                } else {
+                    $sumaCuotas = 0.0;
+                    foreach ($cuotasPlan as $c) {
+                        $sumaCuotas += $c['monto'];
+                    }
+                    if (abs($sumaCuotas - $monto_total) > 0.02) {
+                        $mensaje = 'La suma de las cuotas (' . dinero($sumaCuotas) . ') debe coincidir con el monto total del contrato (' . dinero($monto_total) . ').';
+                    }
+                }
+            }
+            if ($mensaje === '') {
+                $pdo->beginTransaction();
+                try {
+                    $pdo->prepare('INSERT INTO contratos (cliente_id, cuenta_id, muelle_id, slip_id, grupo_id, inmueble_id, fecha_inicio, fecha_fin, monto_total, observaciones, numero_recibo, activo, estado, created_by, updated_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+                        ->execute([
+                            $cliente_id,
+                            $cuenta_id,
+                            $muelle_id ?: null,
+                            $slip_id ?: null,
+                            $grupo_id ?: null,
+                            $inmueble_id ?: null,
+                            $fecha_inicio,
+                            $fecha_fin,
+                            $monto_total,
+                            $observaciones,
+                            $numero_recibo === '' ? null : $numero_recibo,
+                            1,
+                            'activo',
+                            $uid,
+                            $uid
+                        ]);
+                    $contrato_id = (int) $pdo->lastInsertId();
+                    if ($cuotasPlan !== null && $cuotasPlan !== []) {
+                        $stInsCuota = $pdo->prepare('INSERT INTO cuotas (contrato_id, numero_cuota, monto, fecha_vencimiento, created_by, updated_by) VALUES (?,?,?,?,?,?)');
+                        foreach ($cuotasPlan as $c) {
+                            $stInsCuota->execute([$contrato_id, $c['numero'], $c['monto'], $c['vencimiento'], $uid, $uid]);
+                        }
+                    }
+                    $pdo->commit();
+                    $okMsg = ($cuotasPlan !== null && $cuotasPlan !== [])
+                        ? 'Contrato creado con ' . count($cuotasPlan) . ' cuotas'
+                        : 'Contrato creado';
+                    redirigir(MARINA_URL . '/index.php?p=contratos&accion=cuotas&id=' . $contrato_id . '&ok=' . rawurlencode($okMsg));
+                } catch (Throwable $e) {
+                    $pdo->rollBack();
+                    $mensaje = marinaMensajeErrorIntegridad($e);
+                }
+            }
         }
         }
     }
@@ -137,11 +203,19 @@ if ($accion === 'editar' && $id > 0 && $registro && (string) ($registro['estado'
 }
 
 $clientes = $pdo->query('SELECT id, nombre FROM clientes ORDER BY nombre')->fetchAll(PDO::FETCH_KEY_PAIR);
+$clientesLista = $pdo->query('SELECT id, nombre, dueno_capitan FROM clientes ORDER BY nombre')->fetchAll(PDO::FETCH_ASSOC);
 $cuentas = $pdo->query('SELECT c.id, CONCAT(b.nombre, " - ", c.nombre) AS nom FROM cuentas c JOIN bancos b ON c.banco_id = b.id ORDER BY b.nombre, c.nombre')->fetchAll(PDO::FETCH_KEY_PAIR);
 $muelles = $pdo->query('SELECT id, nombre FROM muelles ORDER BY nombre')->fetchAll(PDO::FETCH_KEY_PAIR);
 $slips = $pdo->query('SELECT s.id, CONCAT(m.nombre, " - ", s.nombre) AS nom FROM slips s JOIN muelles m ON s.muelle_id = m.id ORDER BY m.nombre, s.nombre')->fetchAll(PDO::FETCH_KEY_PAIR);
+$slipsLista = $pdo->query('SELECT s.id, s.nombre, s.muelle_id FROM slips s ORDER BY s.nombre')->fetchAll(PDO::FETCH_ASSOC);
 $grupos = $pdo->query('SELECT id, nombre FROM grupos ORDER BY nombre')->fetchAll(PDO::FETCH_KEY_PAIR);
-$inmuebles = $pdo->query('SELECT i.id, CONCAT(g.nombre, " - ", i.nombre) AS nom FROM inmuebles i JOIN grupos g ON i.grupo_id = g.id ORDER BY g.nombre, i.nombre')->fetchAll(PDO::FETCH_KEY_PAIR);
+$inmueblesLista = $pdo->query('SELECT i.id, i.nombre, i.grupo_id FROM inmuebles i ORDER BY i.nombre')->fetchAll(PDO::FETCH_ASSOC);
+$tarifasLista = [];
+try {
+    $tarifasLista = $pdo->query('SELECT id, nombre, precio_dia FROM tarifas ORDER BY nombre')->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable $e) {
+    $tarifasLista = [];
+}
 $formas_pago = $pdo->query("SELECT id, nombre FROM formas_pago WHERE tipo_movimiento = 'ingreso' ORDER BY nombre")->fetchAll(PDO::FETCH_KEY_PAIR);
 
 // --- Vista Cuotas (página aparte, con modales: agregar, pagar, abonar, ver)
@@ -732,6 +806,7 @@ $modalDatos = [
     'monto_total' => $registro['monto_total'] ?? ($_POST['monto_total'] ?? ''),
     'observaciones' => $registro['observaciones'] ?? ($_POST['observaciones'] ?? ''),
     'numero_recibo' => $registro['numero_recibo'] ?? ($_POST['numero_recibo'] ?? ''),
+    'numero_cuotas' => $_POST['numero_cuotas'] ?? '',
     'estado' => (string) ($registro['estado'] ?? ($_POST['estado'] ?? 'activo')),
 ];
 require_once __DIR__ . '/../includes/contrato_estado_cuenta.php';
@@ -846,13 +921,13 @@ require_once __DIR__ . '/../includes/layout.php';
                     <div id="contratoModalMensaje" class="alert alert-danger d-none"></div>
                     <div class="row">
                         <div class="col-md-6">
-                            <label>Cliente *</label>
-                            <select class="form-select" id="contratoClienteId" name="cliente_id" required>
-                                <option value="">Seleccione</option>
-                                <?php foreach ($clientes as $cid => $cnom): ?>
-                                    <option value="<?= (int)$cid ?>"><?= e($cnom) ?></option>
-                                <?php endforeach; ?>
-                            </select>
+                            <label class="form-label">Cliente *</label>
+                            <div class="marina-cliente-combobox position-relative">
+                                <input type="hidden" name="cliente_id" id="contratoClienteId" value="">
+                                <input type="text" class="form-control" id="contratoClienteBuscar" placeholder="Buscar por nombre o dueño/capitán…" autocomplete="off" aria-autocomplete="list" aria-controls="contratoClienteList" aria-expanded="false">
+                                <ul class="marina-combobox-list list-group position-absolute w-100 d-none" id="contratoClienteList" role="listbox"></ul>
+                            </div>
+                            <small class="text-muted">Escriba para filtrar y elija un cliente de la lista.</small>
                             <label class="mt-2">Cuenta acreditación *</label>
                             <select class="form-select" id="contratoCuentaId" name="cuenta_id" required>
                                 <option value="">Seleccione</option>
@@ -868,11 +943,8 @@ require_once __DIR__ . '/../includes/layout.php';
                                 <?php endforeach; ?>
                             </select>
                             <label class="mt-2">Slip</label>
-                            <select class="form-select" id="contratoSlipId" name="slip_id">
-                                <option value="">Seleccione (opcional)</option>
-                                <?php foreach ($slips as $sid => $snom): ?>
-                                    <option value="<?= (int)$sid ?>"><?= e($snom) ?></option>
-                                <?php endforeach; ?>
+                            <select class="form-select" id="contratoSlipId" name="slip_id" disabled>
+                                <option value="">Seleccione un muelle primero</option>
                             </select>
                             <label class="mt-2">Grupo</label>
                             <select class="form-select" id="contratoGrupoId" name="grupo_id">
@@ -882,11 +954,8 @@ require_once __DIR__ . '/../includes/layout.php';
                                 <?php endforeach; ?>
                             </select>
                             <label class="mt-2">Inmueble</label>
-                            <select class="form-select" id="contratoInmuebleId" name="inmueble_id">
-                                <option value="">Seleccione (opcional)</option>
-                                <?php foreach ($inmuebles as $iid => $inom): ?>
-                                    <option value="<?= (int)$iid ?>"><?= e($inom) ?></option>
-                                <?php endforeach; ?>
+                            <select class="form-select" id="contratoInmuebleId" name="inmueble_id" disabled>
+                                <option value="">Seleccione un grupo primero</option>
                             </select>
                             <small class="text-muted d-block mt-1">Debe indicar al menos una unidad: muelle/slip o grupo/inmueble.</small>
                         </div>
@@ -895,8 +964,23 @@ require_once __DIR__ . '/../includes/layout.php';
                             <input type="date" class="form-control" id="contratoFechaInicio" name="fecha_inicio" required>
                             <label class="mt-2">Fecha fin *</label>
                             <input type="date" class="form-control" id="contratoFechaFin" name="fecha_fin" required>
+                            <label class="mt-2">Tarifa (opcional)</label>
+                            <select class="form-select" id="contratoTarifaId">
+                                <option value="">Sin tarifa — monto manual</option>
+                                <?php foreach ($tarifasLista as $t): ?>
+                                    <option value="<?= (int) $t['id'] ?>" data-precio-dia="<?= e((string) $t['precio_dia']) ?>"><?= e($t['nombre']) ?> (<?= dinero((float) $t['precio_dia']) ?>/día)</option>
+                                <?php endforeach; ?>
+                            </select>
+                            <div id="contratoTarifaInfo" class="small text-muted mt-1 d-none"></div>
                             <label class="mt-2">Monto total *</label>
                             <input type="text" class="form-control" id="contratoMontoTotal" name="monto_total" required>
+                            <div id="contratoNumCuotasWrap">
+                            <label class="mt-2">Nº de cuotas</label>
+                            <input type="number" class="form-control" id="contratoNumCuotas" name="numero_cuotas" min="1" max="120" step="1" placeholder="Opcional">
+                            <small class="text-muted">Si indica un número, al guardar podrá revisar y confirmar las cuotas generadas automáticamente.</small>
+                            </div>
+                            <div id="contratoCuotasHidden" class="d-none" aria-hidden="true"></div>
+                            <input type="hidden" name="crear_con_cuotas" id="contratoCrearConCuotas" value="0">
                             <label class="mt-2">Observaciones</label>
                             <textarea class="form-control" id="contratoObservaciones" name="observaciones" rows="2"></textarea>
                             <label class="mt-2">Nº recibo al cliente</label>
@@ -911,6 +995,44 @@ require_once __DIR__ . '/../includes/layout.php';
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="contratoCuotasPreviewModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Cuotas del contrato</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <p id="contratoCuotasPreviewResumen" class="text-muted small mb-2"></p>
+                <div id="contratoCuotasPreviewErr" class="alert alert-danger d-none mb-2"></div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width:4rem">#</th>
+                                <th>Fecha vencimiento</th>
+                                <th style="width:10rem">Monto</th>
+                            </tr>
+                        </thead>
+                        <tbody id="contratoCuotasPreviewBody"></tbody>
+                        <tfoot>
+                            <tr class="table-light fw-semibold">
+                                <td colspan="2" class="text-end">Total cuotas</td>
+                                <td id="contratoCuotasPreviewTotal"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                <p class="text-muted small mt-2 mb-0">Puede ajustar fechas y montos antes de confirmar. La suma debe coincidir con el monto total del contrato.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="btnContratoCuotasVolver">Volver al contrato</button>
+                <button type="button" class="btn btn-primary" id="btnContratoCuotasConfirmar">Confirmar y guardar</button>
+            </div>
         </div>
     </div>
 </div>
@@ -947,6 +1069,36 @@ require_once __DIR__ . '/../includes/layout.php';
     </div>
 </div>
 
-<script>window.__contratoModal = { mostrar: <?= $mostrarModal ? 'true' : 'false' ?>, datos: <?= json_encode($modalDatos, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>, error: <?= json_encode($mensaje, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?> };</script>
+<script>
+window.__contratoTarifas = <?= json_encode(array_map(static function ($t) {
+    return [
+        'id' => (int) $t['id'],
+        'nombre' => (string) ($t['nombre'] ?? ''),
+        'precio_dia' => (float) ($t['precio_dia'] ?? 0),
+    ];
+}, $tarifasLista), JSON_UNESCAPED_UNICODE) ?>;
+window.__contratoInmuebles = <?= json_encode(array_map(static function ($i) {
+    return [
+        'id' => (int) $i['id'],
+        'nombre' => (string) ($i['nombre'] ?? ''),
+        'grupo_id' => (int) ($i['grupo_id'] ?? 0),
+    ];
+}, $inmueblesLista), JSON_UNESCAPED_UNICODE) ?>;
+window.__contratoSlips = <?= json_encode(array_map(static function ($s) {
+    return [
+        'id' => (int) $s['id'],
+        'nombre' => (string) ($s['nombre'] ?? ''),
+        'muelle_id' => (int) ($s['muelle_id'] ?? 0),
+    ];
+}, $slipsLista), JSON_UNESCAPED_UNICODE) ?>;
+window.__contratoClientes = <?= json_encode(array_map(static function ($c) {
+    return [
+        'id' => (int) $c['id'],
+        'nombre' => (string) ($c['nombre'] ?? ''),
+        'dueno_capitan' => trim((string) ($c['dueno_capitan'] ?? '')),
+    ];
+}, $clientesLista), JSON_UNESCAPED_UNICODE) ?>;
+window.__contratoModal = { mostrar: <?= $mostrarModal ? 'true' : 'false' ?>, datos: <?= json_encode($modalDatos, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>, error: <?= json_encode($mensaje, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?> };
+</script>
 <?php require_once __DIR__ . '/../includes/partials/modal_estado_cuenta_contrato.php'; ?>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

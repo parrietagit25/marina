@@ -947,3 +947,37 @@ body {
   border-bottom: 0;
 }
 
+/* Autocompletado cliente (contratos y similares) */
+.marina-cliente-combobox .marina-combobox-list {
+  z-index: 1065;
+  max-height: 240px;
+  overflow-y: auto;
+  margin-top: 2px;
+  border-radius: 0.5rem;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
+}
+.marina-cliente-combobox .marina-combobox-list .list-group-item {
+  cursor: pointer;
+  border-left: 0;
+  border-right: 0;
+  font-size: 0.9rem;
+}
+.marina-cliente-combobox .marina-combobox-list .list-group-item:first-child {
+  border-top-left-radius: 0.5rem;
+  border-top-right-radius: 0.5rem;
+}
+.marina-cliente-combobox .marina-combobox-list .list-group-item:last-child {
+  border-bottom-left-radius: 0.5rem;
+  border-bottom-right-radius: 0.5rem;
+}
+.marina-cliente-combobox .marina-combobox-list .list-group-item.active,
+.marina-cliente-combobox .marina-combobox-list .list-group-item:hover {
+  background: #e8f4fc;
+  color: #0b3558;
+}
+.marina-cliente-combobox .marina-combobox-sub {
+  display: block;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+

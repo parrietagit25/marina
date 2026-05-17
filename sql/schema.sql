@@ -117,6 +117,19 @@ CREATE TABLE inmuebles (
   UNIQUE KEY uk_inmueble_grupo (grupo_id, nombre)
 ) ENGINE=InnoDB;
 
+-- Tarifas (precio por día para contratos)
+CREATE TABLE tarifas (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  nombre VARCHAR(150) NOT NULL,
+  precio_dia DECIMAL(12,2) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_by INT UNSIGNED NULL,
+  updated_by INT UNSIGNED NULL,
+  FOREIGN KEY (created_by) REFERENCES usuarios(id),
+  FOREIGN KEY (updated_by) REFERENCES usuarios(id)
+) ENGINE=InnoDB;
+
 -- Formas de pago
 CREATE TABLE formas_pago (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

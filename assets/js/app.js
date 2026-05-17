@@ -247,6 +247,53 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     })();
 
+    // Tarifas
+    (function() {
+        var el = document.getElementById('tarifaModal');
+        if (!el) return;
+        var title = document.getElementById('tarifaModalTitle');
+        var accion = document.getElementById('tarifaFormAccion');
+        var fid = document.getElementById('tarifaFormId');
+        var nombre = document.getElementById('tarifaNombre');
+        var precio = document.getElementById('tarifaPrecioDia');
+        var msg = document.getElementById('tarifaModalMensaje');
+        var modal = new bootstrap.Modal(el);
+        function setErr(m) { if (msg) { msg.textContent = m || ''; msg.classList.toggle('d-none', !m); } }
+        document.getElementById('btnNuevoTarifa') && document.getElementById('btnNuevoTarifa').addEventListener('click', function() {
+            title.textContent = 'Nueva tarifa'; accion.value = 'crear'; fid.value = '';
+            if (nombre) nombre.value = ''; if (precio) precio.value = ''; setErr(''); modal.show();
+        });
+        document.querySelectorAll('.btn-editar-tarifa').forEach(function(b) {
+            b.addEventListener('click', function() {
+                title.textContent = 'Editar tarifa'; accion.value = 'editar';
+                fid.value = b.getAttribute('data-id') || '';
+                if (nombre) nombre.value = b.getAttribute('data-nombre') || '';
+                if (precio) precio.value = b.getAttribute('data-precio-dia') || '';
+                setErr(''); modal.show();
+            });
+        });
+        var delEl = document.getElementById('confirmEliminarTarifaModal');
+        if (delEl) {
+            var d = new bootstrap.Modal(delEl);
+            document.querySelectorAll('.btn-eliminar-tarifa').forEach(function(b) {
+                b.addEventListener('click', function() {
+                    document.getElementById('tarifaDeleteId').value = b.getAttribute('data-id') || '';
+                    document.getElementById('tarifaDeleteNombre').textContent = (b.getAttribute('data-nombre') || '') ? '"' + b.getAttribute('data-nombre') + '"' : '';
+                    d.show();
+                });
+            });
+        }
+        if (window.__tarifaModal && window.__tarifaModal.mostrar && window.__tarifaModal.datos) {
+            var w = window.__tarifaModal;
+            title.textContent = w.datos.id ? 'Editar tarifa' : 'Nueva tarifa';
+            accion.value = w.datos.id ? 'editar' : 'crear';
+            fid.value = w.datos.id || '';
+            if (nombre) nombre.value = w.datos.nombre || '';
+            if (precio) precio.value = w.datos.precio_dia !== undefined && w.datos.precio_dia !== null ? w.datos.precio_dia : '';
+            setErr(w.error || ''); modal.show();
+        }
+    })();
+
     // Grupos
     (function() {
         var el = document.getElementById('grupoModal');
@@ -475,16 +522,510 @@ document.addEventListener('DOMContentLoaded', function () {
         var title = document.getElementById('contratoModalTitle');
         var accion = document.getElementById('contratoFormAccion');
         var fid = document.getElementById('contratoFormId');
+        var formContrato = el.querySelector('form');
         var modal = new bootstrap.Modal(el);
         var msg = document.getElementById('contratoModalMensaje');
         var ids = ['ClienteId','CuentaId','MuelleId','SlipId','GrupoId','InmuebleId'];
-        var fields = ['FechaInicio','FechaFin','MontoTotal','Observaciones','NumeroRecibo'];
+        var clienteBuscar = document.getElementById('contratoClienteBuscar');
+        var clienteList = document.getElementById('contratoClienteList');
+        var clientesData = Array.isArray(window.__contratoClientes) ? window.__contratoClientes : [];
+        var slipsData = Array.isArray(window.__contratoSlips) ? window.__contratoSlips : [];
+        var muelleSel = document.getElementById('contratoMuelleId');
+        var slipSel = document.getElementById('contratoSlipId');
+        var grupoSel = document.getElementById('contratoGrupoId');
+        var inmuebleSel = document.getElementById('contratoInmuebleId');
+        var inmueblesData = Array.isArray(window.__contratoInmuebles) ? window.__contratoInmuebles : [];
+        var clienteHighlight = -1;
+        var contratoSettingSlip = false;
+        var contratoSettingInmueble = false;
+        var numCuotasWrap = document.getElementById('contratoNumCuotasWrap');
+        var numCuotasInp = document.getElementById('contratoNumCuotas');
+        var cuotasHidden = document.getElementById('contratoCuotasHidden');
+        var crearConCuotasInp = document.getElementById('contratoCrearConCuotas');
+        var cuotasPreviewEl = document.getElementById('contratoCuotasPreviewModal');
+        var cuotasPreviewModal = cuotasPreviewEl ? new bootstrap.Modal(cuotasPreviewEl) : null;
+        var cuotasPreviewBody = document.getElementById('contratoCuotasPreviewBody');
+        var cuotasPreviewResumen = document.getElementById('contratoCuotasPreviewResumen');
+        var cuotasPreviewErr = document.getElementById('contratoCuotasPreviewErr');
+        var cuotasPreviewTotal = document.getElementById('contratoCuotasPreviewTotal');
+        var btnCuotasVolver = document.getElementById('btnContratoCuotasVolver');
+        var btnCuotasConfirmar = document.getElementById('btnContratoCuotasConfirmar');
+        var tarifaSel = document.getElementById('contratoTarifaId');
+        var tarifaInfo = document.getElementById('contratoTarifaInfo');
+        var tarifasData = Array.isArray(window.__contratoTarifas) ? window.__contratoTarifas : [];
+        var fechaInicioInp = document.getElementById('contratoFechaInicio');
+        var fechaFinInp = document.getElementById('contratoFechaFin');
+        var montoTotalInp = document.getElementById('contratoMontoTotal');
+
+        function normTxt(s) {
+            return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        }
+
+        function clienteLabel(c) {
+            if (!c) return '';
+            var sub = c.dueno_capitan ? ' — ' + c.dueno_capitan : '';
+            return (c.nombre || '') + sub;
+        }
+
+        function findClienteById(id) {
+            var n = parseInt(String(id || ''), 10);
+            if (!n) return null;
+            for (var i = 0; i < clientesData.length; i++) {
+                if (clientesData[i].id === n) return clientesData[i];
+            }
+            return null;
+        }
+
+        function setClienteId(id) {
+            var hid = document.getElementById('contratoClienteId');
+            var c = findClienteById(id);
+            if (hid) hid.value = c ? String(c.id) : '';
+            if (clienteBuscar) clienteBuscar.value = c ? c.nombre : '';
+            hideClienteList();
+        }
+
+        function hideClienteList() {
+            if (!clienteList) return;
+            clienteList.classList.add('d-none');
+            clienteList.innerHTML = '';
+            clienteHighlight = -1;
+            if (clienteBuscar) clienteBuscar.setAttribute('aria-expanded', 'false');
+        }
+
+        function renderClienteList(q) {
+            if (!clienteList) return;
+            var nq = normTxt(q);
+            var items = clientesData.filter(function(c) {
+                if (!nq) return true;
+                var blob = normTxt(c.nombre) + ' ' + normTxt(c.dueno_capitan);
+                return blob.indexOf(nq) !== -1;
+            }).slice(0, 40);
+            if (!items.length) {
+                clienteList.innerHTML = '<li class="list-group-item text-muted">Sin coincidencias</li>';
+                clienteList.classList.remove('d-none');
+                if (clienteBuscar) clienteBuscar.setAttribute('aria-expanded', 'true');
+                return;
+            }
+            clienteList.innerHTML = items.map(function(c, idx) {
+                var sub = c.dueno_capitan ? '<span class="marina-combobox-sub">' + escapeHtml(c.dueno_capitan) + '</span>' : '';
+                return '<li class="list-group-item' + (idx === clienteHighlight ? ' active' : '') + '" role="option" data-id="' + c.id + '" tabindex="-1">' +
+                    escapeHtml(c.nombre) + sub + '</li>';
+            }).join('');
+            clienteList.classList.remove('d-none');
+            if (clienteBuscar) clienteBuscar.setAttribute('aria-expanded', 'true');
+        }
+
+        function escapeHtml(s) {
+            return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function refillSlipOptions(muelleId, selectedSlipId) {
+            if (!slipSel) return;
+            var mid = parseInt(String(muelleId || ''), 10);
+            var html = '<option value="">Seleccione (opcional)</option>';
+            if (mid > 0) {
+                slipsData.forEach(function(s) {
+                    if (s.muelle_id === mid) {
+                        html += '<option value="' + s.id + '">' + escapeHtml(s.nombre) + '</option>';
+                    }
+                });
+                slipSel.disabled = false;
+            } else {
+                html = '<option value="">Seleccione un muelle primero</option>';
+                slipSel.disabled = true;
+            }
+            slipSel.innerHTML = html;
+            var sid = parseInt(String(selectedSlipId || ''), 10);
+            if (mid > 0 && sid > 0) {
+                var valid = slipsData.some(function(s) { return s.id === sid && s.muelle_id === mid; });
+                slipSel.value = valid ? String(sid) : '';
+            } else {
+                slipSel.value = '';
+            }
+        }
+
+        if (muelleSel) {
+            muelleSel.addEventListener('change', function() {
+                refillSlipOptions(muelleSel.value, '');
+            });
+        }
+
+        function refillInmuebleOptions(grupoId, selectedInmuebleId) {
+            if (!inmuebleSel) return;
+            var gid = parseInt(String(grupoId || ''), 10);
+            var html = '<option value="">Seleccione (opcional)</option>';
+            if (gid > 0) {
+                inmueblesData.forEach(function(i) {
+                    if (i.grupo_id === gid) {
+                        html += '<option value="' + i.id + '">' + escapeHtml(i.nombre) + '</option>';
+                    }
+                });
+                inmuebleSel.disabled = false;
+            } else {
+                html = '<option value="">Seleccione un grupo primero</option>';
+                inmuebleSel.disabled = true;
+            }
+            inmuebleSel.innerHTML = html;
+            var iid = parseInt(String(selectedInmuebleId || ''), 10);
+            if (gid > 0 && iid > 0) {
+                var valid = inmueblesData.some(function(i) { return i.id === iid && i.grupo_id === gid; });
+                inmuebleSel.value = valid ? String(iid) : '';
+            } else {
+                inmuebleSel.value = '';
+            }
+        }
+
+        if (grupoSel) {
+            grupoSel.addEventListener('change', function() {
+                refillInmuebleOptions(grupoSel.value, '');
+            });
+        }
+
+        if (clienteBuscar && clienteList) {
+            clienteBuscar.addEventListener('input', function() {
+                var hid = document.getElementById('contratoClienteId');
+                if (hid) hid.value = '';
+                renderClienteList(clienteBuscar.value);
+            });
+            clienteBuscar.addEventListener('focus', function() {
+                renderClienteList(clienteBuscar.value);
+            });
+            clienteBuscar.addEventListener('keydown', function(ev) {
+                var opts = clienteList.querySelectorAll('.list-group-item[data-id]');
+                if (ev.key === 'ArrowDown') {
+                    ev.preventDefault();
+                    if (opts.length) clienteHighlight = Math.min(clienteHighlight + 1, opts.length - 1);
+                    renderClienteList(clienteBuscar.value);
+                } else if (ev.key === 'ArrowUp') {
+                    ev.preventDefault();
+                    if (opts.length) clienteHighlight = Math.max(clienteHighlight - 1, 0);
+                    renderClienteList(clienteBuscar.value);
+                } else if (ev.key === 'Enter' && clienteHighlight >= 0 && opts[clienteHighlight]) {
+                    ev.preventDefault();
+                    setClienteId(opts[clienteHighlight].getAttribute('data-id'));
+                } else if (ev.key === 'Escape') {
+                    hideClienteList();
+                }
+            });
+            clienteList.addEventListener('mousedown', function(ev) {
+                var li = ev.target && ev.target.closest ? ev.target.closest('.list-group-item[data-id]') : null;
+                if (li) {
+                    ev.preventDefault();
+                    setClienteId(li.getAttribute('data-id'));
+                }
+            });
+            document.addEventListener('click', function(ev) {
+                if (!ev.target.closest || !ev.target.closest('.marina-cliente-combobox')) hideClienteList();
+            });
+        }
+
+        function parseMontoContrato(s) {
+            return parseFloat(String(s || '').replace(/,/g, '.')) || 0;
+        }
+
+        function diasEstadiaContrato(inicio, fin) {
+            if (!inicio || !fin || fin < inicio) return 0;
+            var d1 = new Date(inicio + 'T12:00:00');
+            var d2 = new Date(fin + 'T12:00:00');
+            if (isNaN(d1.getTime()) || isNaN(d2.getTime()) || d2 < d1) return 0;
+            return Math.floor((d2 - d1) / 86400000) + 1;
+        }
+
+        function findTarifaById(id) {
+            var n = parseInt(String(id || ''), 10);
+            if (!n) return null;
+            for (var i = 0; i < tarifasData.length; i++) {
+                if (tarifasData[i].id === n) return tarifasData[i];
+            }
+            return null;
+        }
+
+        function getTarifaSeleccionada() {
+            if (!tarifaSel) return null;
+            return findTarifaById(tarifaSel.value);
+        }
+
+        function aplicarMontoDesdeTarifa() {
+            var t = getTarifaSeleccionada();
+            if (!tarifaInfo) return;
+            if (!t) {
+                tarifaInfo.classList.add('d-none');
+                tarifaInfo.textContent = '';
+                return;
+            }
+            var inicio = get('FechaInicio');
+            var fin = get('FechaFin');
+            var dias = diasEstadiaContrato(inicio, fin);
+            var precioDia = parseFloat(t.precio_dia) || 0;
+            if (dias < 1 || precioDia <= 0) {
+                tarifaInfo.classList.remove('d-none');
+                tarifaInfo.textContent = 'Precio/día: ' + formatMontoContrato(precioDia) + ' — indique fechas de inicio y fin válidas para calcular el monto.';
+                return;
+            }
+            var total = Math.round(precioDia * dias * 100) / 100;
+            if (montoTotalInp) montoTotalInp.value = total.toFixed(2);
+            tarifaInfo.classList.remove('d-none');
+            tarifaInfo.textContent = 'Precio/día: ' + formatMontoContrato(precioDia) +
+                ' × ' + dias + ' día(s) de estadía = ' + formatMontoContrato(total);
+        }
+
+        if (tarifaSel) {
+            tarifaSel.addEventListener('change', aplicarMontoDesdeTarifa);
+        }
+        if (fechaInicioInp) {
+            fechaInicioInp.addEventListener('change', function() {
+                if (getTarifaSeleccionada()) aplicarMontoDesdeTarifa();
+            });
+        }
+        if (fechaFinInp) {
+            fechaFinInp.addEventListener('change', function() {
+                if (getTarifaSeleccionada()) aplicarMontoDesdeTarifa();
+            });
+        }
+
+        function clearTarifaContrato() {
+            if (tarifaSel) tarifaSel.value = '';
+            if (tarifaInfo) {
+                tarifaInfo.classList.add('d-none');
+                tarifaInfo.textContent = '';
+            }
+        }
+
+        function setTarifaContrato(id) {
+            if (!tarifaSel) return;
+            tarifaSel.value = id !== undefined && id !== null && id !== '' ? String(id) : '';
+            aplicarMontoDesdeTarifa();
+        }
+
+        function formatMontoContrato(n) {
+            var x = Math.round((parseFloat(n) || 0) * 100) / 100;
+            return x.toLocaleString('es-PA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function isoFromDate(d) {
+            var y = d.getFullYear();
+            var m = String(d.getMonth() + 1).padStart(2, '0');
+            var day = String(d.getDate()).padStart(2, '0');
+            return y + '-' + m + '-' + day;
+        }
+
+        function splitMontoCuotas(total, n) {
+            var cents = Math.round((parseFloat(total) || 0) * 100);
+            var base = Math.floor(cents / n);
+            var out = [];
+            for (var i = 0; i < n - 1; i++) out.push(base / 100);
+            out.push((cents - base * (n - 1)) / 100);
+            return out;
+        }
+
+        function generarFechasVencimiento(inicio, fin, n) {
+            if (n < 1) return [];
+            if (n === 1) return [fin];
+            var start = new Date(inicio + 'T12:00:00');
+            var end = new Date(fin + 'T12:00:00');
+            if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) return [];
+            var ms = end.getTime() - start.getTime();
+            var dates = [];
+            for (var i = 0; i < n; i++) {
+                var d = new Date(start.getTime() + Math.round((ms * i) / (n - 1)));
+                dates.push(isoFromDate(d));
+            }
+            return dates;
+        }
+
+        function toggleNumCuotasWrap() {
+            if (!numCuotasWrap) return;
+            numCuotasWrap.classList.toggle('d-none', accion.value === 'editar');
+        }
+
+        function clearCuotasHidden() {
+            if (cuotasHidden) cuotasHidden.innerHTML = '';
+            if (crearConCuotasInp) crearConCuotasInp.value = '0';
+        }
+
+        function setPreviewErr(m) {
+            if (!cuotasPreviewErr) return;
+            cuotasPreviewErr.textContent = m || '';
+            cuotasPreviewErr.classList.toggle('d-none', !m);
+        }
+
+        function updatePreviewTotal(montoContrato) {
+            if (!cuotasPreviewBody || !cuotasPreviewTotal) return;
+            var sum = 0;
+            cuotasPreviewBody.querySelectorAll('.contrato-cuota-monto').forEach(function(inp) {
+                sum += parseMontoContrato(inp.value);
+            });
+            cuotasPreviewTotal.textContent = formatMontoContrato(sum);
+            var diff = Math.abs(sum - montoContrato);
+            if (diff > 0.02) {
+                cuotasPreviewTotal.classList.add('text-danger');
+                setPreviewErr('La suma de cuotas (' + formatMontoContrato(sum) + ') no coincide con el monto del contrato (' + formatMontoContrato(montoContrato) + ').');
+            } else {
+                cuotasPreviewTotal.classList.remove('text-danger');
+                setPreviewErr('');
+            }
+        }
+
+        function buildCuotasPreviewRows(n, inicio, fin, montoTotal) {
+            if (!cuotasPreviewBody) return;
+            var fechas = generarFechasVencimiento(inicio, fin, n);
+            var montos = splitMontoCuotas(montoTotal, n);
+            var html = '';
+            for (var i = 0; i < n; i++) {
+                html += '<tr>' +
+                    '<td class="text-center align-middle">' + (i + 1) + '</td>' +
+                    '<td><input type="date" class="form-control form-control-sm contrato-cuota-venc" value="' + escapeHtml(fechas[i] || '') + '" required></td>' +
+                    '<td><input type="text" class="form-control form-control-sm contrato-cuota-monto" inputmode="decimal" value="' + escapeHtml(String(montos[i].toFixed(2))) + '" required></td>' +
+                    '</tr>';
+            }
+            cuotasPreviewBody.innerHTML = html;
+            cuotasPreviewBody.querySelectorAll('.contrato-cuota-monto, .contrato-cuota-venc').forEach(function(inp) {
+                inp.addEventListener('input', function() { updatePreviewTotal(montoTotal); });
+                inp.addEventListener('change', function() { updatePreviewTotal(montoTotal); });
+            });
+            updatePreviewTotal(montoTotal);
+        }
+
+        function openCuotasPreview() {
+            var inicio = get('FechaInicio');
+            var fin = get('FechaFin');
+            var montoTotal = parseMontoContrato(get('MontoTotal'));
+            var n = parseInt(numCuotasInp ? numCuotasInp.value : '', 10) || 0;
+            if (n < 1) return false;
+            if (!inicio || !fin) {
+                setErr('Indique fecha de inicio y fin del contrato.');
+                return false;
+            }
+            if (fin < inicio) {
+                setErr('La fecha fin debe ser igual o posterior a la fecha de inicio.');
+                return false;
+            }
+            if (montoTotal <= 0) {
+                setErr('Indique un monto total válido.');
+                return false;
+            }
+            setErr('');
+            if (cuotasPreviewResumen) {
+                cuotasPreviewResumen.textContent = n + ' cuota(s) · Monto del contrato: ' + formatMontoContrato(montoTotal) +
+                    ' · Período: ' + inicio + ' a ' + fin;
+            }
+            buildCuotasPreviewRows(n, inicio, fin, montoTotal);
+            setPreviewErr('');
+            if (cuotasPreviewModal) {
+                modal.hide();
+                cuotasPreviewModal.show();
+            }
+            return true;
+        }
+
+        if (cuotasPreviewEl) {
+            cuotasPreviewEl.addEventListener('hidden.bs.modal', function() {
+                if (crearConCuotasInp && crearConCuotasInp.value === '1') return;
+                modal.show();
+            });
+        }
+
+        function fillCuotasHiddenFromPreview() {
+            if (!cuotasHidden || !cuotasPreviewBody) return false;
+            var rows = cuotasPreviewBody.querySelectorAll('tr');
+            var html = '';
+            rows.forEach(function(tr, idx) {
+                var venc = tr.querySelector('.contrato-cuota-venc');
+                var mInp = tr.querySelector('.contrato-cuota-monto');
+                var v = venc ? venc.value : '';
+                var m = mInp ? mInp.value : '';
+                if (!v || parseMontoContrato(m) <= 0) return;
+                html += '<input type="hidden" name="cuota_numero[]" value="' + (idx + 1) + '">' +
+                    '<input type="hidden" name="cuota_monto[]" value="' + escapeHtml(m) + '">' +
+                    '<input type="hidden" name="cuota_fecha_vencimiento[]" value="' + escapeHtml(v) + '">';
+            });
+            if (!html) return false;
+            cuotasHidden.innerHTML = html;
+            if (crearConCuotasInp) crearConCuotasInp.value = '1';
+            return true;
+        }
+
+        if (formContrato) {
+            formContrato.addEventListener('submit', function(ev) {
+                var hid = document.getElementById('contratoClienteId');
+                if (!hid || parseInt(hid.value, 10) < 1) {
+                    ev.preventDefault();
+                    setErr('Seleccione un cliente de la lista de sugerencias.');
+                    if (clienteBuscar) clienteBuscar.focus();
+                    return;
+                }
+                if (accion.value !== 'crear') return;
+                if (crearConCuotasInp && crearConCuotasInp.value === '1') return;
+                var nCuotas = parseInt(numCuotasInp ? numCuotasInp.value : '', 10) || 0;
+                if (nCuotas < 1) {
+                    clearCuotasHidden();
+                    return;
+                }
+                ev.preventDefault();
+                openCuotasPreview();
+            });
+        }
+
+        if (btnCuotasVolver) {
+            btnCuotasVolver.addEventListener('click', function() {
+                if (cuotasPreviewModal) cuotasPreviewModal.hide();
+            });
+        }
+
+        if (btnCuotasConfirmar) {
+            btnCuotasConfirmar.addEventListener('click', function() {
+                var montoTotal = parseMontoContrato(get('MontoTotal'));
+                updatePreviewTotal(montoTotal);
+                if (cuotasPreviewErr && !cuotasPreviewErr.classList.contains('d-none')) return;
+                if (!fillCuotasHiddenFromPreview()) {
+                    setPreviewErr('Revise montos y fechas de cada cuota.');
+                    return;
+                }
+                if (cuotasPreviewModal) cuotasPreviewModal.hide();
+                if (formContrato) formContrato.requestSubmit();
+            });
+        }
+
         function setErr(m) { if (msg) { msg.textContent = m || ''; msg.classList.toggle('d-none', !m); } }
         function get(id) { var e = document.getElementById('contrato' + id); return e ? e.value : ''; }
-        function set(id, v) { var e = document.getElementById('contrato' + id); if (e) e.value = v !== undefined && v !== null ? v : ''; }
+        function set(id, v) {
+            if (id === 'ClienteId') {
+                setClienteId(v);
+                return;
+            }
+            if (id === 'MuelleId') {
+                if (muelleSel) muelleSel.value = v !== undefined && v !== null ? v : '';
+                if (!contratoSettingSlip) refillSlipOptions(muelleSel ? muelleSel.value : '', '');
+                return;
+            }
+            if (id === 'SlipId') {
+                contratoSettingSlip = true;
+                refillSlipOptions(muelleSel ? muelleSel.value : '', v);
+                contratoSettingSlip = false;
+                return;
+            }
+            if (id === 'GrupoId') {
+                if (grupoSel) grupoSel.value = v !== undefined && v !== null ? v : '';
+                if (!contratoSettingInmueble) refillInmuebleOptions(grupoSel ? grupoSel.value : '', '');
+                return;
+            }
+            if (id === 'InmuebleId') {
+                contratoSettingInmueble = true;
+                refillInmuebleOptions(grupoSel ? grupoSel.value : '', v);
+                contratoSettingInmueble = false;
+                return;
+            }
+            var e = document.getElementById('contrato' + id);
+            if (e) e.value = v !== undefined && v !== null ? v : '';
+        }
         document.getElementById('btnNuevoContrato') && document.getElementById('btnNuevoContrato').addEventListener('click', function() {
             title.textContent = 'Nuevo contrato'; accion.value = 'crear'; fid.value = '';
-            ids.forEach(function(i){ set(i, ''); }); set('FechaInicio', ''); set('FechaFin', ''); set('MontoTotal', ''); set('Observaciones', ''); set('NumeroRecibo', ''); setErr(''); modal.show();
+            ids.forEach(function(i){ set(i, ''); }); set('FechaInicio', ''); set('FechaFin', ''); set('MontoTotal', ''); set('Observaciones', ''); set('NumeroRecibo', '');
+            if (numCuotasInp) numCuotasInp.value = '';
+            clearCuotasHidden();
+            clearTarifaContrato();
+            toggleNumCuotasWrap();
+            setErr(''); modal.show();
         });
         document.addEventListener('click', function(ev) {
             var bEdit = ev.target && ev.target.closest ? ev.target.closest('.btn-editar-contrato') : null;
@@ -492,7 +1033,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 title.textContent = 'Editar contrato'; accion.value = 'editar';
                 fid.value = bEdit.getAttribute('data-id') || '';
                 set('ClienteId', bEdit.getAttribute('data-cliente-id')); set('CuentaId', bEdit.getAttribute('data-cuenta-id')); set('MuelleId', bEdit.getAttribute('data-muelle-id')); set('SlipId', bEdit.getAttribute('data-slip-id')); set('GrupoId', bEdit.getAttribute('data-grupo-id')); set('InmuebleId', bEdit.getAttribute('data-inmueble-id'));
-                set('FechaInicio', bEdit.getAttribute('data-fecha-inicio')); set('FechaFin', bEdit.getAttribute('data-fecha-fin')); set('MontoTotal', bEdit.getAttribute('data-monto-total')); set('Observaciones', bEdit.getAttribute('data-observaciones')); set('NumeroRecibo', bEdit.getAttribute('data-numero-recibo')); setErr(''); modal.show();
+                set('FechaInicio', bEdit.getAttribute('data-fecha-inicio')); set('FechaFin', bEdit.getAttribute('data-fecha-fin')); set('MontoTotal', bEdit.getAttribute('data-monto-total')); set('Observaciones', bEdit.getAttribute('data-observaciones')); set('NumeroRecibo', bEdit.getAttribute('data-numero-recibo'));
+                if (numCuotasInp) numCuotasInp.value = '';
+                clearCuotasHidden();
+                clearTarifaContrato();
+                toggleNumCuotasWrap();
+                setErr(''); modal.show();
                 return;
             }
             var bLib = ev.target && ev.target.closest ? ev.target.closest('.btn-liberar-contrato') : null;
@@ -520,8 +1066,14 @@ document.addEventListener('DOMContentLoaded', function () {
             var d = w.datos;
             title.textContent = (d.id && d.id !== '') ? 'Editar contrato' : 'Nuevo contrato'; accion.value = (d.id && d.id !== '') ? 'editar' : 'crear'; fid.value = d.id || '';
             set('ClienteId', d.cliente_id); set('CuentaId', d.cuenta_id); set('MuelleId', d.muelle_id); set('SlipId', d.slip_id); set('GrupoId', d.grupo_id); set('InmuebleId', d.inmueble_id);
-            set('FechaInicio', d.fecha_inicio); set('FechaFin', d.fecha_fin); set('MontoTotal', d.monto_total); set('Observaciones', d.observaciones); set('NumeroRecibo', d.numero_recibo); setErr(w.error || ''); modal.show();
+            set('FechaInicio', d.fecha_inicio); set('FechaFin', d.fecha_fin); set('MontoTotal', d.monto_total); set('Observaciones', d.observaciones); set('NumeroRecibo', d.numero_recibo);
+            if (numCuotasInp) numCuotasInp.value = d.numero_cuotas || '';
+            clearCuotasHidden();
+            clearTarifaContrato();
+            toggleNumCuotasWrap();
+            setErr(w.error || ''); modal.show();
         }
+        toggleNumCuotasWrap();
     })();
 
     // Gastos / facturas + abonos
