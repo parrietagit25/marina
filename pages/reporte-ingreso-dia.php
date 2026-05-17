@@ -24,7 +24,6 @@ $sql = "
            co.fecha_fin,
            co.monto_total,
            cl.nombre AS navio,
-           NULLIF(TRIM(cl.dueno_capitan), '') AS cliente_nombre,
            mu.nombre AS muelle_nombre,
            sl.nombre AS slip_nombre,
            g.nombre AS grupo_nombre,
@@ -76,7 +75,6 @@ foreach ($filasRaw as $r) {
 
     $filas[] = [
         'id' => (int) $r['id'],
-        'cliente' => (string) ($r['cliente_nombre'] ?? '') !== '' ? (string) $r['cliente_nombre'] : '—',
         'navio' => (string) ($r['navio'] ?? ''),
         'muelle' => $muelle !== '' ? $muelle : '—',
         'slip' => $slip !== '' ? $slip : '—',
@@ -95,8 +93,6 @@ if (obtener('export') === 'excel') {
     $rows = [];
     foreach ($filas as $r) {
         $rows[] = [
-            $r['id'],
-            $r['cliente'],
             $r['navio'],
             $r['muelle'],
             $r['slip'],
@@ -107,10 +103,10 @@ if (obtener('export') === 'excel') {
             $r['monto_dia'],
         ];
     }
-    $pie = [['Total ingreso del día', '', '', '', '', '', '', '', '', $totalDia]];
+    $pie = [['Total ingreso del día', '', '', '', '', '', '', $totalDia]];
     exportarExcel(
         'ingreso_x_dia',
-        ['Contrato', 'Cliente', 'Navío', 'Muelle / Grupo', 'Slip / Inmueble', 'Inicio', 'Fin', 'Días estadía', 'Monto contrato', 'Ingreso del día'],
+        ['Navío', 'Muelle / Grupo', 'Slip / Inmueble', 'Inicio', 'Fin', 'Días estadía', 'Monto contrato', 'Ingreso del día'],
         $rows,
         $pie,
         $titulo . ' — ' . fechaFormato($fecha)
@@ -184,8 +180,6 @@ require_once __DIR__ . '/../includes/layout.php';
         <table class="table table-hover align-middle mb-0">
             <thead>
                 <tr>
-                    <th>Contrato</th>
-                    <th>Cliente</th>
                     <th>Navío</th>
                     <th>Muelle</th>
                     <th>Slip</th>
@@ -200,8 +194,6 @@ require_once __DIR__ . '/../includes/layout.php';
             <tbody>
             <?php foreach ($filas as $r): ?>
                 <tr>
-                    <td>#<?= (int) $r['id'] ?></td>
-                    <td><?= e($r['cliente']) ?></td>
                     <td><?= e($r['navio']) ?></td>
                     <td><?= e($r['muelle']) ?></td>
                     <td><?= e($r['slip']) ?></td>
@@ -217,11 +209,11 @@ require_once __DIR__ . '/../includes/layout.php';
             <?php endforeach; ?>
             <?php if ($filas === []): ?>
                 <tr>
-                    <td colspan="11" class="text-muted">No hay contratos activos vigentes en esta fecha con los filtros aplicados.</td>
+                    <td colspan="9" class="text-muted">No hay contratos activos vigentes en esta fecha con los filtros aplicados.</td>
                 </tr>
             <?php else: ?>
                 <tr class="table-light fw-semibold">
-                    <td colspan="9" class="text-end">Total ingreso del día</td>
+                    <td colspan="7" class="text-end">Total ingreso del día</td>
                     <td class="text-end"><?= dinero($totalDia) ?></td>
                     <td></td>
                 </tr>
