@@ -358,14 +358,20 @@ $stCuotasPagadas = $pdo->prepare("
 $stCuotasPagadas->execute([$desde, $hasta]);
 $cuotas_pagadas_mes = (int) $stCuotasPagadas->fetch(PDO::FETCH_ASSOC)['total'];
 
-$stCuotasVencidas = $pdo->prepare("
-    SELECT COUNT(*) AS total
-    FROM cuotas
-    WHERE fecha_pago IS NULL
-      AND fecha_vencimiento BETWEEN ? AND ?
-");
-$stCuotasVencidas->execute([$desde, $hasta]);
-$cuotas_vencidas_mes = (int) $stCuotasVencidas->fetch(PDO::FETCH_ASSOC)['total'];
+require_once __DIR__ . '/../includes/reportes_queries.php';
+$idsCuotasVencidas = reportes_ids_cuotas_por_estado_vencimiento(
+    $pdo,
+    $desde,
+    $hasta,
+    'vencida',
+    0,
+    '',
+    0,
+    0,
+    0,
+    0
+);
+$cuotas_vencidas_mes = count($idsCuotasVencidas);
 
 $stContratosVencer = $pdo->prepare("
     SELECT COUNT(*) AS total
