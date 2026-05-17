@@ -214,10 +214,10 @@ try {
 <div class="toolbar d-flex gap-2"><button type="button" class="btn btn-primary" id="btnNuevoCliente">Nuevo cliente</button></div>
 
 <table>
-    <thead><tr><th>Id</th><th>Nombre</th><th>Dueño / Capitán</th><th>Teléfono</th><th>Creado</th><th>Creado por</th><th></th></tr></thead>
+    <thead><tr><th>Id</th><th>Nombre</th><th>Dueño / Capitán</th><th>Teléfono</th><th>Creado</th><th></th></tr></thead>
     <tbody>
     <?php
-    $st = $pdo->query('SELECT c.*, u.nombre AS creado_por FROM clientes c LEFT JOIN usuarios u ON c.created_by = u.id ORDER BY c.nombre');
+    $st = $pdo->query('SELECT c.* FROM clientes c ORDER BY c.nombre');
     while ($r = $st->fetch()): ?>
         <tr>
             <td><?= (int)$r['id'] ?></td>
@@ -225,7 +225,6 @@ try {
             <td><?= e($r['dueno_capitan'] ?? '—') ?></td>
             <td><?= e($r['telefono'] ?? '—') ?></td>
             <td><?= fechaHoraFormato($r['created_at']) ?></td>
-            <td><?= e($r['creado_por'] ?? '—') ?></td>
             <td class="acciones">
                 <button type="button" class="btn btn-primary btn-sm btn-registrar-mov-cliente" data-id="<?= (int)$r['id'] ?>" data-nombre="<?= e($r['nombre']) ?>">Registrar movimiento</button>
                 <button type="button" class="btn btn-outline-primary btn-sm btn-ver-mov-cliente" data-id="<?= (int)$r['id'] ?>" data-nombre="<?= e($r['nombre']) ?>">Ver movimientos</button>

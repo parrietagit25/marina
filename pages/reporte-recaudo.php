@@ -1,0 +1,284 @@
+<?php
+/**
+ * Reporte de recaudo: cuotas con vencimiento en el rango y saldo pendiente por cobrar.
+ * No incluye cuotas ya pagadas (solo el monto que falta por recaudar).
+ */
+$titulo = 'Reporte de recaudo';
+$pdo = getDb();
+require_once __DIR__ . '/../includes/export_excel.php';
+
+$desde = trim(obtener('desde', date('Y-m-01')));
+$hasta = trim(obtener('hasta', date('Y-m-d')));
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $desde)) {
+    $desde = date('Y-m-01');
+}
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $hasta)) {
+    $hasta = date('Y-m-d');
+}
+if ($desde > $hasta) {
+    [$desde, $hasta] = [$hasta, $desde];
+}
+
+$muelle_id = (int) obtener('muelle_id', 0);
+$tipoUnidad = trim(obtener('tipo_unidad', ''));
+$tipoUnidad = in_array($tipoUnidad, ['', 'slip', 'inmueble'], true) ? $tipoUnidad : '';
+
+$muellesOpts = $pdo->query('SELECT id, nombre FROM muelles ORDER BY nombre')->fetchAll(PDO::FETCH_KEY_PAIR);
+
+$sql = "
+    SELECT cu.id AS cuota_id,
+           cu.contrato_id,
+           cu.numero_cuota,
+           cu.monto,
+           cu.fecha_vencimiento,
+           cu.fecha_pago AS fecha_pago_legacy,
+           COALESCE(co.estado, 'activo') AS contrato_estado,
+           COALESCE(mov.pagado_mov, 0) AS pagado_mov,
+           cl.nombre AS navio,
+           NULLIF(TRIM(cl.dueno_capitan), '') AS cliente_nombre,
+           mu.nombre AS muelle_nombre,
+           sl.nombre AS slip_nombre,
+           g.nombre AS grupo_nombre,
+           i.nombre AS inmueble_nombre
+    FROM cuotas cu
+    JOIN contratos co ON cu.contrato_id = co.id
+    JOIN clientes cl ON co.cliente_id = cl.id
+    LEFT JOIN (
+        SELECT cuota_id, SUM(monto) AS pagado_mov
+        FROM cuotas_movimientos
+        WHERE tipo IN ('pago', 'abono')
+        GROUP BY cuota_id
+    ) mov ON mov.cuota_id = cu.id
+    LEFT JOIN muelles mu ON mu.id = co.muelle_id
+    LEFT JOIN slips sl ON sl.id = co.slip_id
+    LEFT JOIN grupos g ON g.id = co.grupo_id
+    LEFT JOIN inmuebles i ON i.id = co.inmueble_id
+    WHERE cu.fecha_vencimiento BETWEEN ? AND ?
+";
+$params = [$desde, $hasta];
+
+if ($tipoUnidad === 'slip') {
+    $sql .= ' AND co.slip_id IS NOT NULL ';
+} elseif ($tipoUnidad === 'inmueble') {
+    $sql .= ' AND co.inmueble_id IS NOT NULL ';
+}
+if ($muelle_id > 0) {
+    $sql .= ' AND co.muelle_id = ? ';
+    $params[] = $muelle_id;
+}
+
+$sql .= ' ORDER BY cu.fecha_vencimiento ASC, co.id ASC, cu.numero_cuota ASC';
+
+$st = $pdo->prepare($sql);
+$st->execute($params);
+$raw = $st->fetchAll(PDO::FETCH_ASSOC);
+
+$hoy = date('Y-m-d');
+$filas = [];
+$totalRecaudo = 0.0;
+
+foreach ($raw as $r) {
+    $monto = round((float) ($r['monto'] ?? 0), 2);
+    $pagadoMov = (float) ($r['pagado_mov'] ?? 0);
+    if ($pagadoMov > 0.00001) {
+        $pagado = round($pagadoMov, 2);
+    } elseif (!empty($r['fecha_pago_legacy'])) {
+        $pagado = $monto;
+    } else {
+        $pagado = 0.0;
+    }
+    $saldo = max(0.0, round($monto - $pagado, 2));
+    if ($saldo <= 0.00001) {
+        continue;
+    }
+
+    $fv = (string) ($r['fecha_vencimiento'] ?? '');
+    if ($fv !== '' && $fv < $hoy) {
+        $estado = 'Vencida';
+    } else {
+        $estado = 'Pendiente';
+    }
+
+    $muelle = (string) ($r['muelle_nombre'] ?? '');
+    $slip = (string) ($r['slip_nombre'] ?? '');
+    if ($muelle === '' && !empty($r['grupo_nombre'])) {
+        $muelle = (string) $r['grupo_nombre'];
+    }
+    if ($slip === '' && !empty($r['inmueble_nombre'])) {
+        $slip = (string) $r['inmueble_nombre'];
+    }
+
+    $filas[] = [
+        'contrato_id' => (int) $r['contrato_id'],
+        'cuota_id' => (int) $r['cuota_id'],
+        'numero_cuota' => (int) $r['numero_cuota'],
+        'cliente' => (string) ($r['cliente_nombre'] ?? '') !== '' ? (string) $r['cliente_nombre'] : '—',
+        'navio' => (string) ($r['navio'] ?? ''),
+        'muelle' => $muelle !== '' ? $muelle : '—',
+        'slip' => $slip !== '' ? $slip : '—',
+        'vencimiento' => $fv,
+        'monto_cuota' => $monto,
+        'pagado' => $pagado,
+        'por_recaudar' => $saldo,
+        'estado' => $estado,
+        'contrato_estado' => (string) ($r['contrato_estado'] ?? 'activo'),
+    ];
+    $totalRecaudo += $saldo;
+}
+
+$totalRecaudo = round($totalRecaudo, 2);
+
+if (obtener('export') === 'excel') {
+    $rows = [];
+    foreach ($filas as $r) {
+        $rows[] = [
+            $r['contrato_id'],
+            $r['numero_cuota'],
+            $r['cliente'],
+            $r['navio'],
+            $r['muelle'],
+            $r['slip'],
+            $r['vencimiento'],
+            $r['monto_cuota'],
+            $r['pagado'],
+            $r['por_recaudar'],
+            $r['estado'],
+        ];
+    }
+    $pie = [['Total por recaudar', '', '', '', '', '', '', '', '', $totalRecaudo, '']];
+    exportarExcel(
+        'reporte_recaudo',
+        ['Contrato', 'Cuota', 'Cliente', 'Navío', 'Muelle / Grupo', 'Slip / Inmueble', 'Vencimiento', 'Monto cuota', 'Pagado', 'Por recaudar', 'Estado'],
+        $rows,
+        $pie,
+        $titulo . ' — ' . fechaFormato($desde) . ' a ' . fechaFormato($hasta)
+    );
+}
+
+require_once __DIR__ . '/../includes/layout.php';
+?>
+<h1 class="h4 mb-2">Reporte de recaudo</h1>
+<p class="text-muted small mb-3">
+    Cuotas con <strong>vencimiento</strong> entre las fechas indicadas que aún tienen <strong>saldo por cobrar</strong>.
+    Las cuotas ya pagadas no aparecen; solo el monto pendiente de cada una.
+</p>
+
+<form method="get" class="toolbar mb-3">
+    <input type="hidden" name="p" value="reporte-recaudo">
+    <div class="row g-2 align-items-end">
+        <div class="col-12 col-md-2">
+            <label class="form-label mb-1">Desde</label>
+            <input type="date" class="form-control" name="desde" value="<?= e($desde) ?>" required>
+        </div>
+        <div class="col-12 col-md-2">
+            <label class="form-label mb-1">Hasta</label>
+            <input type="date" class="form-control" name="hasta" value="<?= e($hasta) ?>" required>
+        </div>
+        <div class="col-12 col-md-3">
+            <label class="form-label mb-1">Muelle</label>
+            <select class="form-select" name="muelle_id">
+                <option value="0">Todos</option>
+                <?php foreach ($muellesOpts as $mid => $mnom): ?>
+                    <option value="<?= (int) $mid ?>" <?= $muelle_id === (int) $mid ? 'selected' : '' ?>><?= e($mnom) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="col-12 col-md-3">
+            <label class="form-label mb-1">Tipo unidad</label>
+            <select class="form-select" name="tipo_unidad">
+                <option value="" <?= $tipoUnidad === '' ? 'selected' : '' ?>>Marina e inmuebles</option>
+                <option value="slip" <?= $tipoUnidad === 'slip' ? 'selected' : '' ?>>Solo slips (marina)</option>
+                <option value="inmueble" <?= $tipoUnidad === 'inmueble' ? 'selected' : '' ?>>Solo inmuebles</option>
+            </select>
+        </div>
+        <div class="col-12 col-md-auto">
+            <button type="submit" class="btn btn-primary">Consultar</button>
+        </div>
+        <div class="col-12 col-md-auto">
+            <button type="submit" class="btn btn-success" name="export" value="excel">Exportar Excel</button>
+        </div>
+    </div>
+</form>
+
+<div class="row g-3 mb-3">
+    <div class="col-12 col-md-4">
+        <div class="card p-3 border-0 shadow-sm">
+            <div class="text-muted small mb-1">Período</div>
+            <div class="fs-6 fw-semibold"><?= fechaFormato($desde) ?> — <?= fechaFormato($hasta) ?></div>
+        </div>
+    </div>
+    <div class="col-12 col-md-4">
+        <div class="card p-3 border-0 shadow-sm">
+            <div class="text-muted small mb-1">Cuotas por recaudar</div>
+            <div class="fs-5 fw-semibold"><?= count($filas) ?></div>
+        </div>
+    </div>
+    <div class="col-12 col-md-4">
+        <div class="card p-3 border-0 shadow-sm bg-success bg-opacity-10">
+            <div class="text-muted small mb-1">Total por recaudar</div>
+            <div class="fs-5 fw-bold text-success"><?= dinero($totalRecaudo) ?></div>
+        </div>
+    </div>
+</div>
+
+<div class="card p-3">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Contrato</th>
+                    <th>Cuota</th>
+                    <th>Cliente</th>
+                    <th>Navío</th>
+                    <th>Muelle</th>
+                    <th>Slip</th>
+                    <th>Vencimiento</th>
+                    <th class="text-end">Monto cuota</th>
+                    <th class="text-end">Pagado</th>
+                    <th class="text-end">Por recaudar</th>
+                    <th>Estado</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($filas as $r): ?>
+                <tr>
+                    <td>#<?= (int) $r['contrato_id'] ?></td>
+                    <td>#<?= (int) $r['numero_cuota'] ?></td>
+                    <td><?= e($r['cliente']) ?></td>
+                    <td><?= e($r['navio']) ?></td>
+                    <td><?= e($r['muelle']) ?></td>
+                    <td><?= e($r['slip']) ?></td>
+                    <td><?= fechaFormato($r['vencimiento']) ?></td>
+                    <td class="text-end"><?= dinero((float) $r['monto_cuota']) ?></td>
+                    <td class="text-end"><?= dinero((float) $r['pagado']) ?></td>
+                    <td class="text-end fw-semibold text-success"><?= dinero((float) $r['por_recaudar']) ?></td>
+                    <td>
+                        <?php if ($r['estado'] === 'Vencida'): ?>
+                            <span class="badge bg-danger">Vencida</span>
+                        <?php else: ?>
+                            <span class="badge bg-warning text-dark">Pendiente</span>
+                        <?php endif; ?>
+                    </td>
+                    <td class="text-nowrap">
+                        <a class="btn btn-sm btn-outline-primary" href="<?= MARINA_URL ?>/index.php?p=contratos&amp;accion=cuotas&amp;id=<?= (int) $r['contrato_id'] ?>">Cuotas</a>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+            <?php if ($filas === []): ?>
+                <tr>
+                    <td colspan="12" class="text-muted">No hay cuotas con saldo pendiente y vencimiento en este rango.</td>
+                </tr>
+            <?php else: ?>
+                <tr class="table-light fw-semibold">
+                    <td colspan="9" class="text-end">Total por recaudar</td>
+                    <td class="text-end text-success"><?= dinero($totalRecaudo) ?></td>
+                    <td colspan="2"></td>
+                </tr>
+            <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<?php require_once __DIR__ . '/../includes/footer.php'; ?>

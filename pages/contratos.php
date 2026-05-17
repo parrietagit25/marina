@@ -713,6 +713,9 @@ if ($accion === 'cuotas' && $registro) {
 }
 
 // --- Lista de contratos + modales
+$fin_desde = trim(obtener('fin_desde', ''));
+$fin_hasta = trim(obtener('fin_hasta', ''));
+$solo_activos = obtener('solo_activos', '') === '1';
 $ok = obtener('ok');
 $err = obtener('err');
 $mostrarModal = enviado() && ($accion === 'crear' || $accion === 'editar') && $mensaje !== '';
@@ -731,35 +734,63 @@ $modalDatos = [
     'numero_recibo' => $registro['numero_recibo'] ?? ($_POST['numero_recibo'] ?? ''),
     'estado' => (string) ($registro['estado'] ?? ($_POST['estado'] ?? 'activo')),
 ];
+require_once __DIR__ . '/../includes/contrato_estado_cuenta.php';
+require_once __DIR__ . '/../includes/layout.php';
 ?>
-<?php require_once __DIR__ . '/../includes/layout.php'; ?>
 
 <h1>Contratos</h1>
 <?php if ($ok): ?><p class="success"><?= e($ok) ?></p><?php endif; ?>
 <?php if ($err): ?><p class="error"><?= e($err) ?></p><?php endif; ?>
 <?php if ($mensaje && !$mostrarModal): ?><p class="error"><?= e($mensaje) ?></p><?php endif; ?>
 
+<?php if ($fin_desde !== '' || $fin_hasta !== '' || $solo_activos): ?>
+    <div class="alert alert-info py-2 small mb-3">
+        Filtro activo:
+        <?php if ($solo_activos): ?>contratos <strong>activos</strong><?php endif; ?>
+        <?php if ($fin_desde !== '' || $fin_hasta !== ''): ?>
+            <?= $solo_activos ? ' · ' : '' ?>fecha fin
+            <?= $fin_desde !== '' ? 'desde ' . e(fechaFormato($fin_desde)) : '' ?>
+            <?= $fin_hasta !== '' ? 'hasta ' . e(fechaFormato($fin_hasta)) : '' ?>
+        <?php endif; ?>
+        — <a href="<?= MARINA_URL ?>/index.php?p=contratos">Quitar filtro</a>
+    </div>
+<?php endif; ?>
+
 <div class="toolbar d-flex gap-2"><button type="button" class="btn btn-primary" id="btnNuevoContrato">Nuevo contrato</button></div>
 
 <table>
     <thead>
-        <tr><th>Id</th><th>Cliente</th><th>Unidad</th><th>Inicio</th><th>Fin</th><th>Monto</th><th>Estado</th><th>Creado por</th><th></th></tr>
+        <tr><th>Id</th><th>Cliente</th><th>Unidad</th><th>Inicio</th><th>Fin</th><th>Monto</th><th>Estado</th><th></th></tr>
     </thead>
     <tbody>
     <?php
-    $st = $pdo->query("
+    $sqlLista = "
         SELECT co.id, co.cliente_id, co.cuenta_id, co.muelle_id, co.slip_id, co.grupo_id, co.inmueble_id, co.fecha_inicio, co.fecha_fin, co.monto_total, co.observaciones, co.numero_recibo, co.activo, COALESCE(co.estado, 'activo') AS estado,
                cl.nombre AS cliente_nombre,
-               m.nombre AS muelle_nombre, s.nombre AS slip_nombre, g.nombre AS grupo_nombre, i.nombre AS inmueble_nombre, u.nombre AS creado_por
+               m.nombre AS muelle_nombre, s.nombre AS slip_nombre, g.nombre AS grupo_nombre, i.nombre AS inmueble_nombre
         FROM contratos co
         JOIN clientes cl ON co.cliente_id = cl.id
         LEFT JOIN muelles m ON co.muelle_id = m.id
         LEFT JOIN slips s ON co.slip_id = s.id
         LEFT JOIN grupos g ON co.grupo_id = g.id
         LEFT JOIN inmuebles i ON co.inmueble_id = i.id
-        LEFT JOIN usuarios u ON co.created_by = u.id
-        ORDER BY co.id DESC
-    ");
+        WHERE 1=1
+    ";
+    $paramsLista = [];
+    if ($solo_activos) {
+        $sqlLista .= " AND COALESCE(co.estado, 'activo') = 'activo' ";
+    }
+    if ($fin_desde !== '') {
+        $sqlLista .= ' AND co.fecha_fin >= ? ';
+        $paramsLista[] = $fin_desde;
+    }
+    if ($fin_hasta !== '') {
+        $sqlLista .= ' AND co.fecha_fin <= ? ';
+        $paramsLista[] = $fin_hasta;
+    }
+    $sqlLista .= ' ORDER BY co.fecha_fin ASC, co.id DESC ';
+    $st = $pdo->prepare($sqlLista);
+    $st->execute($paramsLista);
     while ($r = $st->fetch()): ?>
         <tr>
             <td><?= $r['id'] ?></td>
@@ -771,8 +802,8 @@ $modalDatos = [
             <td><?php $est = (string) ($r['estado'] ?? 'activo'); ?>
                 <span class="badge <?= $est === 'activo' ? 'bg-success' : 'bg-secondary' ?>"><?= $est === 'activo' ? 'Activo' : 'Liberado' ?></span>
             </td>
-            <td><?= e($r['creado_por'] ?? '—') ?></td>
             <td class="acciones">
+                <?= marina_html_btn_estado_cuenta_contrato((int) $r['id']) ?>
                 <a href="?p=contratos&accion=cuotas&id=<?= $r['id'] ?>" class="btn btn-primary btn-sm">Cuotas</a>
                 <a href="<?= MARINA_URL ?>/index.php?p=contratos-electricidad&amp;id=<?= (int) $r['id'] ?>" class="btn btn-info btn-sm text-white">Electricidad</a>
                 <?php if ($est === 'activo'): ?>
@@ -917,4 +948,5 @@ $modalDatos = [
 </div>
 
 <script>window.__contratoModal = { mostrar: <?= $mostrarModal ? 'true' : 'false' ?>, datos: <?= json_encode($modalDatos, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>, error: <?= json_encode($mensaje, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?> };</script>
+<?php require_once __DIR__ . '/../includes/partials/modal_estado_cuenta_contrato.php'; ?>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

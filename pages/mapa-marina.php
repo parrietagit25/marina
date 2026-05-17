@@ -136,14 +136,18 @@ $ok = obtener('ok');
 ?>
 <?php require_once __DIR__ . '/../includes/layout.php'; ?>
 
-<div class="d-flex align-items-center justify-content-between mb-3">
-    <div>
-        <h1 class="mb-1">Mapa Marina</h1>
-        <div class="text-muted">Muelle → slips. Verde = contrato activo en ese slip.</div>
+<div class="mapa-marina-page">
+<div class="mapa-marina-hero mb-3">
+    <div class="mapa-marina-hero-inner">
+        <div class="mapa-marina-hero-icon" aria-hidden="true"><i data-lucide="anchor" class="mapa-hero-ico"></i></div>
+        <div>
+            <h1 class="mapa-marina-title mb-1">Mapa Marina</h1>
+            <p class="mapa-marina-subtitle mb-0">Plano de muelles y amarres · clic en slip con contrato para ver detalle</p>
+        </div>
     </div>
-    <div class="d-flex gap-2">
-        <div><span class="badge bg-success">Con contrato</span></div>
-        <div><span class="badge bg-secondary">Sin contrato</span></div>
+    <div class="mapa-marina-legend">
+        <span class="mapa-legend-item mapa-legend-item--ocupado"><i data-lucide="ship" class="menu-ico"></i> Con contrato</span>
+        <span class="mapa-legend-item mapa-legend-item--libre"><i data-lucide="circle" class="menu-ico"></i> Disponible</span>
     </div>
 </div>
 <?php if ($ok): ?><div class="alert alert-success"><?= e($ok) ?></div><?php endif; ?>
@@ -152,14 +156,17 @@ $ok = obtener('ok');
 <?php if (empty($muelles)): ?>
     <div class="error">No hay muelles registrados.</div>
 <?php else: ?>
-    <div class="mapa-grid">
+    <div class="mapa-marina-grid">
         <?php foreach ($muelles as $m): ?>
             <?php
                 $mid = (int) $m['id'];
                 $slipsMu = $slipsPorMuelle[$mid] ?? [];
             ?>
-            <div class="mapa-muelle card p-3">
-                <h2 class="h5 mb-2"><?= e($m['nombre']) ?></h2>
+            <div class="mapa-muelle mapa-marina-muelle card">
+                <div class="mapa-marina-muelle-head">
+                    <span class="mapa-muelle-ico" aria-hidden="true"><i data-lucide="waves" class="menu-ico"></i></span>
+                    <h2 class="mapa-marina-muelle-title"><?= e($m['nombre']) ?></h2>
+                </div>
                 <?php if (empty($slipsMu)): ?>
                     <div class="text-muted small">Sin slips</div>
                 <?php else: ?>
@@ -190,18 +197,19 @@ $ok = obtener('ok');
                                 }
                             ?>
                             <div
-                                class="mapa-slip-item d-flex align-items-center justify-content-between <?= $tieneContrato ? 'cursor-pointer' : '' ?>"
+                                class="mapa-slip-item mapa-marina-slip <?= $tieneContrato ? 'mapa-marina-slip--ocupado cursor-pointer' : 'mapa-marina-slip--libre' ?>"
                                 <?php if ($tieneContrato && $detallePayload): ?>
                                     data-bs-toggle="modal"
                                     data-bs-target="#detalleContratoSlipModal"
                                     data-contrato='<?= e(json_encode($detallePayload, JSON_UNESCAPED_UNICODE)) ?>'
                                 <?php endif; ?>
                             >
-                                <div class="fw-semibold"><?= e($s['nombre']) ?></div>
+                                <span class="mapa-slip-ico" aria-hidden="true"><i data-lucide="<?= $tieneContrato ? 'ship' : 'anchor' ?>" class="menu-ico"></i></span>
+                                <span class="mapa-slip-name"><?= e($s['nombre']) ?></span>
                                 <?php if ($tieneContrato): ?>
-                                    <span class="badge bg-success">Con contrato</span>
+                                    <span class="mapa-slip-pill mapa-slip-pill--ocupado" title="Con contrato">Ocupado</span>
                                 <?php else: ?>
-                                    <span class="badge bg-secondary">Sin contrato</span>
+                                    <span class="mapa-slip-pill mapa-slip-pill--libre" title="Disponible">Libre</span>
                                 <?php endif; ?>
                             </div>
                         <?php endforeach; ?>
@@ -333,8 +341,8 @@ window.addEventListener('load', function() {
             elMuelle.textContent = d.muelle_actual_nombre || '—';
             elSlip.textContent = d.slip_actual_nombre || '—';
             elMonto.textContent = money(d.monto_total || 0);
-            elFIni.textContent = d.fecha_inicio || '—';
-            elFFin.textContent = d.fecha_fin || '—';
+            elFIni.textContent = d.fecha_inicio ? marinaFmtFecha(d.fecha_inicio) : '—';
+            elFFin.textContent = d.fecha_fin ? marinaFmtFecha(d.fecha_fin) : '—';
             elObs.textContent = d.observaciones || '—';
             if (elContratoInput) elContratoInput.value = d.id || '';
             if (elLiberarInput) elLiberarInput.value = d.id || '';
@@ -354,7 +362,7 @@ window.addEventListener('load', function() {
                     '<td>' + esc(money(c.monto || 0)) + '</td>' +
                     '<td>' + esc(money(c.pagado || 0)) + '</td>' +
                     '<td>' + esc(money(c.saldo || 0)) + '</td>' +
-                    '<td>' + esc(c.fecha_vencimiento || '') + '</td>' +
+                    '<td>' + esc(marinaFmtFecha(c.fecha_vencimiento || '')) + '</td>' +
                     '<td><span class="badge ' + badge + '">' + esc(estado) + '</span></td>' +
                 '</tr>';
             });
@@ -363,6 +371,8 @@ window.addEventListener('load', function() {
     });
 });
 </script>
+
+</div><!-- .mapa-marina-page -->
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
 

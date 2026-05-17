@@ -323,8 +323,8 @@ window.addEventListener('load', function() {
             elGrupo.textContent = d.grupo_actual_nombre || '—';
             elInmueble.textContent = d.inmueble_actual_nombre || '—';
             elMonto.textContent = money(d.monto_total || 0);
-            elFIni.textContent = d.fecha_inicio || '—';
-            elFFin.textContent = d.fecha_fin || '—';
+            elFIni.textContent = d.fecha_inicio ? marinaFmtFecha(d.fecha_inicio) : '—';
+            elFFin.textContent = d.fecha_fin ? marinaFmtFecha(d.fecha_fin) : '—';
             elObs.textContent = d.observaciones || '—';
             if (elContratoInput) elContratoInput.value = d.id || '';
             if (elLiberarInput) elLiberarInput.value = d.id || '';
@@ -345,7 +345,7 @@ window.addEventListener('load', function() {
                     + '<td>' + esc(money(c.monto || 0)) + '</td>'
                     + '<td>' + esc(money(c.pagado || 0)) + '</td>'
                     + '<td>' + esc(money(c.saldo || 0)) + '</td>'
-                    + '<td>' + esc(c.fecha_vencimiento || '') + '</td>'
+                    + '<td>' + esc(marinaFmtFecha(c.fecha_vencimiento || '')) + '</td>'
                     + '<td><span class="badge ' + badge + '">' + esc(estado) + '</span></td>'
                     + '</tr>';
             });

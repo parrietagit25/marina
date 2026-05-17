@@ -2,12 +2,15 @@
 <footer class='footer text-center text-muted py-3'>
   Marina &copy; <?= date('Y') ?>
 </footer>
+  </div><!-- .main-area -->
+</div><!-- .app-shell -->
 <script src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js' crossorigin='anonymous'></script>
 <script src='https://code.jquery.com/jquery-3.7.1.min.js'></script>
 <script src='https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js'></script>
 <script src='https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js'></script>
 <script src='https://unpkg.com/lucide@latest'></script>
 <script src='<?= MARINA_URL ?>/assets/js/app.js'></script>
+<script src='<?= MARINA_URL ?>/assets/js/contrato-estado-cuenta.js'></script>
 <script>
 (function() {
   function initDataTablesGlobal() {

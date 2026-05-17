@@ -12,16 +12,39 @@ function redirigir(string $url, int $codigo = 302): void {
     exit;
 }
 
-function fechaFormato(?string $fecha, string $formato = 'd/m/Y'): string {
-    if ($fecha === null || $fecha === '') return '';
+/** Formato de fecha en pantallas operativas (año con 2 dígitos: 16/05/26). */
+const MARINA_FMT_FECHA_PANTALLA = 'd/m/y';
+
+/** Formato de fecha en reportes (año completo: 16/05/2026). */
+const MARINA_FMT_FECHA_REPORTE = 'd/m/Y';
+
+const MARINA_FMT_FECHA_HORA_PANTALLA = 'd/m/y H:i';
+
+const MARINA_FMT_FECHA_HORA_REPORTE = 'd/m/Y H:i';
+
+function fechaFormato(?string $fecha, string $formato = MARINA_FMT_FECHA_PANTALLA): string {
+    if ($fecha === null || $fecha === '') {
+        return '';
+    }
     $t = strtotime($fecha);
     return $t ? date($formato, $t) : $fecha;
 }
 
-function fechaHoraFormato(?string $fecha, string $formato = 'd/m/Y H:i'): string {
-    if ($fecha === null || $fecha === '') return '';
+/** Fecha en reportes (año de 4 dígitos). */
+function fechaFormatoReporte(?string $fecha): string {
+    return fechaFormato($fecha, MARINA_FMT_FECHA_REPORTE);
+}
+
+function fechaHoraFormato(?string $fecha, string $formato = MARINA_FMT_FECHA_HORA_PANTALLA): string {
+    if ($fecha === null || $fecha === '') {
+        return '';
+    }
     $t = strtotime($fecha);
     return $t ? date($formato, $t) : $fecha;
+}
+
+function fechaHoraFormatoReporte(?string $fecha): string {
+    return fechaHoraFormato($fecha, MARINA_FMT_FECHA_HORA_REPORTE);
 }
 
 function dinero(float $n): string {

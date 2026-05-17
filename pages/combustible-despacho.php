@@ -464,7 +464,6 @@ require_once __DIR__ . '/../includes/layout.php';
                     <th class="text-end">Total</th>
                     <th class="text-end">Pagado</th>
                     <th class="text-end">Saldo</th>
-                    <th>Cuenta sugerida</th>
                     <th></th>
                 </tr>
             </thead>
@@ -472,14 +471,11 @@ require_once __DIR__ . '/../includes/layout.php';
             <?php
             $st = $pdo->query("
                 SELECT d.*,
-                       CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nom,
                        COALESCE(p.pagado, 0) AS pagado_sum
                 FROM combustible_despachos d
                 LEFT JOIN (
                     SELECT despacho_id, SUM(monto) AS pagado FROM combustible_despacho_pagos GROUP BY despacho_id
                 ) p ON p.despacho_id = d.id
-                LEFT JOIN cuentas c ON c.id = d.cuenta_id
-                LEFT JOIN bancos b ON b.id = c.banco_id
                 ORDER BY d.fecha DESC, d.id DESC
             ");
             while ($r = $st->fetch(PDO::FETCH_ASSOC)):
@@ -496,7 +492,6 @@ require_once __DIR__ . '/../includes/layout.php';
                     <td class="text-end"><?= dinero($totalF) ?></td>
                     <td class="text-end"><?= dinero($pagadoF) ?></td>
                     <td class="text-end"><?= $saldoF > 0.00001 ? dinero($saldoF) : '—' ?></td>
-                    <td><?= $r['cuenta_nom'] ? e($r['cuenta_nom']) : '—' ?></td>
                     <td class="text-nowrap">
                         <a class="btn btn-sm btn-primary" href="<?= MARINA_URL ?>/index.php?p=combustible-despacho&cobrar=<?= (int) $r['id'] ?>">Cobrar</a>
                         <button type="button" class="btn btn-sm btn-secondary btn-editar-despacho"

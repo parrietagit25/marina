@@ -131,6 +131,30 @@ $u = function (string $p, string $label): string {
 
     <div class="accordion-item">
         <h2 class="accordion-header">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#manualCombustible">
+                Combustible
+            </button>
+        </h2>
+        <div id="manualCombustible" class="accordion-collapse collapse" data-bs-parent="#manualAccordion">
+            <div class="accordion-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-3"><?= $u('combustible-pedidos', 'Pedidos') ?></dt>
+                    <dd class="col-sm-9">Compras y recepción de combustible; al recibir se registra gasto e inventario.</dd>
+                    <dt class="col-sm-3"><?= $u('combustible-despacho', 'Despacho') ?></dt>
+                    <dd class="col-sm-9">Factura de venta a embarcaciones; cobros parciales o totales generan ingreso bancario.</dd>
+                    <dt class="col-sm-3"><?= $u('combustible-ajuste', 'Ajuste') ?></dt>
+                    <dd class="col-sm-9">Correcciones de inventario en galones.</dd>
+                    <dt class="col-sm-3"><?= $u('combustible-precios', 'Precio x galón') ?></dt>
+                    <dd class="col-sm-9">Tarifas de venta vigentes por tipo de combustible.</dd>
+                    <dt class="col-sm-3"><?= $u('reporte-combustible', 'Reporte') ?></dt>
+                    <dd class="col-sm-9">Operación e inventario de combustible en un período.</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    <div class="accordion-item">
+        <h2 class="accordion-header">
             <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#manualMarina">
                 Marina Ingresos
             </button>
@@ -158,13 +182,6 @@ $u = function (string $p, string $label): string {
                         Desde la lista puede abrir la gestión de <strong>electricidad por contrato</strong> cuando aplique.</dd>
                     <dt class="col-sm-3"><?= $u('contratos-electricidad', 'Electricidad (contrato)') ?></dt>
                     <dd class="col-sm-9">Facturas y cobros de electricidad ligados a un contrato; los pagos aparecen como créditos bancarios en reportes y movimiento bancario.</dd>
-                    <dt class="col-sm-3">Combustible</dt>
-                    <dd class="col-sm-9">
-                        <?= $u('combustible-pedidos', 'Pedidos') ?> (compras y recepción),
-                        <?= $u('combustible-despacho', 'Despacho') ?> (venta a embarcaciones),
-                        <?= $u('combustible-ajuste', 'Ajuste') ?> (correcciones de inventario),
-                        <?= $u('combustible-precios', 'Precio x galón') ?> (tarifas vigentes).
-                    </dd>
                 </dl>
             </div>
         </div>
@@ -185,7 +202,6 @@ $u = function (string $p, string $label): string {
                     <li><?= $u('reporte-ingresos-egresos', 'Ingresos y egresos (detalle)') ?> — listado conjunto con filtros (cuenta, vista agrupada, etc.).</li>
                     <li><?= $u('reporte-marina-contratos', 'Reporte Marina → contratos') ?> — relación muelle/slip y contratos.</li>
                     <li><?= $u('reporte-inmuebles-contratos', 'Reporte Inmuebles → contratos') ?> — relación grupo/inmueble y contratos.</li>
-                    <li><?= $u('reporte-combustible', 'Combustible') ?> — operación e inventario de combustible.</li>
                 </ul>
             </div>
         </div>

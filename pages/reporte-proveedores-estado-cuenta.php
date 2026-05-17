@@ -58,15 +58,24 @@ if (obtener('export') === 'excel') {
             $m['fecha_gasto'] ?? '',
             $m['proveedor_nombre'] ?? '',
             $m['partida_nombre'] ?? '',
-            (float) ($m['monto'] ?? 0),
             $m['cuenta_nombre'] ?? '',
             $m['forma_pago_nombre'] ?? '',
             $m['referencia'] ?? '',
-            $m['observaciones'] ?? '',
+            (float) ($m['monto'] ?? 0),
         ];
     }
-    $pie = [['Total', '', '', $totalGeneral, '', '', '', '']];
-    exportarExcel('reporte_proveedores_estado_cuenta', ['Fecha', 'Proveedor', 'Partida', 'Monto', 'Cuenta', 'Forma pago', 'Referencia', 'Observaciones'], $rows, $pie, $titulo);
+    $pie = [['Total', '', '', '', '', '', $totalGeneral]];
+    $tituloExcel = $titulo;
+    if ($proveedor_id > 0) {
+        $nombreProv = trim((string) ($proveedores[$proveedor_id] ?? ''));
+        if ($nombreProv === '' && $movs !== []) {
+            $nombreProv = trim((string) ($movs[0]['proveedor_nombre'] ?? ''));
+        }
+        if ($nombreProv !== '') {
+            $tituloExcel = 'Estado de Cuenta - ' . $nombreProv;
+        }
+    }
+    exportarExcel('reporte_proveedores_estado_cuenta', ['Fecha', 'Proveedor', 'Partida', 'Cuenta', 'Forma pago', 'Referencia', 'Monto'], $rows, $pie, $tituloExcel);
 }
 
 require_once __DIR__ . '/../includes/layout.php';

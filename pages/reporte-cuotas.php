@@ -8,6 +8,8 @@ require_once __DIR__ . '/../includes/export_excel.php';
 
 $desde = obtener('desde', date('Y-m-01'));
 $hasta = obtener('hasta', date('Y-m-d'));
+$fecha_campo = obtener('fecha_campo', 'vencimiento');
+$fecha_campo = ($fecha_campo === 'pago') ? 'pago' : 'vencimiento';
 $estado = trim(obtener('estado', ''));
 $contrato_id = (int) obtener('contrato_id', 0);
 $tipo_unidad = trim(obtener('tipo_unidad', ''));
@@ -60,9 +62,23 @@ $sql = "
     LEFT JOIN slips s ON co.slip_id = s.id
     LEFT JOIN grupos g ON co.grupo_id = g.id
     LEFT JOIN inmuebles i ON co.inmueble_id = i.id
-    WHERE cu.fecha_vencimiento BETWEEN ? AND ?
+    WHERE " . ($fecha_campo === 'pago'
+        ? "(
+            EXISTS (
+                SELECT 1 FROM cuotas_movimientos mo2
+                WHERE mo2.cuota_id = cu.id
+                  AND mo2.tipo IN ('pago','abono')
+                  AND mo2.fecha_pago BETWEEN ? AND ?
+            )
+            OR (
+                cu.fecha_pago IS NOT NULL
+                AND cu.fecha_pago BETWEEN ? AND ?
+                AND NOT EXISTS (SELECT 1 FROM cuotas_movimientos x WHERE x.cuota_id = cu.id)
+            )
+        )"
+        : 'cu.fecha_vencimiento BETWEEN ? AND ?') . "
 ";
-$params = [$desde, $hasta];
+$params = $fecha_campo === 'pago' ? [$desde, $hasta, $desde, $hasta] : [$desde, $hasta];
 
 if ($contrato_id > 0) {
     $sql .= ' AND cu.contrato_id = ? ';
@@ -215,18 +231,25 @@ if (obtener('export') === 'excel') {
 require_once __DIR__ . '/../includes/layout.php';
 ?>
 <h1 class="h4 mb-2">Reporte de cuotas</h1>
-<p class="text-muted small mb-3">Cuotas de contratos de <strong>marina</strong> (muelle/slip) e <strong>inmuebles</strong> (grupo/inmueble). El rango aplica a la <strong>fecha de vencimiento</strong> de cada cuota. Estados: <strong>Pagada</strong> (cubierta por movimientos o pago único antiguo), <strong>Pendiente</strong> (saldo y aún no vence), <strong>Vencida</strong> (saldo y vencimiento anterior a hoy).</p>
+<p class="text-muted small mb-3">Cuotas de contratos de <strong>marina</strong> (muelle/slip) e <strong>inmuebles</strong> (grupo/inmueble). El rango aplica a la <strong><?= $fecha_campo === 'pago' ? 'fecha de pago' : 'fecha de vencimiento' ?></strong> de cada cuota. Estados: <strong>Pagada</strong> (cubierta por movimientos o pago único antiguo), <strong>Pendiente</strong> (saldo y aún no vence), <strong>Vencida</strong> (saldo y vencimiento anterior a hoy).</p>
 
 <form method="get" class="toolbar mb-3">
     <input type="hidden" name="p" value="reporte-cuotas">
     <div class="row g-2 align-items-end">
         <div class="col-12 col-md-6 col-lg-2">
-            <label class="form-label mb-1">Vence desde</label>
+            <label class="form-label mb-1"><?= $fecha_campo === 'pago' ? 'Pago desde' : 'Vence desde' ?></label>
             <input type="date" class="form-control" name="desde" value="<?= e($desde) ?>">
         </div>
         <div class="col-12 col-md-6 col-lg-2">
-            <label class="form-label mb-1">Vence hasta</label>
+            <label class="form-label mb-1"><?= $fecha_campo === 'pago' ? 'Pago hasta' : 'Vence hasta' ?></label>
             <input type="date" class="form-control" name="hasta" value="<?= e($hasta) ?>">
+        </div>
+        <div class="col-12 col-md-6 col-lg-2">
+            <label class="form-label mb-1">Filtrar por fecha</label>
+            <select class="form-select" name="fecha_campo">
+                <option value="vencimiento" <?= $fecha_campo === 'vencimiento' ? 'selected' : '' ?>>Vencimiento</option>
+                <option value="pago" <?= $fecha_campo === 'pago' ? 'selected' : '' ?>>Pago</option>
+            </select>
         </div>
         <div class="col-12 col-md-6 col-lg-2">
             <label class="form-label mb-1">Estado cuota</label>

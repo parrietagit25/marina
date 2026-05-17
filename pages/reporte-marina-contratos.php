@@ -59,6 +59,7 @@ if (obtener('export') === 'excel') {
     exportarExcel('reporte_marina_contratos', ['ID', 'Muelle', 'Slip', 'Cliente', 'Inicio', 'Fin', 'Monto total', 'Estado'], $rows, $pie, $titulo);
 }
 
+require_once __DIR__ . '/../includes/contrato_estado_cuenta.php';
 require_once __DIR__ . '/../includes/layout.php';
 ?>
 <h1 class="h4 mb-3">Reporte Marina — Contratos</h1>
@@ -120,7 +121,10 @@ require_once __DIR__ . '/../includes/layout.php';
                     <td><?= fechaFormato($r['fecha_fin']) ?></td>
                     <td class="text-end"><?= dinero((float) ($r['monto_total'] ?? 0)) ?></td>
                     <td><?= (string)($r['estado'] ?? 'activo') === 'activo' ? 'Activo' : 'Liberado' ?></td>
-                    <td><a class="btn btn-sm btn-outline-primary" href="<?= MARINA_URL ?>/index.php?p=contratos&amp;accion=editar&amp;id=<?= (int) $r['id'] ?>">Ver</a></td>
+                    <td class="text-nowrap">
+                        <?= marina_html_btn_estado_cuenta_contrato((int) $r['id']) ?>
+                        <a class="btn btn-sm btn-outline-primary" href="<?= MARINA_URL ?>/index.php?p=contratos&amp;accion=editar&amp;id=<?= (int) $r['id'] ?>">Ver</a>
+                    </td>
                 </tr>
             <?php endforeach; ?>
             <?php if (empty($filas)): ?>
@@ -131,4 +135,5 @@ require_once __DIR__ . '/../includes/layout.php';
     </div>
 </div>
 
+<?php require_once __DIR__ . '/../includes/partials/modal_estado_cuenta_contrato.php'; ?>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

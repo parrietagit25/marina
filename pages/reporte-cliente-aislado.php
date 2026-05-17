@@ -1,9 +1,9 @@
 <?php
 /**
- * Reporte Cliente Aislado:
+ * Clientes por movimientos bancarios:
  * solo movimientos bancarios manuales registrados desde Clientes (cliente_id IS NOT NULL).
  */
-$titulo = 'Reporte Cliente Aislado';
+$titulo = 'Clientes por movimientos bancarios';
 $pdo = getDb();
 require_once __DIR__ . '/../includes/export_excel.php';
 
@@ -103,7 +103,7 @@ if (obtener('export') === 'excel') {
 
 require_once __DIR__ . '/../includes/layout.php';
 ?>
-<h1 class="h4 mb-2">Reporte Cliente Aislado</h1>
+<h1 class="h4 mb-2">Clientes por movimientos bancarios</h1>
 <p class="text-muted small mb-3">Muestra unicamente movimientos bancarios manuales registrados desde el modulo de <strong>Clientes</strong>.</p>
 
 <form method="get" class="toolbar mb-3">

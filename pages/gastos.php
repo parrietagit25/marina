@@ -245,19 +245,17 @@ $modalAbonoDatos = [
             <th>Pendiente</th>
             <th>Estado</th>
             <th>Fecha factura</th>
-            <th>Creado por</th>
             <th></th>
         </tr>
     </thead>
     <tbody>
     <?php
     $st = $pdo->query("
-        SELECT g.*, p.nombre AS partida_nombre, pr.nombre AS proveedor_nombre, u.nombre AS creado_por,
+        SELECT g.*, p.nombre AS partida_nombre, pr.nombre AS proveedor_nombre,
                (SELECT COALESCE(SUM(gp.monto), 0) FROM gasto_pagos gp WHERE gp.gasto_id = g.id) AS total_pagado
         FROM gastos g
         JOIN partidas p ON g.partida_id = p.id
         JOIN proveedores pr ON g.proveedor_id = pr.id
-        LEFT JOIN usuarios u ON g.created_by = u.id
         ORDER BY g.fecha_gasto DESC, g.id DESC
     ");
     $facturas = $st->fetchAll(PDO::FETCH_ASSOC);
@@ -322,7 +320,6 @@ $modalAbonoDatos = [
             <td><?= dinero($pend) ?></td>
             <td><span class="badge <?= $est === 'pagada' ? 'text-bg-success' : 'text-bg-warning' ?>"><?= e($est === 'pagada' ? 'Pagada' : 'Pendiente') ?></span></td>
             <td><?= fechaFormato($r['fecha_gasto']) ?></td>
-            <td><?= e($r['creado_por'] ?? '—') ?></td>
             <td class="acciones">
                 <?php
                 $fid = (int) $r['id'];

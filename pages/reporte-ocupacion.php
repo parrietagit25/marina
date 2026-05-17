@@ -574,8 +574,6 @@ require_once __DIR__ . '/../includes/layout.php';
     <p class="small alert alert-info py-2 mb-3">Vista <strong>Totales por grupo</strong>: se suma todo por <strong>cada muelle</strong> (todos sus slips) y por <strong>cada grupo de inmuebles</strong> (Astillero, Dique seco, etc. según nombres en el sistema), incluyendo <strong>unidades libres y ocupadas</strong>. El filtro de ocupación (libre/ocupado) <strong>no aplica</strong> en esta vista; sí aplican muelle, grupo, y tipo (slips / inmuebles).</p>
 <?php endif; ?>
 
-<?php require_once __DIR__ . '/../includes/footer.php'; ?>
-
 <form method="get" class="toolbar mb-3">
     <input type="hidden" name="p" value="reporte-ocupacion">
     <div class="row g-2 align-items-end">
@@ -679,6 +677,21 @@ require_once __DIR__ . '/../includes/layout.php';
                 <td class="text-end"><?= dinero((float) $f['sum_por_vencer']) ?></td>
             </tr>
             <?php endforeach; ?>
+        </tbody>
+        <tfoot class="reporte-ocupacion-tfoot">
+            <tr class="table-secondary">
+                <th scope="col">Ámbito</th>
+                <th scope="col">Grupo / muelle</th>
+                <th scope="col" class="text-end">Unid.</th>
+                <th scope="col" class="text-end">Libres</th>
+                <th scope="col" class="text-end">Ocup.</th>
+                <th scope="col" class="text-end">Monto contrato ∑</th>
+                <th scope="col" class="text-end">Suma cuotas ∑</th>
+                <th scope="col" class="text-end">Pagado ∑</th>
+                <th scope="col" class="text-end">Falta por pagar ∑</th>
+                <th scope="col" class="text-end">Vencido ∑</th>
+                <th scope="col" class="text-end">Pend. no venc. ∑</th>
+            </tr>
             <tr class="table-light fw-bold">
                 <td>Total general</td>
                 <td>Todos los grupos</td>
@@ -692,8 +705,8 @@ require_once __DIR__ . '/../includes/layout.php';
                 <td class="text-end"><?= dinero((float) $totalesGrupos['sum_vencido']) ?></td>
                 <td class="text-end"><?= dinero((float) $totalesGrupos['sum_por_vencer']) ?></td>
             </tr>
+        </tfoot>
         <?php endif; ?>
-        </tbody>
     </table>
 </div>
 <?php else: ?>
@@ -743,6 +756,23 @@ require_once __DIR__ . '/../includes/layout.php';
                 <td class="text-end"><?= $f['ocupacion'] === 'Ocupado' ? dinero((float) $f['por_vencer']) : '—' ?></td>
             </tr>
             <?php endforeach; ?>
+        </tbody>
+        <tfoot class="reporte-ocupacion-tfoot">
+            <tr class="table-secondary">
+                <th scope="col">Tipo</th>
+                <th scope="col">Unidad</th>
+                <th scope="col">Ocupación</th>
+                <th scope="col">Contrato</th>
+                <th scope="col">Cliente</th>
+                <th scope="col" class="text-end">Monto contrato</th>
+                <th scope="col" class="text-end">Suma cuotas</th>
+                <th scope="col">Fin contrato</th>
+                <th scope="col">Próx. venc. cuota</th>
+                <th scope="col" class="text-end">Pagado (cuotas)</th>
+                <th scope="col" class="text-end">Falta por pagar</th>
+                <th scope="col" class="text-end">Vencido</th>
+                <th scope="col" class="text-end">Pend. no venc.</th>
+            </tr>
             <tr class="table-light fw-bold">
                 <td>Total general</td>
                 <td>Unidades listadas</td>
@@ -758,8 +788,10 @@ require_once __DIR__ . '/../includes/layout.php';
                 <td class="text-end"><?= dinero((float) $totalesDetalle['sum_vencido']) ?></td>
                 <td class="text-end"><?= dinero((float) $totalesDetalle['sum_por_vencer']) ?></td>
             </tr>
+        </tfoot>
         <?php endif; ?>
-        </tbody>
     </table>
 </div>
 <?php endif; ?>
+
+<?php require_once __DIR__ . '/../includes/footer.php'; ?>
