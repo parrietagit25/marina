@@ -121,6 +121,7 @@ CREATE TABLE inmuebles (
 CREATE TABLE tarifas (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   nombre VARCHAR(150) NOT NULL,
+  tipo VARCHAR(10) NOT NULL DEFAULT 'dia' COMMENT 'dia|pie',
   precio_dia DECIMAL(12,2) NOT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -186,6 +187,9 @@ CREATE TABLE contratos (
   fecha_inicio DATE NOT NULL,
   fecha_fin DATE NOT NULL,
   monto_total DECIMAL(12,2) NOT NULL,
+  tarifa_pie_id INT UNSIGNED NULL,
+  cantidad_pies DECIMAL(10,2) NULL,
+  impuesto_porcentaje DECIMAL(5,2) NULL,
   observaciones TEXT NULL,
   numero_recibo VARCHAR(100) NULL COMMENT 'Número de recibo emitido al cliente',
   activo TINYINT(1) NOT NULL DEFAULT 1,

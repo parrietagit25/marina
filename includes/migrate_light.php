@@ -12,6 +12,10 @@ function marina_ensure_schema(PDO $pdo): void
     }
     $done = true;
     $stmts = [
+        "ALTER TABLE tarifas ADD COLUMN tipo VARCHAR(10) NOT NULL DEFAULT 'dia' COMMENT 'dia|pie' AFTER nombre",
+        "ALTER TABLE contratos ADD COLUMN tarifa_pie_id INT UNSIGNED NULL DEFAULT NULL COMMENT 'Tarifa por pie' AFTER monto_total",
+        "ALTER TABLE contratos ADD COLUMN cantidad_pies DECIMAL(10,2) NULL DEFAULT NULL COMMENT 'Pies del barco' AFTER tarifa_pie_id",
+        "ALTER TABLE contratos ADD COLUMN impuesto_porcentaje DECIMAL(5,2) NULL DEFAULT NULL COMMENT 'ITBMS %; NULL = sin impuesto' AFTER cantidad_pies",
         "ALTER TABLE contratos ADD COLUMN numero_recibo VARCHAR(100) NULL DEFAULT NULL COMMENT 'Número de recibo al cliente' AFTER observaciones",
         "ALTER TABLE cuotas_movimientos ADD COLUMN concepto VARCHAR(255) NULL DEFAULT NULL COMMENT 'Término / descripción del pago de cuota' AFTER referencia",
         "ALTER TABLE clientes ADD COLUMN dueno_capitan VARCHAR(150) NULL DEFAULT NULL COMMENT 'Dueño / Capitán' AFTER direccion",
@@ -23,6 +27,11 @@ function marina_ensure_schema(PDO $pdo): void
         } catch (Throwable $e) {
             // Columna duplicada u otro entorno ya migrado
         }
+    }
+    try {
+        $pdo->exec('ALTER TABLE contratos ADD CONSTRAINT fk_contratos_tarifa_pie FOREIGN KEY (tarifa_pie_id) REFERENCES tarifas(id) ON DELETE SET NULL');
+    } catch (Throwable $e) {
+        // FK ya existe
     }
     foreach ([
         "ALTER TABLE movimientos_bancarios ADD CONSTRAINT fk_mov_banc_cliente FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE SET NULL",

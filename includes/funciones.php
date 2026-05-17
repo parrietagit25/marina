@@ -66,6 +66,70 @@ function marina_contrato_dias_estadia(string $fechaInicio, string $fechaFin): in
     return (int) $d1->diff($d2)->days + 1;
 }
 
+/** ITBMS % desde formulario: vacío = sin impuesto (null). */
+function marina_contrato_parse_impuesto_porcentaje(string $raw): ?float
+{
+    $raw = trim($raw);
+    if ($raw === '') {
+        return null;
+    }
+    $n = (float) str_replace(',', '.', $raw);
+    if ($n < 0) {
+        return null;
+    }
+    return round($n, 2);
+}
+
+/**
+ * @return array{subtotal_dia: float, subtotal_pie: float, subtotal: float, impuesto: float, total: float}|null
+ */
+function marina_contrato_calcular_montos(
+    PDO $pdo,
+    string $fechaInicio,
+    string $fechaFin,
+    int $tarifaDiaId,
+    int $tarifaPieId,
+    float $cantidadPies,
+    ?float $impuestoPorcentaje
+): ?array {
+    $subtotalDia = 0.0;
+    $subtotalPie = 0.0;
+    if ($tarifaDiaId > 0) {
+        $st = $pdo->prepare("SELECT precio_dia, COALESCE(tipo, 'dia') AS tipo FROM tarifas WHERE id = ?");
+        $st->execute([$tarifaDiaId]);
+        $t = $st->fetch(PDO::FETCH_ASSOC);
+        if ($t && (string) ($t['tipo'] ?? 'dia') === 'dia') {
+            $dias = marina_contrato_dias_estadia($fechaInicio, $fechaFin);
+            if ($dias > 0) {
+                $subtotalDia = round((float) $t['precio_dia'] * $dias, 2);
+            }
+        }
+    }
+    if ($tarifaPieId > 0 && $cantidadPies > 0) {
+        $st = $pdo->prepare("SELECT precio_dia, COALESCE(tipo, 'dia') AS tipo FROM tarifas WHERE id = ?");
+        $st->execute([$tarifaPieId]);
+        $t = $st->fetch(PDO::FETCH_ASSOC);
+        if ($t && (string) ($t['tipo'] ?? 'dia') === 'pie') {
+            $subtotalPie = round((float) $t['precio_dia'] * $cantidadPies, 2);
+        }
+    }
+    $subtotal = round($subtotalDia + $subtotalPie, 2);
+    if ($subtotal <= 0 && $tarifaDiaId <= 0 && $tarifaPieId <= 0) {
+        return null;
+    }
+    $impuesto = 0.0;
+    if ($impuestoPorcentaje !== null && $impuestoPorcentaje > 0) {
+        $impuesto = round($subtotal * $impuestoPorcentaje / 100, 2);
+    }
+    return [
+        'subtotal_dia' => $subtotalDia,
+        'subtotal_pie' => $subtotalPie,
+        'subtotal' => $subtotal,
+        'impuesto' => $impuesto,
+        'total' => round($subtotal + $impuesto, 2),
+    ];
+}
+
 /** Etiqueta UI: acreditación / tipo_movimiento ingreso en BD (sigue siendo `ingreso`). */
 function marina_ui_credito(): string {
     return 'Crédito';

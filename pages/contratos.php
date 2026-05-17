@@ -81,6 +81,10 @@ if (enviado() && ($accion === 'crear' || $accion === 'editar')) {
     $fecha_inicio = trim($_POST['fecha_inicio'] ?? '');
     $fecha_fin = trim($_POST['fecha_fin'] ?? '');
     $monto_total = (float) str_replace(',', '.', $_POST['monto_total'] ?? 0);
+    $tarifa_dia_id = (int) ($_POST['tarifa_dia_id'] ?? 0);
+    $tarifa_pie_id = (int) ($_POST['tarifa_pie_id'] ?? 0);
+    $cantidad_pies = (float) str_replace(',', '.', $_POST['cantidad_pies'] ?? 0);
+    $impuesto_porcentaje = marina_contrato_parse_impuesto_porcentaje((string) ($_POST['impuesto_porcentaje'] ?? ''));
     $observaciones = trim($_POST['observaciones'] ?? '');
     $numero_recibo = trim($_POST['numero_recibo'] ?? '');
 
@@ -88,7 +92,13 @@ if (enviado() && ($accion === 'crear' || $accion === 'editar')) {
     $tieneUnidadInmueble = ($grupo_id > 0 && $inmueble_id > 0);
     if ($cliente_id < 1 || $cuenta_id < 1 || $fecha_inicio === '' || $fecha_fin === '' || $monto_total <= 0 || (!$tieneUnidadMuelleSlip && !$tieneUnidadInmueble)) {
         $mensaje = 'Complete campos obligatorios (cliente, cuenta, fechas, monto y al menos una unidad: muelle/slip o grupo/inmueble).';
+    } elseif ($tarifa_pie_id > 0 && $cantidad_pies <= 0) {
+        $mensaje = 'Indique la cantidad de pies cuando selecciona una tarifa por pie.';
     } else {
+        $calc = marina_contrato_calcular_montos($pdo, $fecha_inicio, $fecha_fin, $tarifa_dia_id, $tarifa_pie_id, $cantidad_pies, $impuesto_porcentaje);
+        if ($calc !== null && abs($monto_total - $calc['total']) > 0.05) {
+            $monto_total = $calc['total'];
+        }
         if ($accion === 'editar' && $id > 0) {
             $stEst = $pdo->prepare('SELECT estado FROM contratos WHERE id = ?');
             $stEst->execute([$id]);
@@ -99,7 +109,7 @@ if (enviado() && ($accion === 'crear' || $accion === 'editar')) {
         }
         if ($mensaje === '' && $slip_id > 0) {
             $oid = ($accion === 'editar' && $id > 0) ? $id : 0;
-            $stDup = $pdo->prepare('SELECT id FROM contratos WHERE estado = \'activo\' AND slip_id = ? AND id <> ? LIMIT 1');
+            $stDup = $pdo->prepare('SELECT id FROM contratos WHERE COALESCE(estado, \'activo\') = \'activo\' AND slip_id = ? AND id <> ? LIMIT 1');
             $stDup->execute([$slip_id, $oid]);
             if ($stDup->fetch()) {
                 $mensaje = 'Ese slip ya tiene otro contrato activo. Libere el contrato anterior o elija otro slip.';
@@ -107,7 +117,7 @@ if (enviado() && ($accion === 'crear' || $accion === 'editar')) {
         }
         if ($mensaje === '' && $inmueble_id > 0) {
             $oid = ($accion === 'editar' && $id > 0) ? $id : 0;
-            $stDup = $pdo->prepare('SELECT id FROM contratos WHERE estado = \'activo\' AND inmueble_id = ? AND id <> ? LIMIT 1');
+            $stDup = $pdo->prepare('SELECT id FROM contratos WHERE COALESCE(estado, \'activo\') = \'activo\' AND inmueble_id = ? AND id <> ? LIMIT 1');
             $stDup->execute([$inmueble_id, $oid]);
             if ($stDup->fetch()) {
                 $mensaje = 'Ese inmueble ya tiene otro contrato activo. Libere el contrato anterior o elija otro inmueble.';
@@ -115,7 +125,7 @@ if (enviado() && ($accion === 'crear' || $accion === 'editar')) {
         }
         if ($mensaje === '') {
         if ($accion === 'editar' && $id > 0) {
-            $pdo->prepare('UPDATE contratos SET cliente_id=?, cuenta_id=?, muelle_id=?, slip_id=?, grupo_id=?, inmueble_id=?, fecha_inicio=?, fecha_fin=?, monto_total=?, observaciones=?, numero_recibo=?, activo=1, estado=\'activo\', updated_by=? WHERE id=?')
+            $pdo->prepare('UPDATE contratos SET cliente_id=?, cuenta_id=?, muelle_id=?, slip_id=?, grupo_id=?, inmueble_id=?, fecha_inicio=?, fecha_fin=?, monto_total=?, tarifa_pie_id=?, cantidad_pies=?, impuesto_porcentaje=?, observaciones=?, numero_recibo=?, activo=1, estado=\'activo\', updated_by=? WHERE id=?')
                 ->execute([
                     $cliente_id,
                     $cuenta_id,
@@ -126,6 +136,9 @@ if (enviado() && ($accion === 'crear' || $accion === 'editar')) {
                     $fecha_inicio,
                     $fecha_fin,
                     $monto_total,
+                    $tarifa_pie_id > 0 ? $tarifa_pie_id : null,
+                    $tarifa_pie_id > 0 && $cantidad_pies > 0 ? $cantidad_pies : null,
+                    $impuesto_porcentaje,
                     $observaciones,
                     $numero_recibo === '' ? null : $numero_recibo,
                     $uid,
@@ -150,7 +163,7 @@ if (enviado() && ($accion === 'crear' || $accion === 'editar')) {
             if ($mensaje === '') {
                 $pdo->beginTransaction();
                 try {
-                    $pdo->prepare('INSERT INTO contratos (cliente_id, cuenta_id, muelle_id, slip_id, grupo_id, inmueble_id, fecha_inicio, fecha_fin, monto_total, observaciones, numero_recibo, activo, estado, created_by, updated_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+                    $pdo->prepare('INSERT INTO contratos (cliente_id, cuenta_id, muelle_id, slip_id, grupo_id, inmueble_id, fecha_inicio, fecha_fin, monto_total, tarifa_pie_id, cantidad_pies, impuesto_porcentaje, observaciones, numero_recibo, activo, estado, created_by, updated_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
                         ->execute([
                             $cliente_id,
                             $cuenta_id,
@@ -161,6 +174,9 @@ if (enviado() && ($accion === 'crear' || $accion === 'editar')) {
                             $fecha_inicio,
                             $fecha_fin,
                             $monto_total,
+                            $tarifa_pie_id > 0 ? $tarifa_pie_id : null,
+                            $tarifa_pie_id > 0 && $cantidad_pies > 0 ? $cantidad_pies : null,
+                            $impuesto_porcentaje,
                             $observaciones,
                             $numero_recibo === '' ? null : $numero_recibo,
                             1,
@@ -208,14 +224,33 @@ $cuentas = $pdo->query('SELECT c.id, CONCAT(b.nombre, " - ", c.nombre) AS nom FR
 $muelles = $pdo->query('SELECT id, nombre FROM muelles ORDER BY nombre')->fetchAll(PDO::FETCH_KEY_PAIR);
 $slips = $pdo->query('SELECT s.id, CONCAT(m.nombre, " - ", s.nombre) AS nom FROM slips s JOIN muelles m ON s.muelle_id = m.id ORDER BY m.nombre, s.nombre')->fetchAll(PDO::FETCH_KEY_PAIR);
 $slipsLista = $pdo->query('SELECT s.id, s.nombre, s.muelle_id FROM slips s ORDER BY s.nombre')->fetchAll(PDO::FETCH_ASSOC);
+$slipsOcupados = [];
+$stSlipsOcupados = $pdo->query("
+    SELECT co.slip_id, co.id AS contrato_id, cl.nombre AS cliente_nombre
+    FROM contratos co
+    JOIN clientes cl ON cl.id = co.cliente_id
+    WHERE COALESCE(co.estado, 'activo') = 'activo'
+      AND co.slip_id IS NOT NULL
+");
+while ($rowOcc = $stSlipsOcupados->fetch(PDO::FETCH_ASSOC)) {
+    $sidOcc = (int) ($rowOcc['slip_id'] ?? 0);
+    if ($sidOcc > 0) {
+        $slipsOcupados[$sidOcc] = [
+            'contrato_id' => (int) ($rowOcc['contrato_id'] ?? 0),
+            'cliente' => (string) ($rowOcc['cliente_nombre'] ?? ''),
+        ];
+    }
+}
 $grupos = $pdo->query('SELECT id, nombre FROM grupos ORDER BY nombre')->fetchAll(PDO::FETCH_KEY_PAIR);
 $inmueblesLista = $pdo->query('SELECT i.id, i.nombre, i.grupo_id FROM inmuebles i ORDER BY i.nombre')->fetchAll(PDO::FETCH_ASSOC);
 $tarifasLista = [];
 try {
-    $tarifasLista = $pdo->query('SELECT id, nombre, precio_dia FROM tarifas ORDER BY nombre')->fetchAll(PDO::FETCH_ASSOC);
+    $tarifasLista = $pdo->query("SELECT id, nombre, precio_dia, COALESCE(tipo, 'dia') AS tipo FROM tarifas ORDER BY nombre")->fetchAll(PDO::FETCH_ASSOC);
 } catch (Throwable $e) {
     $tarifasLista = [];
 }
+$tarifasDiaLista = array_values(array_filter($tarifasLista, static fn($t) => ($t['tipo'] ?? 'dia') === 'dia'));
+$tarifasPieLista = array_values(array_filter($tarifasLista, static fn($t) => ($t['tipo'] ?? 'dia') === 'pie'));
 $formas_pago = $pdo->query("SELECT id, nombre FROM formas_pago WHERE tipo_movimiento = 'ingreso' ORDER BY nombre")->fetchAll(PDO::FETCH_KEY_PAIR);
 
 // --- Vista Cuotas (página aparte, con modales: agregar, pagar, abonar, ver)
@@ -804,6 +839,14 @@ $modalDatos = [
     'fecha_inicio' => $registro['fecha_inicio'] ?? ($_POST['fecha_inicio'] ?? ''),
     'fecha_fin' => $registro['fecha_fin'] ?? ($_POST['fecha_fin'] ?? ''),
     'monto_total' => $registro['monto_total'] ?? ($_POST['monto_total'] ?? ''),
+    'tarifa_dia_id' => $_POST['tarifa_dia_id'] ?? '',
+    'tarifa_pie_id' => $registro['tarifa_pie_id'] ?? ($_POST['tarifa_pie_id'] ?? ''),
+    'cantidad_pies' => $registro['cantidad_pies'] ?? ($_POST['cantidad_pies'] ?? ''),
+    'impuesto_porcentaje' => array_key_exists('impuesto_porcentaje', $_POST)
+        ? $_POST['impuesto_porcentaje']
+        : (isset($registro['impuesto_porcentaje']) && $registro['impuesto_porcentaje'] !== null && $registro['impuesto_porcentaje'] !== ''
+            ? $registro['impuesto_porcentaje']
+            : '7'),
     'observaciones' => $registro['observaciones'] ?? ($_POST['observaciones'] ?? ''),
     'numero_recibo' => $registro['numero_recibo'] ?? ($_POST['numero_recibo'] ?? ''),
     'numero_cuotas' => $_POST['numero_cuotas'] ?? '',
@@ -840,7 +883,7 @@ require_once __DIR__ . '/../includes/layout.php';
     <tbody>
     <?php
     $sqlLista = "
-        SELECT co.id, co.cliente_id, co.cuenta_id, co.muelle_id, co.slip_id, co.grupo_id, co.inmueble_id, co.fecha_inicio, co.fecha_fin, co.monto_total, co.observaciones, co.numero_recibo, co.activo, COALESCE(co.estado, 'activo') AS estado,
+        SELECT co.id, co.cliente_id, co.cuenta_id, co.muelle_id, co.slip_id, co.grupo_id, co.inmueble_id, co.fecha_inicio, co.fecha_fin, co.monto_total, co.tarifa_pie_id, co.cantidad_pies, co.impuesto_porcentaje, co.observaciones, co.numero_recibo, co.activo, COALESCE(co.estado, 'activo') AS estado,
                cl.nombre AS cliente_nombre,
                m.nombre AS muelle_nombre, s.nombre AS slip_nombre, g.nombre AS grupo_nombre, i.nombre AS inmueble_nombre
         FROM contratos co
@@ -894,6 +937,9 @@ require_once __DIR__ . '/../includes/layout.php';
                     data-fecha-inicio="<?= e($r['fecha_inicio']) ?>"
                     data-fecha-fin="<?= e($r['fecha_fin']) ?>"
                     data-monto-total="<?= e($r['monto_total']) ?>"
+                    data-tarifa-pie-id="<?= (int) ($r['tarifa_pie_id'] ?? 0) ?>"
+                    data-cantidad-pies="<?= e((string) ($r['cantidad_pies'] ?? '')) ?>"
+                    data-impuesto-porcentaje="<?= isset($r['impuesto_porcentaje']) && $r['impuesto_porcentaje'] !== null && $r['impuesto_porcentaje'] !== '' ? e((string) $r['impuesto_porcentaje']) : '' ?>"
                     data-observaciones="<?= e($r['observaciones'] ?? '') ?>"
                     data-numero-recibo="<?= e($r['numero_recibo'] ?? '') ?>">Editar</button>
                 <?php endif; ?>
@@ -946,6 +992,7 @@ require_once __DIR__ . '/../includes/layout.php';
                             <select class="form-select" id="contratoSlipId" name="slip_id" disabled>
                                 <option value="">Seleccione un muelle primero</option>
                             </select>
+                            <small class="text-muted d-block mt-1">Los slips con contrato activo aparecen como <strong>ocupados</strong> y no se pueden elegir.</small>
                             <label class="mt-2">Grupo</label>
                             <select class="form-select" id="contratoGrupoId" name="grupo_id">
                                 <option value="">Seleccione (opcional)</option>
@@ -964,14 +1011,28 @@ require_once __DIR__ . '/../includes/layout.php';
                             <input type="date" class="form-control" id="contratoFechaInicio" name="fecha_inicio" required>
                             <label class="mt-2">Fecha fin *</label>
                             <input type="date" class="form-control" id="contratoFechaFin" name="fecha_fin" required>
-                            <label class="mt-2">Tarifa (opcional)</label>
-                            <select class="form-select" id="contratoTarifaId">
-                                <option value="">Sin tarifa — monto manual</option>
-                                <?php foreach ($tarifasLista as $t): ?>
-                                    <option value="<?= (int) $t['id'] ?>" data-precio-dia="<?= e((string) $t['precio_dia']) ?>"><?= e($t['nombre']) ?> (<?= dinero((float) $t['precio_dia']) ?>/día)</option>
+                            <label class="mt-2">Tarifa por día (opcional)</label>
+                            <select class="form-select" id="contratoTarifaId" name="tarifa_dia_id">
+                                <option value="">Sin tarifa por día</option>
+                                <?php foreach ($tarifasDiaLista as $t): ?>
+                                    <option value="<?= (int) $t['id'] ?>"><?= e($t['nombre']) ?> (<?= dinero((float) $t['precio_dia']) ?>/día)</option>
                                 <?php endforeach; ?>
                             </select>
                             <div id="contratoTarifaInfo" class="small text-muted mt-1 d-none"></div>
+                            <label class="mt-2">Tarifa por pie (opcional)</label>
+                            <select class="form-select" id="contratoTarifaPieId" name="tarifa_pie_id">
+                                <option value="">Sin tarifa por pie</option>
+                                <?php foreach ($tarifasPieLista as $t): ?>
+                                    <option value="<?= (int) $t['id'] ?>"><?= e($t['nombre']) ?> (<?= dinero((float) $t['precio_dia']) ?>/pie)</option>
+                                <?php endforeach; ?>
+                            </select>
+                            <label class="mt-2">Cantidad de pies</label>
+                            <input type="text" class="form-control" id="contratoCantidadPies" name="cantidad_pies" inputmode="decimal" placeholder="Ej: 35" disabled>
+                            <small class="text-muted d-block">Se habilita al elegir una tarifa por pie.</small>
+                            <label class="mt-2">Impuesto (%)</label>
+                            <input type="text" class="form-control" id="contratoImpuestoPorcentaje" name="impuesto_porcentaje" inputmode="decimal" placeholder="7" value="7">
+                            <small class="text-muted d-block">ITBMS Panamá (7%). Deje vacío si el cliente está exento.</small>
+                            <div id="contratoMontoDesglose" class="small text-muted mt-2 d-none"></div>
                             <label class="mt-2">Monto total *</label>
                             <input type="text" class="form-control" id="contratoMontoTotal" name="monto_total" required>
                             <div id="contratoNumCuotasWrap">
@@ -1075,6 +1136,7 @@ window.__contratoTarifas = <?= json_encode(array_map(static function ($t) {
         'id' => (int) $t['id'],
         'nombre' => (string) ($t['nombre'] ?? ''),
         'precio_dia' => (float) ($t['precio_dia'] ?? 0),
+        'tipo' => (string) ($t['tipo'] ?? 'dia'),
     ];
 }, $tarifasLista), JSON_UNESCAPED_UNICODE) ?>;
 window.__contratoInmuebles = <?= json_encode(array_map(static function ($i) {
@@ -1091,6 +1153,7 @@ window.__contratoSlips = <?= json_encode(array_map(static function ($s) {
         'muelle_id' => (int) ($s['muelle_id'] ?? 0),
     ];
 }, $slipsLista), JSON_UNESCAPED_UNICODE) ?>;
+window.__contratoSlipsOcupados = <?= json_encode($slipsOcupados, JSON_UNESCAPED_UNICODE) ?>;
 window.__contratoClientes = <?= json_encode(array_map(static function ($c) {
     return [
         'id' => (int) $c['id'],

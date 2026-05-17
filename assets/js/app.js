@@ -255,20 +255,36 @@ document.addEventListener('DOMContentLoaded', function () {
         var accion = document.getElementById('tarifaFormAccion');
         var fid = document.getElementById('tarifaFormId');
         var nombre = document.getElementById('tarifaNombre');
+        var tipo = document.getElementById('tarifaTipo');
         var precio = document.getElementById('tarifaPrecioDia');
+        var precioLabel = document.getElementById('tarifaPrecioLabel');
         var msg = document.getElementById('tarifaModalMensaje');
         var modal = new bootstrap.Modal(el);
         function setErr(m) { if (msg) { msg.textContent = m || ''; msg.classList.toggle('d-none', !m); } }
+        function syncTarifaPrecioLabel() {
+            var esPie = tipo && tipo.value === 'pie';
+            if (precioLabel) precioLabel.textContent = esPie ? 'Precio por pie *' : 'Precio por día *';
+        }
+        if (tipo) tipo.addEventListener('change', syncTarifaPrecioLabel);
+        function fillTarifaForm(d) {
+            if (nombre) nombre.value = (d && d.nombre) ? d.nombre : '';
+            if (tipo) tipo.value = (d && d.tipo === 'pie') ? 'pie' : 'dia';
+            if (precio) precio.value = (d && d.precio_dia !== undefined && d.precio_dia !== null) ? d.precio_dia : '';
+            syncTarifaPrecioLabel();
+        }
         document.getElementById('btnNuevoTarifa') && document.getElementById('btnNuevoTarifa').addEventListener('click', function() {
             title.textContent = 'Nueva tarifa'; accion.value = 'crear'; fid.value = '';
-            if (nombre) nombre.value = ''; if (precio) precio.value = ''; setErr(''); modal.show();
+            fillTarifaForm(null); setErr(''); modal.show();
         });
         document.querySelectorAll('.btn-editar-tarifa').forEach(function(b) {
             b.addEventListener('click', function() {
                 title.textContent = 'Editar tarifa'; accion.value = 'editar';
                 fid.value = b.getAttribute('data-id') || '';
-                if (nombre) nombre.value = b.getAttribute('data-nombre') || '';
-                if (precio) precio.value = b.getAttribute('data-precio-dia') || '';
+                fillTarifaForm({
+                    nombre: b.getAttribute('data-nombre') || '',
+                    tipo: b.getAttribute('data-tipo') || 'dia',
+                    precio_dia: b.getAttribute('data-precio-dia') || ''
+                });
                 setErr(''); modal.show();
             });
         });
@@ -288,8 +304,7 @@ document.addEventListener('DOMContentLoaded', function () {
             title.textContent = w.datos.id ? 'Editar tarifa' : 'Nueva tarifa';
             accion.value = w.datos.id ? 'editar' : 'crear';
             fid.value = w.datos.id || '';
-            if (nombre) nombre.value = w.datos.nombre || '';
-            if (precio) precio.value = w.datos.precio_dia !== undefined && w.datos.precio_dia !== null ? w.datos.precio_dia : '';
+            fillTarifaForm(w.datos);
             setErr(w.error || ''); modal.show();
         }
     })();
@@ -530,6 +545,8 @@ document.addEventListener('DOMContentLoaded', function () {
         var clienteList = document.getElementById('contratoClienteList');
         var clientesData = Array.isArray(window.__contratoClientes) ? window.__contratoClientes : [];
         var slipsData = Array.isArray(window.__contratoSlips) ? window.__contratoSlips : [];
+        var slipsOcupados = window.__contratoSlipsOcupados && typeof window.__contratoSlipsOcupados === 'object'
+            ? window.__contratoSlipsOcupados : {};
         var muelleSel = document.getElementById('contratoMuelleId');
         var slipSel = document.getElementById('contratoSlipId');
         var grupoSel = document.getElementById('contratoGrupoId');
@@ -551,7 +568,11 @@ document.addEventListener('DOMContentLoaded', function () {
         var btnCuotasVolver = document.getElementById('btnContratoCuotasVolver');
         var btnCuotasConfirmar = document.getElementById('btnContratoCuotasConfirmar');
         var tarifaSel = document.getElementById('contratoTarifaId');
+        var tarifaPieSel = document.getElementById('contratoTarifaPieId');
+        var cantidadPiesInp = document.getElementById('contratoCantidadPies');
+        var impuestoInp = document.getElementById('contratoImpuestoPorcentaje');
         var tarifaInfo = document.getElementById('contratoTarifaInfo');
+        var montoDesglose = document.getElementById('contratoMontoDesglose');
         var tarifasData = Array.isArray(window.__contratoTarifas) ? window.__contratoTarifas : [];
         var fechaInicioInp = document.getElementById('contratoFechaInicio');
         var fechaFinInp = document.getElementById('contratoFechaFin');
@@ -619,6 +640,22 @@ document.addEventListener('DOMContentLoaded', function () {
             return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         }
 
+        function contratoEditIdActual() {
+            var esEditar = accion && accion.value === 'editar';
+            var cid = parseInt(String(fid && fid.value ? fid.value : ''), 10);
+            return esEditar && cid > 0 ? cid : 0;
+        }
+
+        function slipOcupacion(slipId) {
+            var occ = slipsOcupados[String(slipId)] || slipsOcupados[slipId];
+            if (!occ) return null;
+            var editId = contratoEditIdActual();
+            if (editId > 0 && parseInt(String(occ.contrato_id || ''), 10) === editId) {
+                return null;
+            }
+            return occ;
+        }
+
         function refillSlipOptions(muelleId, selectedSlipId) {
             if (!slipSel) return;
             var mid = parseInt(String(muelleId || ''), 10);
@@ -626,7 +663,15 @@ document.addEventListener('DOMContentLoaded', function () {
             if (mid > 0) {
                 slipsData.forEach(function(s) {
                     if (s.muelle_id === mid) {
-                        html += '<option value="' + s.id + '">' + escapeHtml(s.nombre) + '</option>';
+                        var occ = slipOcupacion(s.id);
+                        var label = escapeHtml(s.nombre);
+                        if (occ) {
+                            label += ' — Ocupado';
+                            if (occ.cliente) {
+                                label += ' (' + escapeHtml(occ.cliente) + ')';
+                            }
+                        }
+                        html += '<option value="' + s.id + '"' + (occ ? ' disabled' : '') + '>' + label + '</option>';
                     }
                 });
                 slipSel.disabled = false;
@@ -638,7 +683,8 @@ document.addEventListener('DOMContentLoaded', function () {
             var sid = parseInt(String(selectedSlipId || ''), 10);
             if (mid > 0 && sid > 0) {
                 var valid = slipsData.some(function(s) { return s.id === sid && s.muelle_id === mid; });
-                slipSel.value = valid ? String(sid) : '';
+                var occSel = valid ? slipOcupacion(sid) : null;
+                slipSel.value = valid && !occSel ? String(sid) : '';
             } else {
                 slipSel.value = '';
             }
@@ -742,59 +788,149 @@ document.addEventListener('DOMContentLoaded', function () {
 
         function getTarifaSeleccionada() {
             if (!tarifaSel) return null;
-            return findTarifaById(tarifaSel.value);
+            var t = findTarifaById(tarifaSel.value);
+            if (t && t.tipo && t.tipo !== 'dia') return null;
+            return t;
         }
 
-        function aplicarMontoDesdeTarifa() {
+        function getTarifaPieSeleccionada() {
+            if (!tarifaPieSel) return null;
+            var t = findTarifaById(tarifaPieSel.value);
+            if (t && t.tipo !== 'pie') return null;
+            return t;
+        }
+
+        function parseImpuestoContrato() {
+            if (!impuestoInp) return 0;
+            var v = String(impuestoInp.value || '').trim();
+            if (v === '') return 0;
+            var n = parseFloat(v.replace(',', '.'));
+            return isNaN(n) || n < 0 ? 0 : n;
+        }
+
+        function roundMontoContrato(n) {
+            return Math.round((parseFloat(n) || 0) * 100) / 100;
+        }
+
+        function subtotalDiaContrato() {
             var t = getTarifaSeleccionada();
-            if (!tarifaInfo) return;
-            if (!t) {
-                tarifaInfo.classList.add('d-none');
-                tarifaInfo.textContent = '';
-                return;
-            }
+            if (!t) return 0;
             var inicio = get('FechaInicio');
             var fin = get('FechaFin');
             var dias = diasEstadiaContrato(inicio, fin);
             var precioDia = parseFloat(t.precio_dia) || 0;
-            if (dias < 1 || precioDia <= 0) {
-                tarifaInfo.classList.remove('d-none');
-                tarifaInfo.textContent = 'Precio/día: ' + formatMontoContrato(precioDia) + ' — indique fechas de inicio y fin válidas para calcular el monto.';
-                return;
-            }
-            var total = Math.round(precioDia * dias * 100) / 100;
-            if (montoTotalInp) montoTotalInp.value = total.toFixed(2);
-            tarifaInfo.classList.remove('d-none');
-            tarifaInfo.textContent = 'Precio/día: ' + formatMontoContrato(precioDia) +
-                ' × ' + dias + ' día(s) de estadía = ' + formatMontoContrato(total);
+            if (dias < 1 || precioDia <= 0) return 0;
+            return roundMontoContrato(precioDia * dias);
         }
 
-        if (tarifaSel) {
-            tarifaSel.addEventListener('change', aplicarMontoDesdeTarifa);
+        function subtotalPieContrato() {
+            var t = getTarifaPieSeleccionada();
+            if (!t) return 0;
+            var qty = parseFloat(cantidadPiesInp ? String(cantidadPiesInp.value).replace(',', '.') : '') || 0;
+            if (qty <= 0) return 0;
+            return roundMontoContrato((parseFloat(t.precio_dia) || 0) * qty);
         }
-        if (fechaInicioInp) {
-            fechaInicioInp.addEventListener('change', function() {
-                if (getTarifaSeleccionada()) aplicarMontoDesdeTarifa();
-            });
+
+        function usaCalculoAutomatico() {
+            return !!(getTarifaSeleccionada() || getTarifaPieSeleccionada());
         }
-        if (fechaFinInp) {
-            fechaFinInp.addEventListener('change', function() {
-                if (getTarifaSeleccionada()) aplicarMontoDesdeTarifa();
-            });
+
+        function toggleCantidadPies() {
+            var t = getTarifaPieSeleccionada();
+            var on = !!t;
+            if (cantidadPiesInp) {
+                cantidadPiesInp.disabled = !on;
+                if (!on) cantidadPiesInp.value = '';
+            }
         }
+
+        function recalcularMontoContrato() {
+            toggleCantidadPies();
+            var sd = subtotalDiaContrato();
+            var sp = subtotalPieContrato();
+            var tDia = getTarifaSeleccionada();
+            var tPie = getTarifaPieSeleccionada();
+            var auto = usaCalculoAutomatico();
+            var subtotal = auto ? roundMontoContrato(sd + sp) : roundMontoContrato(parseMontoContrato(get('MontoTotal')));
+            var pct = parseImpuestoContrato();
+            var imp = pct > 0 ? roundMontoContrato(subtotal * pct / 100) : 0;
+            var total = roundMontoContrato(subtotal + imp);
+
+            if (tarifaInfo) {
+                if (tDia) {
+                    var dias = diasEstadiaContrato(get('FechaInicio'), get('FechaFin'));
+                    var precioDia = parseFloat(tDia.precio_dia) || 0;
+                    if (dias < 1) {
+                        tarifaInfo.classList.remove('d-none');
+                        tarifaInfo.textContent = 'Precio/día: ' + formatMontoContrato(precioDia) + ' — indique fechas válidas.';
+                    } else {
+                        tarifaInfo.classList.remove('d-none');
+                        tarifaInfo.textContent = 'Estadía: ' + formatMontoContrato(precioDia) + ' × ' + dias + ' día(s) = ' + formatMontoContrato(sd);
+                    }
+                } else {
+                    tarifaInfo.classList.add('d-none');
+                    tarifaInfo.textContent = '';
+                }
+            }
+
+            if (auto) {
+                if (montoTotalInp) montoTotalInp.value = total.toFixed(2);
+            }
+
+            if (montoDesglose) {
+                if (auto || pct > 0) {
+                    var lineas = [];
+                    if (sd > 0) lineas.push('Subtotal por día: ' + formatMontoContrato(sd));
+                    if (sp > 0) {
+                        var qty = parseFloat(cantidadPiesInp ? String(cantidadPiesInp.value).replace(',', '.') : '') || 0;
+                        lineas.push('Subtotal por pie: ' + formatMontoContrato((parseFloat(tPie.precio_dia) || 0)) + ' × ' + qty + ' pie(s) = ' + formatMontoContrato(sp));
+                    }
+                    if (auto) lineas.push('Subtotal: ' + formatMontoContrato(subtotal));
+                    if (imp > 0) lineas.push('Impuesto (' + pct + '%): ' + formatMontoContrato(imp));
+                    lineas.push('<strong>Total: ' + formatMontoContrato(total) + '</strong>');
+                    montoDesglose.classList.remove('d-none');
+                    montoDesglose.innerHTML = lineas.join('<br>');
+                } else {
+                    montoDesglose.classList.add('d-none');
+                    montoDesglose.innerHTML = '';
+                }
+            }
+        }
+
+        if (tarifaSel) tarifaSel.addEventListener('change', recalcularMontoContrato);
+        if (tarifaPieSel) tarifaPieSel.addEventListener('change', recalcularMontoContrato);
+        if (cantidadPiesInp) cantidadPiesInp.addEventListener('input', recalcularMontoContrato);
+        if (impuestoInp) impuestoInp.addEventListener('input', recalcularMontoContrato);
+        if (fechaInicioInp) fechaInicioInp.addEventListener('change', recalcularMontoContrato);
+        if (fechaFinInp) fechaFinInp.addEventListener('change', recalcularMontoContrato);
 
         function clearTarifaContrato() {
             if (tarifaSel) tarifaSel.value = '';
-            if (tarifaInfo) {
-                tarifaInfo.classList.add('d-none');
-                tarifaInfo.textContent = '';
+            if (tarifaPieSel) tarifaPieSel.value = '';
+            if (cantidadPiesInp) { cantidadPiesInp.value = ''; cantidadPiesInp.disabled = true; }
+            if (impuestoInp) impuestoInp.value = '7';
+            if (tarifaInfo) { tarifaInfo.classList.add('d-none'); tarifaInfo.textContent = ''; }
+            if (montoDesglose) { montoDesglose.classList.add('d-none'); montoDesglose.innerHTML = ''; }
+        }
+
+        function setTarifaPieContrato(id, cantidad) {
+            if (tarifaPieSel) tarifaPieSel.value = id !== undefined && id !== null && id !== '' ? String(id) : '';
+            if (cantidadPiesInp && cantidad !== undefined && cantidad !== null && String(cantidad) !== '') {
+                cantidadPiesInp.value = String(cantidad);
             }
+            recalcularMontoContrato();
+        }
+
+        function setImpuestoContrato(v) {
+            if (!impuestoInp) return;
+            impuestoInp.value = (v === null || v === undefined || v === '') ? '' : String(v);
+            recalcularMontoContrato();
         }
 
         function setTarifaContrato(id) {
             if (!tarifaSel) return;
             tarifaSel.value = id !== undefined && id !== null && id !== '' ? String(id) : '';
-            aplicarMontoDesdeTarifa();
+            recalcularMontoContrato();
         }
 
         function formatMontoContrato(n) {
@@ -1037,6 +1173,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (numCuotasInp) numCuotasInp.value = '';
                 clearCuotasHidden();
                 clearTarifaContrato();
+                setTarifaContrato('');
+                setTarifaPieContrato(bEdit.getAttribute('data-tarifa-pie-id') || '', bEdit.getAttribute('data-cantidad-pies') || '');
+                setImpuestoContrato(bEdit.getAttribute('data-impuesto-porcentaje'));
+                recalcularMontoContrato();
                 toggleNumCuotasWrap();
                 setErr(''); modal.show();
                 return;
@@ -1070,6 +1210,10 @@ document.addEventListener('DOMContentLoaded', function () {
             if (numCuotasInp) numCuotasInp.value = d.numero_cuotas || '';
             clearCuotasHidden();
             clearTarifaContrato();
+            setTarifaContrato(d.tarifa_dia_id || '');
+            setTarifaPieContrato(d.tarifa_pie_id || '', d.cantidad_pies || '');
+            setImpuestoContrato(d.impuesto_porcentaje !== undefined && d.impuesto_porcentaje !== null ? d.impuesto_porcentaje : '7');
+            recalcularMontoContrato();
             toggleNumCuotasWrap();
             setErr(w.error || ''); modal.show();
         }
