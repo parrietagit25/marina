@@ -782,6 +782,16 @@ body {
   border-color: rgba(16, 185, 129, 0.45) !important;
 }
 
+.mapa-marina-slip--por-vencer {
+  background: linear-gradient(90deg, #fff7ed, #fff) !important;
+  border-color: rgba(249, 115, 22, 0.55) !important;
+}
+
+.mapa-marina-slip--vencido {
+  background: linear-gradient(90deg, #fef2f2, #fff) !important;
+  border-color: rgba(239, 68, 68, 0.55) !important;
+}
+
 .mapa-marina-slip--libre {
   background: #fff;
   border-color: rgba(148, 163, 184, 0.35) !important;
@@ -794,6 +804,14 @@ body {
 
 .mapa-marina-slip--ocupado .mapa-slip-ico {
   color: #059669;
+}
+
+.mapa-marina-slip--por-vencer .mapa-slip-ico {
+  color: #ea580c;
+}
+
+.mapa-marina-slip--vencido .mapa-slip-ico {
+  color: #dc2626;
 }
 
 .mapa-slip-ico .menu-ico {
@@ -824,6 +842,16 @@ body {
   color: #fff;
 }
 
+.mapa-slip-pill--por-vencer {
+  background: #f97316;
+  color: #fff;
+}
+
+.mapa-slip-pill--vencido {
+  background: #ef4444;
+  color: #fff;
+}
+
 .mapa-slip-pill--libre {
   background: #e2e8f0;
   color: #64748b;
@@ -832,6 +860,53 @@ body {
 .mapa-marina-page .mapa-marina-slip.cursor-pointer:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+}
+
+.mapa-marina-page .mapa-marina-slip--por-vencer.cursor-pointer:hover {
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.25);
+}
+
+.mapa-marina-page .mapa-marina-slip--vencido.cursor-pointer:hover {
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
+}
+
+.mapa-legend-item--por-vencer {
+  color: #c2410c;
+}
+
+.mapa-legend-item--vencido {
+  color: #b91c1c;
+}
+
+.mapa-badge-por-vencer {
+  background: #f97316 !important;
+  color: #fff !important;
+}
+
+.mapa-grupos-page .mapa-grupo-unidad {
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 8px;
+  padding: 0.4rem 0.55rem;
+  margin-bottom: 0.25rem;
+}
+
+.mapa-grupos-page .mapa-grupo-unidad--libre {
+  background: #fff;
+}
+
+.mapa-grupos-page .mapa-grupo-unidad--ocupado {
+  background: linear-gradient(90deg, #ecfdf5, #fff);
+  border-color: rgba(16, 185, 129, 0.45);
+}
+
+.mapa-grupos-page .mapa-grupo-unidad--por-vencer {
+  background: linear-gradient(90deg, #fff7ed, #fff);
+  border-color: rgba(249, 115, 22, 0.55);
+}
+
+.mapa-grupos-page .mapa-grupo-unidad--vencido {
+  background: linear-gradient(90deg, #fef2f2, #fff);
+  border-color: rgba(239, 68, 68, 0.55);
 }
 
 @media (max-width: 1400px) {

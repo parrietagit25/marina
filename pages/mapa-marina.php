@@ -120,7 +120,9 @@ $ok = obtener('ok');
         </div>
     </div>
     <div class="mapa-marina-legend">
-        <span class="mapa-legend-item mapa-legend-item--ocupado"><i data-lucide="ship" class="menu-ico"></i> Con contrato</span>
+        <span class="mapa-legend-item mapa-legend-item--ocupado"><i data-lucide="ship" class="menu-ico"></i> Ocupado</span>
+        <span class="mapa-legend-item mapa-legend-item--por-vencer"><i data-lucide="clock" class="menu-ico"></i> Vence en 7 días</span>
+        <span class="mapa-legend-item mapa-legend-item--vencido"><i data-lucide="alert-triangle" class="menu-ico"></i> Contrato vencido</span>
         <span class="mapa-legend-item mapa-legend-item--libre"><i data-lucide="circle" class="menu-ico"></i> Disponible</span>
     </div>
 </div>
@@ -152,8 +154,12 @@ $ok = obtener('ok');
                                 $tieneContrato = $totalContratos > 0;
                                 $detalle = $detalleContratoPorSlip[$sid] ?? null;
                                 $detallePayload = null;
+                                $estiloMapa = ['slip' => 'mapa-marina-slip--libre', 'pill' => 'mapa-slip-pill--libre', 'label' => 'Libre'];
                                 if ($detalle) {
                                     $contratoId = (int) $detalle['id'];
+                                    $estiloMapa = marina_mapa_estilo_ocupacion(
+                                        marina_contrato_alerta_vencimiento($detalle['fecha_fin'] ?? null)
+                                    );
                                     $detallePayload = [
                                         'id' => $contratoId,
                                         'cliente' => $detalle['cliente_nombre'] ?? '',
@@ -171,7 +177,7 @@ $ok = obtener('ok');
                                 }
                             ?>
                             <div
-                                class="mapa-slip-item mapa-marina-slip <?= $tieneContrato ? 'mapa-marina-slip--ocupado cursor-pointer' : 'mapa-marina-slip--libre' ?>"
+                                class="mapa-slip-item mapa-marina-slip <?= $estiloMapa['slip'] ?><?= $tieneContrato ? ' cursor-pointer' : '' ?>"
                                 <?php if ($tieneContrato && $detallePayload): ?>
                                     data-bs-toggle="modal"
                                     data-bs-target="#detalleContratoSlipModal"
@@ -181,7 +187,7 @@ $ok = obtener('ok');
                                 <span class="mapa-slip-ico" aria-hidden="true"><i data-lucide="<?= $tieneContrato ? 'ship' : 'anchor' ?>" class="menu-ico"></i></span>
                                 <span class="mapa-slip-name"><?= e($s['nombre']) ?></span>
                                 <?php if ($tieneContrato): ?>
-                                    <span class="mapa-slip-pill mapa-slip-pill--ocupado" title="Con contrato">Ocupado</span>
+                                    <span class="mapa-slip-pill <?= e($estiloMapa['pill']) ?>" title="<?= e($estiloMapa['label']) ?>"><?= e($estiloMapa['label']) ?></span>
                                 <?php else: ?>
                                     <span class="mapa-slip-pill mapa-slip-pill--libre" title="Disponible">Libre</span>
                                 <?php endif; ?>

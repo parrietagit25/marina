@@ -103,14 +103,16 @@ $ok = obtener('ok');
 ?>
 <?php require_once __DIR__ . '/../includes/layout.php'; ?>
 
-<div class="d-flex align-items-center justify-content-between mb-3">
+<div class="mapa-grupos-page d-flex align-items-center justify-content-between mb-3">
     <div>
         <h1 class="mb-1">Mapa Grupos</h1>
-        <div class="text-muted">Grupo → inmuebles. Verde = contrato activo en ese inmueble.</div>
+        <div class="text-muted">Grupo → inmuebles. Color según vencimiento del contrato activo.</div>
     </div>
-    <div class="d-flex gap-2">
-        <div><span class="badge bg-success">Con contrato</span></div>
-        <div><span class="badge bg-secondary">Sin contrato</span></div>
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+        <span class="badge bg-success">Ocupado</span>
+        <span class="badge mapa-badge-por-vencer">Vence en 7 días</span>
+        <span class="badge bg-danger">Contrato vencido</span>
+        <span class="badge bg-secondary">Sin contrato</span>
     </div>
 </div>
 <?php if ($ok): ?><div class="alert alert-success"><?= e($ok) ?></div><?php endif; ?>
@@ -137,8 +139,13 @@ $ok = obtener('ok');
                                 $tieneContrato = ((int)($contratosPorInmueble[$iid] ?? 0)) > 0;
                                 $detalle = $detalleContratoPorInmueble[$iid] ?? null;
                                 $detallePayload = null;
+                                $estiloMapa = ['slip' => 'mapa-grupo-unidad--libre', 'pill' => 'mapa-slip-pill--libre', 'badge' => 'bg-secondary', 'label' => 'Libre'];
                                 if ($detalle) {
                                     $contratoId = (int) $detalle['id'];
+                                    $estiloMapa = marina_mapa_estilo_ocupacion(
+                                        marina_contrato_alerta_vencimiento($detalle['fecha_fin'] ?? null),
+                                        'mapa-grupo-unidad'
+                                    );
                                     $detallePayload = [
                                         'id' => $contratoId,
                                         'cliente' => $detalle['cliente_nombre'] ?? '',
@@ -156,7 +163,7 @@ $ok = obtener('ok');
                                 }
                             ?>
                             <div
-                                class="mapa-slip-item d-flex align-items-center justify-content-between <?= $tieneContrato ? 'cursor-pointer' : '' ?>"
+                                class="mapa-slip-item mapa-grupo-unidad d-flex align-items-center justify-content-between <?= $estiloMapa['slip'] ?><?= $tieneContrato ? ' cursor-pointer' : '' ?>"
                                 <?php if ($tieneContrato && $detallePayload): ?>
                                     data-bs-toggle="modal"
                                     data-bs-target="#detalleContratoInmuebleModal"
@@ -165,7 +172,7 @@ $ok = obtener('ok');
                             >
                                 <div class="fw-semibold"><?= e($i['nombre']) ?></div>
                                 <?php if ($tieneContrato): ?>
-                                    <span class="badge bg-success">Con contrato</span>
+                                    <span class="badge <?= e($estiloMapa['badge']) ?>"><?= e($estiloMapa['label']) ?></span>
                                 <?php else: ?>
                                     <span class="badge bg-secondary">Sin contrato</span>
                                 <?php endif; ?>

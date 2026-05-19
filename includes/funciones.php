@@ -51,6 +51,70 @@ function dinero(float $n): string {
     return number_format($n, 2, ',', '.');
 }
 
+/**
+ * Alerta de vencimiento para mapas (contrato activo).
+ * vencido = fecha fin anterior a hoy; por_vencer = fin dentro de 7 días inclusive; ok = resto.
+ *
+ * @return 'ok'|'por_vencer'|'vencido'
+ */
+function marina_contrato_alerta_vencimiento(?string $fechaFin, ?string $hoy = null): string
+{
+    $fechaFin = trim((string) $fechaFin);
+    if ($fechaFin === '') {
+        return 'ok';
+    }
+    try {
+        $fin = new DateTime($fechaFin);
+        $hoyDt = new DateTime($hoy ?? date('Y-m-d'));
+    } catch (Exception $e) {
+        return 'ok';
+    }
+    $hoyDt->setTime(0, 0, 0);
+    $fin->setTime(0, 0, 0);
+    if ($fin < $hoyDt) {
+        return 'vencido';
+    }
+    $limite = clone $hoyDt;
+    $limite->modify('+7 days');
+    if ($fin <= $limite) {
+        return 'por_vencer';
+    }
+
+    return 'ok';
+}
+
+/**
+ * Clases y etiqueta para unidad ocupada en mapa marina / grupos.
+ *
+ * @return array{slip: string, pill: string, label: string}
+ */
+function marina_mapa_estilo_ocupacion(string $alertaVenc, string $prefijo = 'mapa-marina-slip'): array
+{
+    if ($alertaVenc === 'vencido') {
+        return [
+            'slip' => $prefijo . '--ocupado ' . $prefijo . '--vencido',
+            'pill' => 'mapa-slip-pill--vencido',
+            'badge' => 'bg-danger',
+            'label' => 'Vencido',
+        ];
+    }
+    if ($alertaVenc === 'por_vencer') {
+        return [
+            'slip' => $prefijo . '--ocupado ' . $prefijo . '--por-vencer',
+            'pill' => 'mapa-slip-pill--por-vencer',
+            'badge' => 'mapa-badge-por-vencer',
+            'label' => 'Por vencer',
+        ];
+    }
+
+    return [
+        'slip' => $prefijo . '--ocupado',
+        'pill' => 'mapa-slip-pill--ocupado',
+        'badge' => 'bg-success',
+        'label' => 'Ocupado',
+    ];
+}
+
 /** Días de estadía inclusive entre dos fechas (DATE). */
 function marina_contrato_dias_estadia(string $fechaInicio, string $fechaFin): int
 {
