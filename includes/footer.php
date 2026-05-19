@@ -4,6 +4,16 @@
 </footer>
   </div><!-- .main-area -->
 </div><!-- .app-shell -->
+<script>
+window.marinaFmtFecha = function(fecha) {
+  if (!fecha) return '';
+  var s = String(fecha).slice(0, 10);
+  var p = s.split('-');
+  if (p.length !== 3) return s;
+  var y = p[0].length >= 4 ? p[0].slice(-2) : p[0];
+  return p[2] + '/' + p[1] + '/' + y;
+};
+</script>
 <script src='https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js' crossorigin='anonymous'></script>
 <script src='https://code.jquery.com/jquery-3.7.1.min.js'></script>
 <script src='https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js'></script>

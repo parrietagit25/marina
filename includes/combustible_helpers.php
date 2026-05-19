@@ -251,8 +251,59 @@ function marina_combustible_limpiar_gastos_abonos_pedido(PDO $pdo, int $pedidoId
 }
 
 /**
- * Egreso contable: un gasto por el costo total cuando hay recepción (fecha + GLS + costo).
- * Los abonos solo llevan control de pago, no generan gastos adicionales.
+ * Copia abonos del pedido a gasto_pagos (egreso bancario). Solo los abonos mueven la cuenta.
+ */
+function marina_combustible_sync_abonos_a_gasto_pagos(PDO $pdo, int $pedidoId): void
+{
+    require_once __DIR__ . '/gasto_helpers.php';
+
+    $gastoId = 0;
+    try {
+        $st = $pdo->prepare('SELECT gasto_id FROM combustible_pedidos WHERE id = ?');
+        $st->execute([$pedidoId]);
+        $gastoId = (int) ($st->fetchColumn() ?: 0);
+    } catch (Throwable $e) {
+        return;
+    }
+    if ($gastoId < 1) {
+        return;
+    }
+
+    $pdo->prepare('DELETE FROM gasto_pagos WHERE gasto_id = ?')->execute([$gastoId]);
+
+    $st2 = $pdo->prepare('
+        SELECT monto, fecha_pago, cuenta_id, forma_pago_id, referencia
+        FROM combustible_pedido_pagos
+        WHERE pedido_id = ?
+        ORDER BY fecha_pago, id
+    ');
+    $st2->execute([$pedidoId]);
+    $uid = function_exists('usuarioId') ? usuarioId() : null;
+    $obs = 'Abono pedido combustible #' . $pedidoId;
+
+    while ($row = $st2->fetch(PDO::FETCH_ASSOC)) {
+        $ref = trim((string) ($row['referencia'] ?? ''));
+        $pdo->prepare('
+            INSERT INTO gasto_pagos (gasto_id, monto, fecha_pago, cuenta_id, forma_pago_id, referencia, observaciones, created_by, updated_by)
+            VALUES (?,?,?,?,?,?,?,?,?)
+        ')->execute([
+            $gastoId,
+            round((float) ($row['monto'] ?? 0), 2),
+            $row['fecha_pago'],
+            !empty($row['cuenta_id']) ? (int) $row['cuenta_id'] : null,
+            !empty($row['forma_pago_id']) ? (int) $row['forma_pago_id'] : null,
+            $ref !== '' ? $ref : null,
+            $obs,
+            $uid,
+            $uid,
+        ]);
+    }
+
+    marina_gasto_refrescar_estado($pdo, $gastoId);
+}
+
+/**
+ * Factura de gasto al recibir pedido (pendiente). El banco se afecta solo con abonos en combustible_pedido_pagos.
  */
 function marina_combustible_sync_pedido_gasto(PDO $pdo, int $pedidoId): void
 {
@@ -295,53 +346,49 @@ function marina_combustible_sync_pedido_gasto(PDO $pdo, int $pedidoId): void
         return;
     }
 
-    $cuentaId = !empty($p['cuenta_id']) ? (int) $p['cuenta_id'] : null;
-    if ($cuentaId !== null && $cuentaId <= 0) {
-        $cuentaId = null;
-    }
     $tipo = (string) ($p['tipo_combustible'] ?? '');
     $fact = trim((string) ($p['numero_factura'] ?? ''));
     $obs = 'Pedido combustible #' . $pedidoId . ' — ' . $tipo . ' — ' . $glsRec . ' GLS recibidos';
     $fechaGasto = (string) $fechaRec;
 
-    require_once __DIR__ . '/gasto_helpers.php';
-
     if ($gastoId > 0) {
-        $pdo->prepare('UPDATE gastos SET partida_id=?, proveedor_id=?, cuenta_id=NULL, forma_pago_id=NULL, monto=?, fecha_gasto=?, referencia=?, observaciones=?, updated_by=? WHERE id=?')
+        $pdo->prepare('UPDATE gastos SET partida_id=?, proveedor_id=?, cuenta_id=NULL, forma_pago_id=NULL, monto=?, fecha_gasto=?, referencia=?, observaciones=?, estado=\'pendiente\', updated_by=? WHERE id=?')
             ->execute([$partidaId, $provId, $costo, $fechaGasto, $fact !== '' ? $fact : null, $obs, $uid, $gastoId]);
-        marina_gasto_sync_pago_unico(
-            $pdo,
-            $gastoId,
-            $costo,
-            $fechaGasto,
-            $cuentaId,
-            null,
-            $fact !== '' ? $fact : null,
-            $obs,
-            $uid,
-            $uid
-        );
     } else {
-        $pdo->prepare('INSERT INTO gastos (partida_id, proveedor_id, cuenta_id, forma_pago_id, monto, fecha_gasto, referencia, observaciones, created_by, updated_by, estado) VALUES (?,?,NULL,NULL,?,?,?,?,?,?,\'pagada\')')
+        $pdo->prepare('INSERT INTO gastos (partida_id, proveedor_id, cuenta_id, forma_pago_id, monto, fecha_gasto, referencia, observaciones, created_by, updated_by, estado) VALUES (?,?,NULL,NULL,?,?,?,?,?,?,\'pendiente\')')
             ->execute([$partidaId, $provId, $costo, $fechaGasto, $fact !== '' ? $fact : null, $obs, $uid, $uid]);
-        $gid = (int) $pdo->lastInsertId();
-        marina_gasto_sync_pago_unico(
-            $pdo,
-            $gid,
-            $costo,
-            $fechaGasto,
-            $cuentaId,
-            null,
-            $fact !== '' ? $fact : null,
-            $obs,
-            $uid,
-            $uid
-        );
+        $gastoId = (int) $pdo->lastInsertId();
         try {
-            $pdo->prepare('UPDATE combustible_pedidos SET gasto_id = ? WHERE id = ?')->execute([$gid, $pedidoId]);
+            $pdo->prepare('UPDATE combustible_pedidos SET gasto_id = ? WHERE id = ?')->execute([$gastoId, $pedidoId]);
         } catch (Throwable $e) {
             // sin columna gasto_id: el gasto existe en reportes
         }
+    }
+
+    marina_combustible_sync_abonos_a_gasto_pagos($pdo, $pedidoId);
+}
+
+/** Una vez: egreso bancario solo desde abonos, no al recibir el pedido. */
+function marina_combustible_migrar_pedido_banco_solo_abonos(PDO $pdo): void
+{
+    try {
+        $chk = $pdo->prepare("SELECT 1 FROM marina_config WHERE clave = 'migration_comb_pedido_banco_abonos_v1' LIMIT 1");
+        $chk->execute();
+        if ($chk->fetchColumn()) {
+            return;
+        }
+    } catch (Throwable $e) {
+        return;
+    }
+    try {
+        $ids = $pdo->query('SELECT id FROM combustible_pedidos WHERE gasto_id IS NOT NULL AND gasto_id > 0')->fetchAll(PDO::FETCH_COLUMN);
+        foreach ($ids as $pid) {
+            marina_combustible_sync_abonos_a_gasto_pagos($pdo, (int) $pid);
+        }
+        $pdo->prepare("INSERT INTO marina_config (clave, valor) VALUES ('migration_comb_pedido_banco_abonos_v1', '1')
+            ON DUPLICATE KEY UPDATE valor = '1'")->execute();
+    } catch (Throwable $e) {
+        // ignorar
     }
 }
 

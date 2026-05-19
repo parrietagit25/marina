@@ -1,6 +1,6 @@
 <?php
 /**
- * Pedidos de combustible: inventario (GLS recibidos), egreso al recibir (gasto costo total), abonos = pago.
+ * Pedidos de combustible: inventario (GLS recibidos), factura al recibir; el banco solo con abonos.
  */
 $titulo = 'Combustible — Pedidos';
 $pdo = getDb();
@@ -23,6 +23,7 @@ try {
 } catch (Throwable $e) {
     // tabla o columna no lista
 }
+marina_combustible_migrar_pedido_banco_solo_abonos($pdo);
 
 $uid = usuarioId();
 $mensaje = '';
@@ -88,15 +89,10 @@ if (enviado()) {
         $pagoId = (int) ($_POST['pago_id'] ?? 0);
         $pedidoId = (int) ($_POST['pedido_id_ref'] ?? 0);
         if ($pagoId > 0) {
-            $st = $pdo->prepare('SELECT gasto_id FROM combustible_pedido_pagos WHERE id = ?');
-            $st->execute([$pagoId]);
-            $gid = (int) ($st->fetchColumn() ?: 0);
-            if ($gid > 0) {
-                $pdo->prepare('DELETE FROM gastos WHERE id = ?')->execute([$gid]);
-            }
             $pdo->prepare('DELETE FROM combustible_pedido_pagos WHERE id = ?')->execute([$pagoId]);
             if ($pedidoId > 0) {
                 marina_combustible_actualizar_estado_pedido($pdo, $pedidoId);
+                marina_combustible_sync_abonos_a_gasto_pagos($pdo, $pedidoId);
             }
             redirigir(MARINA_URL . '/index.php?p=combustible-pedidos&abonos=' . $pedidoId . '&ok=' . rawurlencode('Abono eliminado'));
         }
@@ -121,6 +117,7 @@ if (enviado()) {
                         ->execute([$pedidoId, $monto, $fecha_pago, $cuenta_p > 0 ? $cuenta_p : null, $forma_p > 0 ? $forma_p : null, $ref !== '' ? $ref : null, $uid]);
                 }
                 marina_combustible_actualizar_estado_pedido($pdo, $pedidoId);
+                marina_combustible_sync_abonos_a_gasto_pagos($pdo, $pedidoId);
                 redirigir(MARINA_URL . '/index.php?p=combustible-pedidos&abonos=' . $pedidoId . '&ok=' . rawurlencode('Abono guardado'));
             } catch (Throwable $e) {
                 $mensaje = 'No se pudo guardar el abono.';
@@ -188,7 +185,7 @@ require_once __DIR__ . '/../includes/layout.php';
             </div>
         <?php endforeach; ?>
     </div>
-    <p class="text-muted small mb-0 mt-2">Inventario = GLS recibidos en pedidos − despachos + <a href="<?= MARINA_URL ?>/index.php?p=combustible-ajuste">ajustes</a>. Con fecha de recibido, GLS recibidos y costo, el pedido genera un <strong>gasto</strong> (egreso) visible en reportes y en Factura / Pagar.</p>
+    <p class="text-muted small mb-0 mt-2">Inventario = GLS recibidos en pedidos − despachos + <a href="<?= MARINA_URL ?>/index.php?p=combustible-ajuste">ajustes</a>. Al recibir mercancía se registra la <strong>factura de gasto</strong> (pendiente). La <strong>cuenta bancaria</strong> solo se afecta al registrar <strong>abonos</strong> al pedido.</p>
 </div>
 
 <div class="toolbar d-flex flex-wrap gap-2 mb-3">
@@ -243,7 +240,7 @@ require_once __DIR__ . '/../includes/layout.php';
                 </tr>
             <?php endforeach; ?>
             <?php if ($pagosLista === []): ?>
-                <tr><td colspan="6" class="text-muted">Sin abonos aún. El egreso contable del pedido se registra al marcar recepción y costo; los abonos solo controlan lo pagado.</td></tr>
+                <tr><td colspan="6" class="text-muted">Sin abonos aún. Cada abono debita la cuenta bancaria indicada.</td></tr>
             <?php endif; ?>
             </tbody>
         </table>

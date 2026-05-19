@@ -95,33 +95,7 @@ foreach ($slips as $s) {
     $slipsIndex[(int) $s['id']] = $s;
 }
 
-$cuotasByContrato = [];
-$stCuotas = $pdo->query("
-    SELECT c.id, c.contrato_id, c.numero_cuota, c.monto, c.fecha_vencimiento, c.fecha_pago,
-           COALESCE(SUM(CASE WHEN m.tipo IN ('pago','abono') THEN m.monto ELSE 0 END), 0) AS total_pagado
-    FROM cuotas c
-    LEFT JOIN cuotas_movimientos m ON m.cuota_id = c.id
-    GROUP BY c.id, c.contrato_id, c.numero_cuota, c.monto, c.fecha_vencimiento, c.fecha_pago
-    ORDER BY c.numero_cuota
-");
-while ($q = $stCuotas->fetch(PDO::FETCH_ASSOC)) {
-    $cid = (int) $q['contrato_id'];
-    if (!isset($cuotasByContrato[$cid])) {
-        $cuotasByContrato[$cid] = [];
-    }
-    $monto = (float) ($q['monto'] ?? 0);
-    $pagado = (float) ($q['total_pagado'] ?? 0);
-    $saldo = max(0, $monto - $pagado);
-    $estado = $saldo <= 0.00001 ? 'Pagada' : 'Pendiente';
-    $cuotasByContrato[$cid][] = [
-        'numero_cuota' => (int) ($q['numero_cuota'] ?? 0),
-        'monto' => $monto,
-        'pagado' => $pagado,
-        'saldo' => $saldo,
-        'fecha_vencimiento' => $q['fecha_vencimiento'] ?? '',
-        'estado' => $estado
-    ];
-}
+$cuotasByContrato = marina_cuotas_resumen_por_contrato($pdo);
 
 $slipsDisponibles = [];
 foreach ($slips as $s) {
@@ -201,7 +175,7 @@ $ok = obtener('ok');
                                 <?php if ($tieneContrato && $detallePayload): ?>
                                     data-bs-toggle="modal"
                                     data-bs-target="#detalleContratoSlipModal"
-                                    data-contrato='<?= e(json_encode($detallePayload, JSON_UNESCAPED_UNICODE)) ?>'
+                                    data-contrato="<?= htmlspecialchars(json_encode($detallePayload, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>"
                                 <?php endif; ?>
                             >
                                 <span class="mapa-slip-ico" aria-hidden="true"><i data-lucide="<?= $tieneContrato ? 'ship' : 'anchor' ?>" class="menu-ico"></i></span>
@@ -315,6 +289,7 @@ window.addEventListener('load', function() {
     var elContratoInput = document.getElementById('cambiarSlipContratoId');
     var elLiberarInput = document.getElementById('mapaMarinaLiberarContratoId');
     var elSlipNuevo = document.getElementById('cambiarSlipNuevoId');
+    var fmtFecha = typeof window.marinaFmtFecha === 'function' ? window.marinaFmtFecha : function(x) { return x || ''; };
 
     function money(n) {
         var num = Number(n || 0);
@@ -328,46 +303,53 @@ window.addEventListener('load', function() {
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#039;');
     }
+    function badgeEstado(estado) {
+        if (estado === 'Pagada') return 'bg-success';
+        if (estado === 'Vencida') return 'bg-danger';
+        return 'bg-warning text-dark';
+    }
 
-    document.querySelectorAll('.mapa-slip-item[data-contrato]').forEach(function(item) {
-        item.addEventListener('click', function() {
-            var raw = item.getAttribute('data-contrato') || '{}';
-            var d = {};
-            try { d = JSON.parse(raw); } catch (e) { d = {}; }
+    function fillModal(d) {
+        elContratoId.textContent = d.id || '—';
+        elCliente.textContent = d.cliente || '—';
+        elCuenta.textContent = d.cuenta || '—';
+        elMuelle.textContent = d.muelle_actual_nombre || '—';
+        elSlip.textContent = d.slip_actual_nombre || '—';
+        elMonto.textContent = money(d.monto_total || 0);
+        elFIni.textContent = d.fecha_inicio ? fmtFecha(d.fecha_inicio) : '—';
+        elFFin.textContent = d.fecha_fin ? fmtFecha(d.fecha_fin) : '—';
+        elObs.textContent = (d.observaciones && String(d.observaciones).trim() !== '') ? d.observaciones : '—';
+        if (elContratoInput) elContratoInput.value = d.id || '';
+        if (elLiberarInput) elLiberarInput.value = d.id || '';
+        if (elSlipNuevo) elSlipNuevo.value = '';
 
-            elContratoId.textContent = d.id || '—';
-            elCliente.textContent = d.cliente || '—';
-            elCuenta.textContent = d.cuenta || '—';
-            elMuelle.textContent = d.muelle_actual_nombre || '—';
-            elSlip.textContent = d.slip_actual_nombre || '—';
-            elMonto.textContent = money(d.monto_total || 0);
-            elFIni.textContent = d.fecha_inicio ? marinaFmtFecha(d.fecha_inicio) : '—';
-            elFFin.textContent = d.fecha_fin ? marinaFmtFecha(d.fecha_fin) : '—';
-            elObs.textContent = d.observaciones || '—';
-            if (elContratoInput) elContratoInput.value = d.id || '';
-            if (elLiberarInput) elLiberarInput.value = d.id || '';
-            if (elSlipNuevo) elSlipNuevo.value = '';
-
-            var cuotas = Array.isArray(d.cuotas) ? d.cuotas : [];
-            if (!cuotas.length) {
-                elTbody.innerHTML = '<tr><td colspan="6" class="text-muted">Sin cuotas registradas.</td></tr>';
-                return;
-            }
-            var html = '';
-            cuotas.forEach(function(c) {
-                var estado = c.estado || 'Pendiente';
-                var badge = estado === 'Pagada' ? 'bg-success' : 'bg-warning text-dark';
-                html += '<tr>' +
-                    '<td>#' + esc(c.numero_cuota || '') + '</td>' +
-                    '<td>' + esc(money(c.monto || 0)) + '</td>' +
-                    '<td>' + esc(money(c.pagado || 0)) + '</td>' +
-                    '<td>' + esc(money(c.saldo || 0)) + '</td>' +
-                    '<td>' + esc(marinaFmtFecha(c.fecha_vencimiento || '')) + '</td>' +
-                    '<td><span class="badge ' + badge + '">' + esc(estado) + '</span></td>' +
-                '</tr>';
-            });
-            elTbody.innerHTML = html;
+        var cuotas = Array.isArray(d.cuotas) ? d.cuotas : [];
+        if (!cuotas.length) {
+            elTbody.innerHTML = '<tr><td colspan="6" class="text-muted">Sin cuotas registradas. <a href="<?= MARINA_URL ?>/index.php?p=contratos&amp;accion=cuotas&amp;id=' + esc(String(d.id || '')) + '">Agregar cuotas</a></td></tr>';
+            return;
+        }
+        var html = '';
+        cuotas.forEach(function(c) {
+            var estado = c.estado || 'Pendiente';
+            html += '<tr>' +
+                '<td>#' + esc(c.numero_cuota || '') + '</td>' +
+                '<td>' + esc(money(c.monto || 0)) + '</td>' +
+                '<td>' + esc(money(c.pagado || 0)) + '</td>' +
+                '<td>' + esc(money(c.saldo || 0)) + '</td>' +
+                '<td>' + esc(fmtFecha(c.fecha_vencimiento || '')) + '</td>' +
+                '<td><span class="badge ' + badgeEstado(estado) + '">' + esc(estado) + '</span></td>' +
+            '</tr>';
         });
+        elTbody.innerHTML = html;
+    }
+
+    modalEl.addEventListener('show.bs.modal', function(ev) {
+        var trigger = ev.relatedTarget;
+        if (!trigger) return;
+        var raw = trigger.getAttribute('data-contrato') || '{}';
+        var d = {};
+        try { d = JSON.parse(raw); } catch (e) { d = {}; }
+        fillModal(d);
     });
 });
 </script>

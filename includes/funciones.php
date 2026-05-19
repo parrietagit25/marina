@@ -130,6 +130,62 @@ function marina_contrato_calcular_montos(
     ];
 }
 
+/**
+ * Resumen de cuotas por contrato_id (mapas, modales). Misma lógica de pagado que reporte de cuotas.
+ *
+ * @return array<int, list<array{numero_cuota: int, monto: float, pagado: float, saldo: float, fecha_vencimiento: string, estado: string}>>
+ */
+function marina_cuotas_resumen_por_contrato(PDO $pdo): array
+{
+    $cuotasByContrato = [];
+    $stCuotas = $pdo->query("
+        SELECT c.id, c.contrato_id, c.numero_cuota, c.monto, c.fecha_vencimiento, c.fecha_pago AS fecha_pago_legacy,
+               COALESCE(SUM(CASE WHEN m.tipo IN ('pago','abono') THEN m.monto ELSE 0 END), 0) AS pagado_mov
+        FROM cuotas c
+        LEFT JOIN cuotas_movimientos m ON m.cuota_id = c.id
+        GROUP BY c.id, c.contrato_id, c.numero_cuota, c.monto, c.fecha_vencimiento, c.fecha_pago
+        ORDER BY c.contrato_id, c.numero_cuota
+    ");
+    $hoy = date('Y-m-d');
+    while ($q = $stCuotas->fetch(PDO::FETCH_ASSOC)) {
+        $cid = (int) ($q['contrato_id'] ?? 0);
+        if ($cid < 1) {
+            continue;
+        }
+        $monto = (float) ($q['monto'] ?? 0);
+        $pagadoMov = (float) ($q['pagado_mov'] ?? 0);
+        if ($pagadoMov > 0.00001) {
+            $pagado = $pagadoMov;
+        } elseif (!empty($q['fecha_pago_legacy'])) {
+            $pagado = $monto;
+        } else {
+            $pagado = 0.0;
+        }
+        $saldo = max(0, $monto - $pagado);
+        $fv = (string) ($q['fecha_vencimiento'] ?? '');
+        if ($saldo <= 0.00001) {
+            $estado = 'Pagada';
+        } elseif ($fv !== '' && $fv < $hoy) {
+            $estado = 'Vencida';
+        } else {
+            $estado = 'Pendiente';
+        }
+        if (!isset($cuotasByContrato[$cid])) {
+            $cuotasByContrato[$cid] = [];
+        }
+        $cuotasByContrato[$cid][] = [
+            'numero_cuota' => (int) ($q['numero_cuota'] ?? 0),
+            'monto' => $monto,
+            'pagado' => $pagado,
+            'saldo' => $saldo,
+            'fecha_vencimiento' => $fv,
+            'estado' => $estado,
+        ];
+    }
+
+    return $cuotasByContrato;
+}
+
 /** Etiqueta UI: acreditación / tipo_movimiento ingreso en BD (sigue siendo `ingreso`). */
 function marina_ui_credito(): string {
     return 'Crédito';
