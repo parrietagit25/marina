@@ -129,7 +129,8 @@ $accionBadge = static function (string $accion): string {
     </div>
     <div class="card chart-card chart-card--wide p-3">
         <h2 class="h5 mb-2">Registros por usuario (top 15)</h2>
-        <div class="chart-canvas-wrap" style="height: <?= max(220, min(420, 28 * max(1, count($datos['por_usuario'])))) ?>px">
+        <p class="text-muted small mb-2">Cantidad de registros por usuario en el período (barras verticales).</p>
+        <div class="chart-canvas-wrap chart-canvas-wrap--bar" style="height: 280px;">
             <canvas id="chartSeguimientoUsuario"></canvas>
         </div>
     </div>
@@ -238,15 +239,40 @@ $accionBadge = static function (string $accion): string {
             data: {
                 labels: labelsUsuarios,
                 datasets: [{
-                    label: 'Registros',
+                    label: 'Cantidad de registros',
                     data: serieUsuarios,
-                    backgroundColor: 'rgba(15, 159, 100, 0.75)',
-                    borderRadius: 4
+                    backgroundColor: 'rgba(15, 159, 100, 0.8)',
+                    borderColor: 'rgba(5, 150, 105, 1)',
+                    borderWidth: 1,
+                    borderRadius: 6,
+                    maxBarThickness: 48
                 }]
             },
             options: {
-                ...barOpts,
-                indexAxis: 'y'
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                return 'Registros: ' + ctx.raw;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { precision: 0, stepSize: 1 },
+                        title: { display: true, text: 'Cantidad' },
+                        grid: { color: 'rgba(148, 163, 184, 0.25)' }
+                    },
+                    x: {
+                        ticks: { maxRotation: 45, minRotation: 0, autoSkip: false },
+                        grid: { display: false }
+                    }
+                }
             }
         });
     }
