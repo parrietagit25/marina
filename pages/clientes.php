@@ -226,8 +226,6 @@ try {
             <td><?= e($r['telefono'] ?? '—') ?></td>
             <td><?= fechaHoraFormato($r['created_at']) ?></td>
             <td class="acciones">
-                <button type="button" class="btn btn-primary btn-sm btn-registrar-mov-cliente" data-id="<?= (int)$r['id'] ?>" data-nombre="<?= e($r['nombre']) ?>">Registrar movimiento</button>
-                <button type="button" class="btn btn-outline-primary btn-sm btn-ver-mov-cliente" data-id="<?= (int)$r['id'] ?>" data-nombre="<?= e($r['nombre']) ?>">Ver movimientos</button>
                 <button type="button" class="btn btn-danger btn-sm btn-eliminar-cliente" data-id="<?= (int)$r['id'] ?>" data-nombre="<?= e($r['nombre']) ?>">Eliminar</button>
                 <button type="button" class="btn btn-secondary btn-sm btn-editar-cliente" data-id="<?= (int)$r['id'] ?>" data-nombre="<?= e($r['nombre']) ?>" data-documento="<?= e($r['documento'] ?? '') ?>" data-telefono="<?= e($r['telefono'] ?? '') ?>" data-email="<?= e($r['email'] ?? '') ?>" data-direccion="<?= e($r['direccion'] ?? '') ?>" data-dueno-capitan="<?= e($r['dueno_capitan'] ?? '') ?>">Editar</button>
             </td>

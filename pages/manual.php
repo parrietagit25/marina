@@ -182,6 +182,8 @@ $u = function (string $p, string $label): string {
                         Desde la lista puede abrir la gestión de <strong>electricidad por contrato</strong> cuando aplique.</dd>
                     <dt class="col-sm-3"><?= $u('contratos-electricidad', 'Electricidad (contrato)') ?></dt>
                     <dd class="col-sm-9">Facturas y cobros de electricidad ligados a un contrato; los pagos aparecen como créditos bancarios en reportes y movimiento bancario.</dd>
+                    <dt class="col-sm-3"><?= $u('reporte-cuotas', 'Reporte de cuotas') ?></dt>
+                    <dd class="col-sm-9">Cuotas por vencimiento, estado (pagada / pendiente / vencida), marina (muelle/slip) o inmueble (grupo/inmueble).</dd>
                 </dl>
             </div>
         </div>
@@ -196,7 +198,6 @@ $u = function (string $p, string $label): string {
         <div id="manualRep" class="accordion-collapse collapse" data-bs-parent="#manualAccordion">
             <div class="accordion-body">
                 <ul class="mb-0">
-                    <li><?= $u('reporte-cuotas', 'Reporte de cuotas') ?> — cuotas por vencimiento, estado (pagada / pendiente / vencida), marina (muelle/slip) o inmueble (grupo/inmueble).</li>
                     <li><?= $u('reporte-ingresos', 'Reporte de ingreso') ?> y <?= $u('reporte-egresos', 'Reporte de egresos') ?> — concentrados por tipo.</li>
                     <li><?= $u('reportes', 'Reporte de ingresos y egresos') ?> — resumen del período (totales por cuenta y por partida).</li>
                     <li><?= $u('reporte-ingresos-egresos', 'Ingresos y egresos (detalle)') ?> — listado conjunto con filtros (cuenta, vista agrupada, etc.).</li>
