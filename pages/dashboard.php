@@ -261,6 +261,11 @@ $stCostTot->execute([$desde, $hasta]);
 $costos_gastos = (float) $stCostTot->fetch(PDO::FETCH_ASSOC)['total'];
 
 require_once __DIR__ . '/../includes/combustible_helpers.php';
+require_once __DIR__ . '/../includes/dashboard_ocupacion.php';
+$ocupacionDash = marina_dashboard_ocupacion_datos($pdo);
+$urlMapaMarina = MARINA_URL . '/index.php?p=mapa-marina';
+$urlMapaGrupos = MARINA_URL . '/index.php?p=mapa-grupos';
+$urlReporteOcupacion = MARINA_URL . '/index.php?p=reporte-ocupacion';
 $partida_combustible_id = marina_combustible_partida_id($pdo);
 
 if ($partida_combustible_id > 0) {
@@ -565,6 +570,65 @@ require_once __DIR__ . '/../includes/layout.php';
     </div>
 </div>
 
+<div class="dashboard-section-title mb-2 d-flex flex-wrap align-items-center justify-content-between gap-2">
+    <span>Ocupación actual</span>
+    <span class="small fw-normal">
+        <a href="<?= e($urlMapaMarina) ?>">Mapa marina</a> ·
+        <a href="<?= e($urlMapaGrupos) ?>">Mapa grupos</a> ·
+        <a href="<?= e($urlReporteOcupacion) ?>">Reporte ocupación</a>
+    </span>
+</div>
+
+<div class="kpi-grid mb-3" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));">
+    <div class="kpi-card">
+        <div class="kpi-title"><i data-lucide="anchor" class="menu-ico"></i>Slips</div>
+        <div class="kpi-value"><?= (int) $ocupacionDash['slips_ocupados'] ?> / <?= (int) $ocupacionDash['total_slips'] ?></div>
+        <p class="text-muted small mb-0"><?= e((string) $ocupacionDash['pct_slips']) ?>% ocupado</p>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-title"><i data-lucide="building-2" class="menu-ico"></i>Inmuebles</div>
+        <div class="kpi-value"><?= (int) $ocupacionDash['inmuebles_ocupados'] ?> / <?= (int) $ocupacionDash['total_inmuebles'] ?></div>
+        <p class="text-muted small mb-0"><?= e((string) $ocupacionDash['pct_inmuebles']) ?>% ocupado</p>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-title"><i data-lucide="layout-grid" class="menu-ico"></i>Total unidades</div>
+        <div class="kpi-value"><?= (int) $ocupacionDash['total_ocupados'] ?> / <?= (int) $ocupacionDash['total_unidades'] ?></div>
+        <p class="text-muted small mb-0"><?= e((string) $ocupacionDash['pct_general']) ?>% ocupación general</p>
+    </div>
+</div>
+
+<div class="charts-grid dashboard-charts dashboard-charts--ocupacion mb-4">
+    <div class="card chart-card p-3">
+        <h2 class="h5 mb-2">Ocupación general</h2>
+        <p class="text-muted small mb-2">Todas las unidades (slips + inmuebles) con contrato activo vs libres.</p>
+        <canvas id="chartOcupacionGeneral" height="200"></canvas>
+    </div>
+    <div class="card chart-card p-3">
+        <h2 class="h5 mb-2">Marina vs grupos (% ocupado)</h2>
+        <p class="text-muted small mb-2">Porcentaje de slips ocupados frente a inmuebles ocupados.</p>
+        <canvas id="chartOcupacionMarinaGrupos" height="200"></canvas>
+    </div>
+    <div class="card chart-card chart-card--wide p-3">
+        <h2 class="h5 mb-2">Slips e inmuebles (unidades)</h2>
+        <p class="text-muted small mb-2">Comparación macro: total de slips y de inmuebles; verde = ocupado, gris = libre.</p>
+        <canvas id="chartOcupacionSlipsInmuebles" height="120"></canvas>
+    </div>
+</div>
+
+<div class="dashboard-section-title mb-2">Ocupación por muelle y por grupo</div>
+<div class="charts-grid dashboard-charts dashboard-charts--ocupacion mb-4">
+    <div class="card chart-card chart-card--wide p-3">
+        <h2 class="h5 mb-2">Slips por muelle</h2>
+        <p class="text-muted small mb-2">Contrato activo por slip en cada muelle.</p>
+        <canvas id="chartOcupacionMuelles" height="<?= max(160, min(420, 28 * count($ocupacionDash['por_muelle']))) ?>"></canvas>
+    </div>
+    <div class="card chart-card chart-card--wide p-3">
+        <h2 class="h5 mb-2">Inmuebles por grupo</h2>
+        <p class="text-muted small mb-2">Contrato activo por inmueble en cada grupo.</p>
+        <canvas id="chartOcupacionGrupos" height="<?= max(160, min(420, 28 * count($ocupacionDash['por_grupo']))) ?>"></canvas>
+    </div>
+</div>
+
 <div class="dashboard-section-title mb-2">Gráficas del período</div>
 <div class="charts-grid dashboard-charts">
     <div class="card chart-card chart-card--wide p-3">
@@ -675,6 +739,27 @@ foreach ([
 
     const cuotasPagadas = <?= (int) $cuotas_pagadas_mes ?>;
     const cuotasVencidas = <?= (int) $cuotas_vencidas_mes ?>;
+
+    const ocupGeneral = {
+        ocupado: <?= (int) $ocupacionDash['total_ocupados'] ?>,
+        libre: <?= (int) $ocupacionDash['total_libres'] ?>
+    };
+    const ocupMarinaGrupos = {
+        labels: ['Slips (marina)', 'Inmuebles (grupos)'],
+        pct: [<?= (float) $ocupacionDash['pct_slips'] ?>, <?= (float) $ocupacionDash['pct_inmuebles'] ?>]
+    };
+    const ocupSlipsInm = {
+        labels: ['Slips', 'Inmuebles'],
+        ocupado: [<?= (int) $ocupacionDash['slips_ocupados'] ?>, <?= (int) $ocupacionDash['inmuebles_ocupados'] ?>],
+        libre: [<?= (int) $ocupacionDash['slips_libres'] ?>, <?= (int) $ocupacionDash['inmuebles_libres'] ?>]
+    };
+    const ocupMuelles = <?= json_encode($ocupacionDash['por_muelle'], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    const ocupGrupos = <?= json_encode($ocupacionDash['por_grupo'], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+
+    const occLibre = 'rgba(148, 163, 184, 0.75)';
+    const occLibreBorder = 'rgba(100, 116, 139, 1)';
+    const occOcup = 'rgba(16, 185, 129, 0.85)';
+    const occOcupBorder = 'rgba(5, 150, 105, 1)';
 
     function fmt(v) {
         const n = Number(v);
@@ -854,6 +939,148 @@ foreach ([
                 aspectRatio: 1.8,
                 plugins: { legend: { position: 'bottom' } }
             }
+        });
+    }
+
+    const barStackedOccOpts = (horizontal) => ({
+        responsive: true,
+        maintainAspectRatio: false,
+        indexAxis: horizontal ? 'y' : 'x',
+        plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 10, usePointStyle: true } },
+            tooltip: {
+                callbacks: {
+                    label: (ctx) => `${ctx.dataset.label}: ${ctx.raw} unidad(es)`
+                }
+            }
+        },
+        scales: {
+            x: {
+                stacked: true,
+                beginAtZero: true,
+                grid: horizontal ? { color: 'rgba(148,163,184,0.2)' } : { display: false },
+                ticks: horizontal ? { callback: (v) => v } : { maxRotation: 45, minRotation: 0 }
+            },
+            y: {
+                stacked: true,
+                beginAtZero: true,
+                grid: horizontal ? { display: false } : { color: 'rgba(148,163,184,0.2)' }
+            }
+        }
+    });
+
+    const cOccGen = document.getElementById('chartOcupacionGeneral');
+    if (cOccGen && (ocupGeneral.ocupado + ocupGeneral.libre) > 0) {
+        new Chart(cOccGen, {
+            type: 'doughnut',
+            data: {
+                labels: ['Ocupado', 'Libre'],
+                datasets: [{
+                    data: [ocupGeneral.ocupado, ocupGeneral.libre],
+                    backgroundColor: [occOcup, occLibre],
+                    borderColor: [occOcupBorder, occLibreBorder],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                ...doughnutOpts,
+                plugins: {
+                    ...doughnutOpts.plugins,
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => {
+                                const tot = ocupGeneral.ocupado + ocupGeneral.libre;
+                                const pct = tot > 0 ? ((ctx.raw / tot) * 100).toFixed(1) : '0';
+                                return `${ctx.label}: ${ctx.raw} (${pct}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    const cOccMG = document.getElementById('chartOcupacionMarinaGrupos');
+    if (cOccMG) {
+        new Chart(cOccMG, {
+            type: 'bar',
+            data: {
+                labels: ocupMarinaGrupos.labels,
+                datasets: [{
+                    label: '% ocupado',
+                    data: ocupMarinaGrupos.pct,
+                    backgroundColor: [occOcup, 'rgba(14, 165, 233, 0.75)'],
+                    borderColor: [occOcupBorder, 'rgba(2, 132, 199, 1)'],
+                    borderWidth: 1,
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => `${ctx.label}: ${ctx.raw}% ocupado`
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: { callback: (v) => v + '%' },
+                        grid: { color: 'rgba(148,163,184,0.2)' }
+                    },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    const cOccSI = document.getElementById('chartOcupacionSlipsInmuebles');
+    if (cOccSI) {
+        new Chart(cOccSI, {
+            type: 'bar',
+            data: {
+                labels: ocupSlipsInm.labels,
+                datasets: [
+                    { label: 'Ocupado', data: ocupSlipsInm.ocupado, backgroundColor: occOcup, borderColor: occOcupBorder, borderWidth: 1, stack: 'u' },
+                    { label: 'Libre', data: ocupSlipsInm.libre, backgroundColor: occLibre, borderColor: occLibreBorder, borderWidth: 1, stack: 'u' }
+                ]
+            },
+            options: barStackedOccOpts(false)
+        });
+    }
+
+    const cOccM = document.getElementById('chartOcupacionMuelles');
+    if (cOccM && ocupMuelles.length) {
+        new Chart(cOccM, {
+            type: 'bar',
+            data: {
+                labels: ocupMuelles.map((r) => r.nombre),
+                datasets: [
+                    { label: 'Ocupado', data: ocupMuelles.map((r) => r.ocupado), backgroundColor: occOcup, stack: 's' },
+                    { label: 'Libre', data: ocupMuelles.map((r) => r.libre), backgroundColor: occLibre, stack: 's' }
+                ]
+            },
+            options: barStackedOccOpts(true)
+        });
+    }
+
+    const cOccG = document.getElementById('chartOcupacionGrupos');
+    if (cOccG && ocupGrupos.length) {
+        new Chart(cOccG, {
+            type: 'bar',
+            data: {
+                labels: ocupGrupos.map((r) => r.nombre),
+                datasets: [
+                    { label: 'Ocupado', data: ocupGrupos.map((r) => r.ocupado), backgroundColor: occOcup, stack: 's' },
+                    { label: 'Libre', data: ocupGrupos.map((r) => r.libre), backgroundColor: occLibre, stack: 's' }
+                ]
+            },
+            options: barStackedOccOpts(true)
         });
     }
 })();
