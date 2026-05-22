@@ -266,6 +266,8 @@ $ocupacionDash = marina_dashboard_ocupacion_datos($pdo);
 $urlMapaMarina = MARINA_URL . '/index.php?p=mapa-marina';
 $urlMapaGrupos = MARINA_URL . '/index.php?p=mapa-grupos';
 $urlReporteOcupacion = MARINA_URL . '/index.php?p=reporte-ocupacion';
+$occAltMuelle = max(200, min(400, 32 * max(1, count($ocupacionDash['por_muelle']))));
+$occAltGrupo = max(200, min(400, 32 * max(1, count($ocupacionDash['por_grupo']))));
 $partida_combustible_id = marina_combustible_partida_id($pdo);
 
 if ($partida_combustible_id > 0) {
@@ -601,17 +603,23 @@ require_once __DIR__ . '/../includes/layout.php';
     <div class="card chart-card p-3">
         <h2 class="h5 mb-2">Ocupación general</h2>
         <p class="text-muted small mb-2">Todas las unidades (slips + inmuebles) con contrato activo vs libres.</p>
-        <canvas id="chartOcupacionGeneral" height="200"></canvas>
+        <div class="chart-canvas-wrap chart-canvas-wrap--doughnut">
+            <canvas id="chartOcupacionGeneral"></canvas>
+        </div>
     </div>
     <div class="card chart-card p-3">
         <h2 class="h5 mb-2">Marina vs grupos (% ocupado)</h2>
         <p class="text-muted small mb-2">Porcentaje de slips ocupados frente a inmuebles ocupados.</p>
-        <canvas id="chartOcupacionMarinaGrupos" height="200"></canvas>
+        <div class="chart-canvas-wrap chart-canvas-wrap--bar">
+            <canvas id="chartOcupacionMarinaGrupos"></canvas>
+        </div>
     </div>
     <div class="card chart-card chart-card--wide p-3">
         <h2 class="h5 mb-2">Slips e inmuebles (unidades)</h2>
         <p class="text-muted small mb-2">Comparación macro: total de slips y de inmuebles; verde = ocupado, gris = libre.</p>
-        <canvas id="chartOcupacionSlipsInmuebles" height="120"></canvas>
+        <div class="chart-canvas-wrap chart-canvas-wrap--bar">
+            <canvas id="chartOcupacionSlipsInmuebles"></canvas>
+        </div>
     </div>
 </div>
 
@@ -620,12 +628,16 @@ require_once __DIR__ . '/../includes/layout.php';
     <div class="card chart-card chart-card--wide p-3">
         <h2 class="h5 mb-2">Slips por muelle</h2>
         <p class="text-muted small mb-2">Contrato activo por slip en cada muelle.</p>
-        <canvas id="chartOcupacionMuelles" height="<?= max(160, min(420, 28 * count($ocupacionDash['por_muelle']))) ?>"></canvas>
+        <div class="chart-canvas-wrap" style="height: <?= (int) $occAltMuelle ?>px">
+            <canvas id="chartOcupacionMuelles"></canvas>
+        </div>
     </div>
     <div class="card chart-card chart-card--wide p-3">
         <h2 class="h5 mb-2">Inmuebles por grupo</h2>
         <p class="text-muted small mb-2">Contrato activo por inmueble en cada grupo.</p>
-        <canvas id="chartOcupacionGrupos" height="<?= max(160, min(420, 28 * count($ocupacionDash['por_grupo']))) ?>"></canvas>
+        <div class="chart-canvas-wrap" style="height: <?= (int) $occAltGrupo ?>px">
+            <canvas id="chartOcupacionGrupos"></canvas>
+        </div>
     </div>
 </div>
 
@@ -945,6 +957,7 @@ foreach ([
     const barStackedOccOpts = (horizontal) => ({
         responsive: true,
         maintainAspectRatio: false,
+        resizeDelay: 50,
         indexAxis: horizontal ? 'y' : 'x',
         plugins: {
             legend: { position: 'bottom', labels: { boxWidth: 10, usePointStyle: true } },
@@ -983,7 +996,9 @@ foreach ([
                 }]
             },
             options: {
-                ...doughnutOpts,
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: doughnutOpts.cutout,
                 plugins: {
                     ...doughnutOpts.plugins,
                     tooltip: {
@@ -1017,7 +1032,7 @@ foreach ([
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: true,
+                maintainAspectRatio: false,
                 plugins: {
                     legend: { display: false },
                     tooltip: {

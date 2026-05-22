@@ -410,24 +410,32 @@ form select {
   align-items: start;
 }
 
-.charts-grid canvas {
-  width: 100% !important;
-  /* Evita que Chart.js expanda el canvas indebidamente */
-  height: auto !important;
-  display: block;
+/* Contenedor con altura fija: evita bucle de resize de Chart.js */
+.charts-grid .chart-canvas-wrap {
+  position: relative;
+  width: 100%;
+  height: 220px;
+  max-height: 420px;
+  flex: 0 0 auto;
+}
+.charts-grid .chart-canvas-wrap--doughnut {
+  height: 200px;
+  max-height: 240px;
+}
+.charts-grid .chart-canvas-wrap--bar {
+  height: 200px;
+  max-height: 280px;
 }
 
 .charts-grid .card {
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .charts-grid .card canvas {
-  flex: 0 0 auto;
-}
-
-.charts-grid .card {
-  overflow: hidden;
+  display: block;
+  max-width: 100%;
 }
 
 /* Mapa Marina */
@@ -997,6 +1005,9 @@ body {
 }
 .dashboard-charts .chart-card {
   min-height: 280px;
+}
+.dashboard-charts--ocupacion .chart-card {
+  min-height: 0;
 }
 .dashboard-charts .chart-card--wide {
   grid-column: 1 / -1;
