@@ -1,7 +1,6 @@
 <?php
 /**
- * Exportación a Excel (.xls): tabla HTML que Excel abre con columnas y filas correctas.
- * Opcional: filas de pie (totales), cada fila con la misma cantidad de columnas que encabezados.
+ * Exportación a Excel (.xlsx) con ZipArchive; respaldo HTML (.xls) si no hay extensión zip.
  */
 declare(strict_types=1);
 
@@ -9,13 +8,203 @@ declare(strict_types=1);
  * @param list<string|int|float|bool|null> $headers
  * @param list<list<mixed>> $rows
  * @param list<list<mixed>>|null $filasPie Filas al final (ej. totales), mismas columnas que encabezados
- * @param string|null $titulo Título mostrado en la primera fila (negrita, tamaño mayor). Si null o vacío, se deduce de $nombreBase.
+ * @param string|null $titulo Título del reporte. Si null o vacío, se deduce de $nombreBase.
  */
 function exportarExcel(string $nombreBase, array $headers, array $rows, ?array $filasPie = null, ?string $titulo = null): void
 {
-    $filename = preg_replace('/[^a-zA-Z0-9_-]/', '_', $nombreBase) ?: 'reporte';
-    $filename .= '_' . date('Ymd_His') . '.xls';
+    $base = preg_replace('/[^a-zA-Z0-9_-]/', '_', $nombreBase) ?: 'reporte';
+    $stamp = date('Ymd_His');
 
+    if (class_exists('ZipArchive')) {
+        marinaExportarExcelXlsxZip($base . '_' . $stamp, $headers, $rows, $filasPie, $titulo, $nombreBase);
+        return;
+    }
+
+    marinaExportarExcelHtml($base . '_' . $stamp . '.xls', $headers, $rows, $filasPie, $titulo, $nombreBase);
+}
+
+/**
+ * @param list<string|int|float|bool|null> $headers
+ * @param list<list<mixed>> $rows
+ * @param list<list<mixed>>|null $filasPie
+ */
+function marinaExportarExcelXlsxZip(string $filename, array $headers, array $rows, ?array $filasPie, ?string $titulo, string $nombreBase): void
+{
+    $ncol = count($headers);
+    $subtitulo = marinaExcelSubtitulo($titulo, $nombreBase);
+    $sheetRows = [];
+
+    if ($ncol > 0) {
+        $sheetRows[] = ['Vista Mar Marina Panamá'];
+        $sheetRows[] = [$subtitulo];
+        $sheetRows[] = array_fill(0, $ncol, '');
+        $sheetRows[] = array_fill(0, $ncol, '');
+    }
+    $sheetRows[] = array_values($headers);
+
+    foreach ($rows as $row) {
+        $sheetRows[] = marinaExcelNormalizarFila($row, $ncol);
+    }
+    if ($filasPie !== null) {
+        foreach ($filasPie as $pie) {
+            $sheetRows[] = marinaExcelNormalizarFila($pie, $ncol);
+        }
+    }
+
+    $sheetXml = marinaXlsxConstruirSheetXml($sheetRows);
+    $tmp = tempnam(sys_get_temp_dir(), 'marxlsx_');
+    if ($tmp === false) {
+        marinaExportarExcelHtml($filename . '.xls', $headers, $rows, $filasPie, $titulo, $nombreBase);
+        return;
+    }
+
+    $zip = new ZipArchive();
+    if ($zip->open($tmp, ZipArchive::OVERWRITE) !== true) {
+        @unlink($tmp);
+        marinaExportarExcelHtml($filename . '.xls', $headers, $rows, $filasPie, $titulo, $nombreBase);
+        return;
+    }
+
+    $zip->addFromString('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        . '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        . '<Default Extension="xml" ContentType="application/xml"/>'
+        . '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+        . '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+        . '</Types>');
+    $zip->addFromString('_rels/.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        . '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+        . '</Relationships>');
+    $zip->addFromString('xl/workbook.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+        . 'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+        . '<sheets><sheet name="Datos" sheetId="1" r:id="rId1"/></sheets></workbook>');
+    $zip->addFromString('xl/_rels/workbook.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        . '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
+        . '</Relationships>');
+    $zip->addFromString('xl/worksheets/sheet1.xml', $sheetXml);
+    $zip->close();
+
+    if (ob_get_length()) {
+        @ob_end_clean();
+    }
+
+    header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    header('Content-Disposition: attachment; filename="' . $filename . '.xlsx"');
+    header('Content-Length: ' . (string) filesize($tmp));
+    header('Pragma: no-cache');
+    header('Expires: 0');
+    readfile($tmp);
+    @unlink($tmp);
+    exit;
+}
+
+/**
+ * @param list<list<mixed>> $sheetRows
+ */
+function marinaXlsxConstruirSheetXml(array $sheetRows): string
+{
+    $xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        . '<sheetData>';
+    $r = 1;
+    foreach ($sheetRows as $row) {
+        $xml .= '<row r="' . $r . '">';
+        $c = 0;
+        foreach ($row as $val) {
+            $c++;
+            $ref = marinaXlsxColLetter($c - 1) . $r;
+            [$txt, $tipo] = marinaXlsxValorCelda($val);
+            if ($tipo === 'n') {
+                $xml .= '<c r="' . $ref . '" t="n"><v>' . $txt . '</v></c>';
+            } else {
+                $xml .= '<c r="' . $ref . '" t="inlineStr"><is><t>'
+                    . marinaXlsxEsc($txt) . '</t></is></c>';
+            }
+        }
+        $xml .= '</row>';
+        $r++;
+    }
+    $xml .= '</sheetData></worksheet>';
+
+    return $xml;
+}
+
+function marinaXlsxColLetter(int $index): string
+{
+    $s = '';
+    $n = $index + 1;
+    while ($n > 0) {
+        $n--;
+        $s = chr(65 + ($n % 26)) . $s;
+        $n = intdiv($n, 26);
+    }
+
+    return $s;
+}
+
+/** @return array{0: string, 1: 'n'|'str'} */
+function marinaXlsxValorCelda($v): array
+{
+    if ($v === null) {
+        return ['', 'str'];
+    }
+    if (is_bool($v)) {
+        return [$v ? 'Sí' : 'No', 'str'];
+    }
+    if (is_int($v)) {
+        return [(string) $v, 'n'];
+    }
+    if (is_float($v)) {
+        return [sprintf('%.10F', $v), 'n'];
+    }
+
+    return [(string) $v, 'str'];
+}
+
+function marinaXlsxEsc(string $s): string
+{
+    return htmlspecialchars($s, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+}
+
+/**
+ * @param list<mixed> $row
+ * @return list<mixed>
+ */
+function marinaExcelNormalizarFila(array $row, int $ncol): array
+{
+    $row = array_values($row);
+    $out = [];
+    for ($i = 0; $i < $ncol; $i++) {
+        $out[] = $row[$i] ?? '';
+    }
+
+    return $out;
+}
+
+function marinaExcelSubtitulo(?string $titulo, string $nombreBase): string
+{
+    $subtitulo = $titulo !== null ? trim($titulo) : '';
+    if ($subtitulo !== '') {
+        return $subtitulo;
+    }
+    $subtitulo = str_replace('_', ' ', $nombreBase);
+    if (function_exists('mb_convert_case')) {
+        return (string) mb_convert_case($subtitulo, MB_CASE_TITLE, 'UTF-8');
+    }
+
+    return (string) ucwords($subtitulo);
+}
+
+/**
+ * @param list<string|int|float|bool|null> $headers
+ * @param list<list<mixed>> $rows
+ * @param list<list<mixed>>|null $filasPie
+ */
+function marinaExportarExcelHtml(string $filename, array $headers, array $rows, ?array $filasPie, ?string $titulo, string $nombreBase): void
+{
     if (ob_get_length()) {
         @ob_end_clean();
     }
@@ -26,24 +215,12 @@ function exportarExcel(string $nombreBase, array $headers, array $rows, ?array $
     header('Expires: 0');
 
     $ncol = count($headers);
-
-    $subtitulo = $titulo !== null ? trim($titulo) : '';
-    if ($subtitulo === '') {
-        $subtitulo = str_replace('_', ' ', $nombreBase);
-        if (function_exists('mb_convert_case')) {
-            $subtitulo = (string) mb_convert_case($subtitulo, MB_CASE_TITLE, 'UTF-8');
-        } else {
-            $subtitulo = (string) ucwords($subtitulo);
-        }
-    }
-
+    $subtitulo = marinaExcelSubtitulo($titulo, $nombreBase);
     $imgSrc = marinaExcelOrigenImagenLogo();
 
     echo "\xEF\xBB\xBF";
     echo '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"></head><body>';
-    // border=0 en la hoja: los bordes de la grilla se aplican solo a encabezados y datos
     echo '<table border="0" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;">';
-
     echo '<thead>';
     if ($ncol > 0) {
         echo marinaExcelFilaSoloLogo($imgSrc, $ncol);
@@ -81,9 +258,6 @@ function exportarExcel(string $nombreBase, array $headers, array $rows, ?array $
     exit;
 }
 
-/**
- * Ruta del archivo de logo bajo la raíz del proyecto (img/1.png).
- */
 function marinaExcelRutaArchivoLogo(): ?string
 {
     $candidatos = [];
@@ -96,13 +270,10 @@ function marinaExcelRutaArchivoLogo(): ?string
             return $p;
         }
     }
+
     return null;
 }
 
-/**
- * src del <img>: URL http(s) absoluta para Excel (el formato .xls vía HTML no muestra bien data: URI);
- * si no hay petición web, data URI a partir del archivo.
- */
 function marinaExcelOrigenImagenLogo(): string
 {
     $ruta = marinaExcelRutaArchivoLogo();
@@ -117,6 +288,7 @@ function marinaExcelOrigenImagenLogo(): string
     if ($bin === false) {
         return '';
     }
+
     return 'data:image/png;base64,' . base64_encode($bin);
 }
 
@@ -134,15 +306,11 @@ function marinaExcelUrlPublicaImagenLogo(): string
     return $scheme . '://' . $host . $base . '/img/1.png';
 }
 
-/** Celdas de grilla: borde reforzado (la tabla principal va sin borde; las filas superiores se dejan en blanco). */
 function marinaExcelEstiloBordeCelda(): string
 {
     return 'border:1px solid #8c8c8c;';
 }
 
-/**
- * Filas de separación sin bordes ni rayas, solo altura, entre logo y títulos sobre la tabla.
- */
 function marinaExcelFilasVaciasEncabezado(int $cantidad, int $ncol): string
 {
     if ($cantidad < 1 || $ncol < 1) {
@@ -159,14 +327,10 @@ function marinaExcelFilasVaciasEncabezado(int $cantidad, int $ncol): string
         $out .= '<tr><td colspan="' . (string) $ncol
             . '" style="' . $s . '">&nbsp;</td></tr>';
     }
+
     return $out;
 }
 
-/**
- * Primera fila: solo logo a la izquierda; celdas vacías sin bordes.
- *
- * @param string $imagenSrc Valor de src: URL pública o data URI
- */
 function marinaExcelFilaSoloLogo(string $imagenSrc, int $ncol): string
 {
     if ($ncol <= 0) {
@@ -182,16 +346,13 @@ function marinaExcelFilaSoloLogo(string $imagenSrc, int $ncol): string
     if ($ncol === 1) {
         return '<tr><th style="text-align:left; vertical-align:top; padding:6px;' . $sin . '">' . $img . '</th></tr>';
     }
-    $out = '<tr>'
+
+    return '<tr>'
         . '<th style="text-align:left;vertical-align:top;width:1%; padding:6px; white-space:nowrap;' . $sin . '">' . $img . '</th>'
         . '<th colspan="' . (string) ($ncol - 1) . '" style="' . $sin . '">&nbsp;</th>'
         . '</tr>';
-    return $out;
 }
 
-/**
- * Marca y nombre del reporte, centrados, inmediatamente encima de la fila de encabezados de la tabla.
- */
 function marinaExcelFilaTitulosSobreTabla(string $marca, string $nombreReporte, int $ncol): string
 {
     if ($ncol <= 0) {

@@ -254,7 +254,7 @@ require_once __DIR__ . '/../includes/layout.php';
         <table class="table table-hover align-middle mb-0">
             <thead>
                 <tr>
-                    <th>Id</th><th>Tipo</th><th>Pedido</th><th>GLS ped.</th><th>Recibido</th><th>GLS rec.</th><th>Factura</th><th>Costo</th><th>Pagado</th><th>Estado</th><th></th>
+                    <th>Id</th><th>Tipo</th><th>Pedido</th><th>GLS ped.</th><th>Recibido</th><th>GLS rec.</th><th>Factura</th><th>Observaciones</th><th>Costo</th><th>Pagado</th><th>Estado</th><th></th>
                 </tr>
             </thead>
             <tbody>
@@ -277,6 +277,7 @@ require_once __DIR__ . '/../includes/layout.php';
                     <td><?= $r['fecha_recibido'] ? fechaFormato($r['fecha_recibido']) : '—' ?></td>
                     <td class="text-end"><?= $r['gls_recibido'] !== null ? e((string) $r['gls_recibido']) : '—' ?></td>
                     <td><?= e($r['numero_factura'] ?? '') ?></td>
+                    <td class="small text-break" style="max-width:14rem" title="<?= e($r['observaciones'] ?? '') ?>"><?= ($r['observaciones'] ?? '') !== '' ? e($r['observaciones']) : '—' ?></td>
                     <td class="text-end"><?= dinero((float) $r['costo_total']) ?></td>
                     <td class="text-end"><?= dinero($sumP) ?></td>
                     <td><?= ($r['estado_pago'] ?? '') === 'pagado' ? 'Pagado' : 'Por pagar' ?></td>

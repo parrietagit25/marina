@@ -18,7 +18,9 @@ window.marinaFmtFecha = function(fecha) {
 <script src='https://code.jquery.com/jquery-3.7.1.min.js'></script>
 <script src='https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js'></script>
 <script src='https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js'></script>
+<script src='https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js'></script>
 <script src='https://unpkg.com/lucide@latest'></script>
+<script src='<?= MARINA_URL ?>/assets/js/marina-excel-export.js'></script>
 <script src='<?= MARINA_URL ?>/assets/js/app.js'></script>
 <script src='<?= MARINA_URL ?>/assets/js/contrato-estado-cuenta.js'></script>
 <script>
@@ -83,6 +85,16 @@ window.marinaFmtFecha = function(fecha) {
   }
   window.addEventListener('load', initDataTablesGlobal);
   setTimeout(initDataTablesGlobal, 250);
+  setTimeout(function() {
+    if (typeof window.marinaInitExcelExport === 'function') {
+      window.marinaInitExcelExport();
+    }
+  }, 300);
+  setTimeout(function() {
+    if (typeof window.marinaInitExcelExport === 'function') {
+      window.marinaInitExcelExport();
+    }
+  }, 1300);
 })();
 if (window.lucide) {
   window.lucide.createIcons();

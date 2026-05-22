@@ -8,6 +8,10 @@ body {
 a { text-decoration: none; }
 a:hover { text-decoration: underline; }
 
+.marina-excel-export-bar .btn-success {
+  font-weight: 500;
+}
+
 /* Layout */
 .app-shell {
   display: flex;
