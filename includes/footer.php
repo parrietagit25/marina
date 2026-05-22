@@ -4,7 +4,20 @@
 </footer>
   </div><!-- .main-area -->
 </div><!-- .app-shell -->
+<?php
+require_once __DIR__ . '/permisos.php';
+$permJs = ['puedeEditar' => true, 'puedeEliminar' => true, 'accesoTotal' => true];
+if (function_exists('marina_permisos_sesion')) {
+    $ps = marina_permisos_sesion();
+    $permJs = [
+        'puedeEditar' => marina_permiso_puede_editar(),
+        'puedeEliminar' => marina_permiso_puede_eliminar(),
+        'accesoTotal' => !empty($ps['acceso_total']),
+    ];
+}
+?>
 <script>
+window.__marinaPerm = <?= json_encode($permJs, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 window.marinaFmtFecha = function(fecha) {
   if (!fecha) return '';
   var s = String(fecha).slice(0, 10);
@@ -99,6 +112,33 @@ window.marinaFmtFecha = function(fecha) {
 if (window.lucide) {
   window.lucide.createIcons();
 }
+(function() {
+  var perm = window.__marinaPerm || {};
+  if (perm.accesoTotal) return;
+  function ocultar(sel) {
+    document.querySelectorAll(sel).forEach(function(el) {
+      el.style.display = 'none';
+      el.setAttribute('aria-hidden', 'true');
+    });
+  }
+  if (!perm.puedeEliminar) {
+    ocultar('[class*="btn-eliminar"], button[name="eliminar"], a.btn-eliminar, .btn-borrar');
+    document.querySelectorAll('form').forEach(function(f) {
+      var acc = f.querySelector('input[name="accion"]');
+      if (acc && acc.value === 'eliminar') f.style.display = 'none';
+    });
+  }
+  if (!perm.puedeEditar) {
+    ocultar('[class*="btn-editar"], [id^="btnNuevo"], [id^="btnEditar"], .btn-nuevo-registro');
+    document.querySelectorAll('button[type="submit"]').forEach(function(btn) {
+      var t = (btn.textContent || '').toLowerCase();
+      if (t.indexOf('guardar') >= 0 && btn.closest('form') && btn.closest('form').id !== 'usuarioRolForm') {
+        var fid = btn.closest('form').id || '';
+        if (fid.indexOf('Delete') < 0 && fid.indexOf('Eliminar') < 0) btn.style.display = 'none';
+      }
+    });
+  }
+})();
 </script>
 </body>
 </html>

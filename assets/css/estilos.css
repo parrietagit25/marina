@@ -1021,6 +1021,23 @@ body {
   }
 }
 
+/* Modal permisos usuario (Rol) */
+.permisos-menu-lista {
+  max-height: 50vh;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+.permisos-menu-seccion {
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 0.75rem;
+}
+.permisos-menu-seccion:last-child {
+  border-bottom: 0;
+}
+.permisos-globales .form-check-label {
+  font-size: 0.92rem;
+}
+
 /* Reporte ocupación: encabezados repetidos sobre totales */
 .reporte-ocupacion-tfoot {
   border-top: 2px solid #0e7490;

@@ -2,6 +2,8 @@
 /**
  * Login
  */
+require_once __DIR__ . '/../includes/permisos.php';
+
 if (usuarioActual()) {
     redirigir(MARINA_URL . '/index.php');
 }
@@ -20,10 +22,13 @@ if (enviado()) {
             $u = $st->fetch();
             if ($u && $u['activo'] && password_verify($pass, $u['password_hash'])) {
                 $_SESSION['usuario'] = [
-                    'id' => $u['id'],
+                    'id' => (int) $u['id'],
                     'nombre' => $u['nombre'],
                     'email' => $u['email'],
                 ];
+                marina_permisos_hidratar_sesion($pdo, (int) $u['id']);
+                require_once __DIR__ . '/../includes/auditoria.php';
+                marina_auditoria_registrar($pdo, 'login', 'login', 'Inicio de sesión', (int) $u['id']);
                 redirigir(MARINA_URL . '/index.php');
             }
             $error = 'Usuario o contraseña incorrectos.';

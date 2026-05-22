@@ -58,6 +58,105 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     })();
 
+    // Usuarios — modal Rol / permisos
+    (function() {
+        var el = document.getElementById('usuarioRolModal');
+        if (!el) return;
+        var modal = new bootstrap.Modal(el);
+        var form = document.getElementById('usuarioRolForm');
+        var uidInp = document.getElementById('usuarioRolId');
+        var nombreSpan = document.getElementById('usuarioRolNombre');
+        var chkTotal = document.getElementById('permAccesoTotal');
+        var chkEditar = document.getElementById('permEditar');
+        var chkEliminar = document.getElementById('permEliminar');
+        var lista = document.getElementById('permisosMenuLista');
+        var pagChecks = lista ? lista.querySelectorAll('.perm-pagina-check') : [];
+        var globalFlags = el.querySelectorAll('.perm-global-flag');
+
+        function setPaginasEnabled(on) {
+            pagChecks.forEach(function(c) {
+                c.disabled = !on;
+                if (!on) return;
+            });
+            globalFlags.forEach(function(c) { c.disabled = !on; });
+            if (lista) lista.style.opacity = on ? '1' : '0.45';
+        }
+
+        function marcarPaginas(paginas) {
+            var set = {};
+            (paginas || []).forEach(function(p) { set[p] = true; });
+            pagChecks.forEach(function(c) {
+                c.checked = !!set[c.value];
+            });
+        }
+
+        function abrirRol(btn) {
+            var id = parseInt(btn.getAttribute('data-id') || '0', 10);
+            var data = (window.__usuariosPermisos && window.__usuariosPermisos[id]) ? window.__usuariosPermisos[id] : null;
+            uidInp.value = id;
+            if (nombreSpan) nombreSpan.textContent = btn.getAttribute('data-nombre') || '';
+            if (!data) {
+                chkTotal.checked = false;
+                chkEditar.checked = false;
+                chkEliminar.checked = false;
+                marcarPaginas([]);
+                setPaginasEnabled(true);
+                modal.show();
+                return;
+            }
+            if (data.acceso_total) {
+                chkTotal.checked = true;
+                chkEditar.checked = true;
+                chkEliminar.checked = true;
+                marcarPaginas(window.__permTodasPaginas || []);
+                setPaginasEnabled(false);
+            } else {
+                chkTotal.checked = false;
+                chkEditar.checked = !!data.editar;
+                chkEliminar.checked = !!data.eliminar;
+                marcarPaginas(data.paginas || []);
+                setPaginasEnabled(true);
+            }
+            modal.show();
+        }
+
+        if (chkTotal) {
+            chkTotal.addEventListener('change', function() {
+                if (chkTotal.checked) {
+                    chkEditar.checked = true;
+                    chkEliminar.checked = true;
+                    marcarPaginas(window.__permTodasPaginas || []);
+                    setPaginasEnabled(false);
+                } else {
+                    setPaginasEnabled(true);
+                }
+            });
+        }
+
+        document.querySelectorAll('.perm-seccion-toggle').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var sec = btn.getAttribute('data-seccion');
+                var checks = lista.querySelectorAll('.perm-pagina-check[data-seccion="' + sec + '"]');
+                var allOn = true;
+                checks.forEach(function(c) { if (!c.checked) allOn = false; });
+                checks.forEach(function(c) { c.checked = !allOn; });
+            });
+        });
+
+        if (form) {
+            form.addEventListener('submit', function() {
+                if (chkTotal && chkTotal.checked) {
+                    pagChecks.forEach(function(c) { c.disabled = false; });
+                    globalFlags.forEach(function(c) { c.disabled = false; });
+                }
+            });
+        }
+
+        document.querySelectorAll('.btn-rol-usuario').forEach(function(b) {
+            b.addEventListener('click', function() { abrirRol(b); });
+        });
+    })();
+
     // Bancos
     (function() {
         var el = document.getElementById('bancoModal');

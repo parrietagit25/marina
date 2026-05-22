@@ -77,6 +77,8 @@ $u = function (string $p, string $label): string {
                     <dd class="col-sm-9">Cuentas corrientes o de depósito usadas en contratos, pagos, movimientos y gastos.</dd>
                     <dt class="col-sm-3"><?= $u('configuracion', 'Configuración') ?></dt>
                     <dd class="col-sm-9">Ajuste del tamaño de fuente global de la interfaz (accesibilidad).</dd>
+                    <dt class="col-sm-3"><?= $u('seguimiento', 'Seguimiento') ?></dt>
+                    <dd class="col-sm-9">Panel de actividad por usuario: quién registra más, qué módulo, fecha/hora y detalle de acciones.</dd>
                 </dl>
             </div>
         </div>

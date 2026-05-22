@@ -4,10 +4,37 @@
  */
 $titulo = 'Usuarios';
 
+require_once __DIR__ . '/../includes/permisos.php';
+
 $pdo = getDb();
 $accion = obtener('accion');
 $id = (int) obtener('id');
 $mensaje = '';
+
+// Guardar permisos (rol / menú)
+if ($accion === 'guardar_permisos' && enviado()) {
+    if (!marina_permiso_puede_gestionar_roles()) {
+        redirigir(MARINA_URL . '/index.php?p=usuarios&err=' . rawurlencode('No tiene permiso para configurar roles.'));
+    }
+    $uidPerm = (int) ($_POST['usuario_id'] ?? 0);
+    if ($uidPerm <= 0) {
+        redirigir(MARINA_URL . '/index.php?p=usuarios&err=' . rawurlencode('Usuario no válido.'));
+    }
+    $accesoTotal = isset($_POST['acceso_total']);
+    if ($accesoTotal) {
+        $pdo->prepare('UPDATE usuarios SET permisos_json = NULL, updated_by = ? WHERE id = ?')
+            ->execute([usuarioId(), $uidPerm]);
+    } else {
+        $paginas = isset($_POST['perm_pagina']) && is_array($_POST['perm_pagina']) ? $_POST['perm_pagina'] : [];
+        $editar = isset($_POST['perm_editar']);
+        $eliminar = isset($_POST['perm_eliminar']);
+        marina_permisos_guardar_usuario($pdo, $uidPerm, $paginas, $editar, $eliminar);
+    }
+    if ($uidPerm === usuarioId()) {
+        marina_permisos_hidratar_sesion($pdo, $uidPerm);
+    }
+    redirigir(MARINA_URL . '/index.php?p=usuarios&ok=' . rawurlencode('Permisos del usuario actualizados.'));
+}
 
 // Eliminar
 if ($accion === 'eliminar' && $id > 0 && enviado()) {
@@ -81,6 +108,25 @@ $modalDatos = [
     'email' => $registro['email'] ?? ($_POST['email'] ?? ''),
     'activo' => isset($_POST['activo']) ? true : (bool)($registro['activo'] ?? false),
 ];
+
+$puedeGestionarRoles = marina_permiso_puede_gestionar_roles();
+$puedeEditarUsuarios = marina_permiso_puede_editar();
+$puedeEliminarUsuarios = marina_permiso_puede_eliminar();
+$permisosPorUsuario = [];
+if ($puedeGestionarRoles) {
+    $stPerm = $pdo->query('SELECT id, nombre, permisos_json FROM usuarios ORDER BY nombre');
+    while ($row = $stPerm->fetch(PDO::FETCH_ASSOC)) {
+        $parsed = marina_permisos_parse_json($row['permisos_json'] !== null ? (string) $row['permisos_json'] : null);
+        $permisosPorUsuario[(int) $row['id']] = [
+            'nombre' => $row['nombre'],
+            'acceso_total' => $parsed['acceso_total'],
+            'paginas' => $parsed['paginas'],
+            'editar' => $parsed['editar'],
+            'eliminar' => $parsed['eliminar'],
+        ];
+    }
+}
+$menuPermisosDef = marina_menu_permisos_definicion();
 ?>
 
 <?php require_once __DIR__ . '/../includes/layout.php'; ?>
@@ -100,8 +146,10 @@ if ($mensaje && !$mostrarModal) {
 }
 ?>
 
-<div class="toolbar d-flex gap-2 align-items-center">
+<div class="toolbar d-flex gap-2 align-items-center flex-wrap">
+    <?php if ($puedeEditarUsuarios): ?>
     <button type="button" class="btn btn-primary" id="btnNuevoUsuario">Nuevo usuario</button>
+    <?php endif; ?>
 </div>
 
 <table>
@@ -130,7 +178,15 @@ if ($mensaje && !$mostrarModal) {
             <td><?= fechaHoraFormato($r['created_at']) ?></td>
             <td><?= $creado ?></td>
             <td class="acciones">
-                <?php if (!$noEliminar): ?>
+                <?php if ($puedeGestionarRoles): ?>
+                <button type="button"
+                        class="btn btn-outline-primary btn-sm btn-rol-usuario"
+                        data-id="<?= (int)$r['id'] ?>"
+                        data-nombre="<?= e($r['nombre']) ?>">
+                    Rol
+                </button>
+                <?php endif; ?>
+                <?php if (!$noEliminar && $puedeEliminarUsuarios): ?>
                     <button type="button"
                             class="btn btn-danger btn-sm btn-eliminar-usuario"
                             data-id="<?= (int)$r['id'] ?>"
@@ -138,7 +194,7 @@ if ($mensaje && !$mostrarModal) {
                         Eliminar
                     </button>
                 <?php endif; ?>
-
+                <?php if ($puedeEditarUsuarios): ?>
                 <button type="button"
                         class="btn btn-secondary btn-sm btn-editar-usuario"
                         data-id="<?= (int)$r['id'] ?>"
@@ -147,6 +203,7 @@ if ($mensaje && !$mostrarModal) {
                         data-activo="<?= (int)$r['activo'] ?>">
                     Editar
                 </button>
+                <?php endif; ?>
             </td>
         </tr>
     <?php endwhile; ?>
@@ -193,6 +250,101 @@ if ($mensaje && !$mostrarModal) {
     </div>
 </div>
 
+<?php if ($puedeGestionarRoles): ?>
+<!-- Modal permisos / rol -->
+<div class="modal fade" id="usuarioRolModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <form method="post" action="?p=usuarios" id="usuarioRolForm">
+                <input type="hidden" name="accion" value="guardar_permisos">
+                <input type="hidden" name="usuario_id" id="usuarioRolId" value="">
+
+                <div class="modal-header">
+                    <h5 class="modal-title">Rol — <span id="usuarioRolNombre" class="fw-semibold"></span></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+
+                <div class="modal-body">
+                    <p class="text-muted small">Marque las secciones del menú a las que tendrá acceso. Los permisos de <strong>Editar</strong> y <strong>Eliminar</strong> aplican en todo el sistema.</p>
+
+                    <div class="permisos-globales card bg-light border-0 p-3 mb-3">
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="acceso_total" id="permAccesoTotal" value="1">
+                            <label class="form-check-label fw-semibold" for="permAccesoTotal">Acceso completo (sin restricciones)</label>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-sm-6">
+                                <div class="form-check">
+                                    <input class="form-check-input perm-global-flag" type="checkbox" name="perm_editar" id="permEditar" value="1">
+                                    <label class="form-check-label" for="permEditar">Permitir <strong>editar</strong> (crear y modificar registros)</label>
+                                </div>
+                            </div>
+                            <div class="col-sm-6">
+                                <div class="form-check">
+                                    <input class="form-check-input perm-global-flag" type="checkbox" name="perm_eliminar" id="permEliminar" value="1">
+                                    <label class="form-check-label" for="permEliminar">Permitir <strong>eliminar</strong> registros</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="permisosMenuLista" class="permisos-menu-lista">
+                        <?php foreach ($menuPermisosDef as $bloque):
+                            if (($bloque['seccion'] ?? '') === 'General') {
+                                continue;
+                            }
+                            $secId = preg_replace('/[^a-zA-Z0-9]/', '', $bloque['seccion']);
+                        ?>
+                        <div class="permisos-menu-seccion mb-3" data-seccion="<?= e($secId) ?>">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <span class="fw-semibold text-primary"><?= e($bloque['seccion']) ?></span>
+                                <button type="button" class="btn btn-link btn-sm p-0 perm-seccion-toggle" data-seccion="<?= e($secId) ?>">Marcar sección</button>
+                            </div>
+                            <div class="row g-1">
+                                <?php foreach ($bloque['items'] as $it): ?>
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input perm-pagina-check" type="checkbox"
+                                               name="perm_pagina[]"
+                                               id="perm-<?= e($it['pagina']) ?>"
+                                               value="<?= e($it['pagina']) ?>"
+                                               data-seccion="<?= e($secId) ?>">
+                                        <label class="form-check-label" for="perm-<?= e($it['pagina']) ?>"><?= e($it['etiqueta']) ?></label>
+                                    </div>
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                        <div class="permisos-menu-seccion mb-2">
+                            <span class="fw-semibold text-primary d-block mb-2">General</span>
+                            <div class="row g-1">
+                                <?php foreach ($menuPermisosDef[0]['items'] ?? [] as $it): ?>
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input perm-pagina-check" type="checkbox"
+                                               name="perm_pagina[]"
+                                               id="perm-<?= e($it['pagina']) ?>"
+                                               value="<?= e($it['pagina']) ?>">
+                                        <label class="form-check-label" for="perm-<?= e($it['pagina']) ?>"><?= e($it['etiqueta']) ?></label>
+                                    </div>
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">Guardar permisos</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <!-- Modal confirmar eliminación -->
 <div class="modal fade" id="confirmEliminarUsuarioModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-sm">
@@ -225,6 +377,8 @@ if ($mensaje && !$mostrarModal) {
         datos: <?= json_encode($modalDatos, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
         error: <?= json_encode($mensaje, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>
     };
+    window.__usuariosPermisos = <?= json_encode($permisosPorUsuario, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    window.__permTodasPaginas = <?= json_encode(marina_permisos_todas_paginas(), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 </script>
 
 <?php
