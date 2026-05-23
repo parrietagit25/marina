@@ -25,6 +25,19 @@ try {
 }
 marina_combustible_migrar_pedido_banco_solo_abonos($pdo);
 
+$desdeFiltro = trim((string) ($_GET['desde'] ?? date('Y-m-01')));
+$hastaFiltro = trim((string) ($_GET['hasta'] ?? date('Y-m-d')));
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $desdeFiltro)) {
+    $desdeFiltro = date('Y-m-01');
+}
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $hastaFiltro)) {
+    $hastaFiltro = date('Y-m-d');
+}
+if ($desdeFiltro > $hastaFiltro) {
+    [$desdeFiltro, $hastaFiltro] = [$hastaFiltro, $desdeFiltro];
+}
+$pedFiltroQs = 'desde=' . rawurlencode($desdeFiltro) . '&hasta=' . rawurlencode($hastaFiltro);
+
 $uid = usuarioId();
 $mensaje = '';
 $pedidoAbonos = (int) obtener('abonos', 0);
@@ -195,11 +208,34 @@ require_once __DIR__ . '/../includes/layout.php';
     <a class="btn btn-outline-secondary" href="<?= MARINA_URL ?>/index.php?p=combustible-precios">Precio por galón</a>
 </div>
 
+<form method="get" class="combustible-filtro-form card p-3 mb-3">
+    <input type="hidden" name="p" value="combustible-pedidos">
+    <?php if ($pedidoAbonos > 0): ?>
+        <input type="hidden" name="abonos" value="<?= (int) $pedidoAbonos ?>">
+    <?php endif; ?>
+    <div class="combustible-filtro-form__inner">
+        <div class="combustible-filtro-campo">
+            <label class="form-label small mb-0" for="pedFiltroDesde">Desde</label>
+            <input type="date" id="pedFiltroDesde" name="desde" class="form-control form-control-sm" value="<?= e($desdeFiltro) ?>">
+        </div>
+        <div class="combustible-filtro-campo">
+            <label class="form-label small mb-0" for="pedFiltroHasta">Hasta</label>
+            <input type="date" id="pedFiltroHasta" name="hasta" class="form-control form-control-sm" value="<?= e($hastaFiltro) ?>">
+        </div>
+        <div class="combustible-filtro-campo combustible-filtro-campo--btn">
+            <button type="submit" class="btn btn-primary btn-sm">Filtrar</button>
+        </div>
+        <p class="combustible-filtro-hint text-muted small mb-0">
+            Listado y totales por <strong>fecha de pedido</strong> (<?= e(fechaFormato($desdeFiltro)) ?> — <?= e(fechaFormato($hastaFiltro)) ?>).
+        </p>
+    </div>
+</form>
+
 <?php if ($pedidoParaAbonos): ?>
 <div class="card p-3 mb-3">
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
         <h2 class="h6 mb-0">Abonos — pedido #<?= (int) $pedidoParaAbonos['id'] ?> (<?= e(MARINA_COMB_TIPOS[$pedidoParaAbonos['tipo_combustible']] ?? $pedidoParaAbonos['tipo_combustible']) ?>)</h2>
-        <a class="btn btn-sm btn-outline-secondary" href="<?= MARINA_URL ?>/index.php?p=combustible-pedidos">Volver al listado</a>
+        <a class="btn btn-sm btn-outline-secondary" href="<?= MARINA_URL ?>/index.php?p=combustible-pedidos&amp;<?= e($pedFiltroQs) ?>">Volver al listado</a>
     </div>
     <p class="small mb-2">
         Costo total: <strong><?= dinero((float) $pedidoParaAbonos['costo_total']) ?></strong> ·
@@ -249,25 +285,48 @@ require_once __DIR__ . '/../includes/layout.php';
 </div>
 <?php endif; ?>
 
+<?php
+$stPedTot = $pdo->prepare("
+    SELECT
+        COALESCE(SUM(p.costo_total), 0) AS total_facturado,
+        COALESCE((
+            SELECT SUM(pg.monto)
+            FROM combustible_pedido_pagos pg
+            INNER JOIN combustible_pedidos p2 ON p2.id = pg.pedido_id
+            WHERE p2.fecha_pedido BETWEEN ? AND ?
+        ), 0) AS total_abonado
+    FROM combustible_pedidos p
+    WHERE p.fecha_pedido BETWEEN ? AND ?
+");
+$stPedTot->execute([$desdeFiltro, $hastaFiltro, $desdeFiltro, $hastaFiltro]);
+$pedTotRow = $stPedTot->fetch(PDO::FETCH_ASSOC);
+$pedTotalFacturado = (float) ($pedTotRow['total_facturado'] ?? 0);
+$pedTotalAbonado = (float) ($pedTotRow['total_abonado'] ?? 0);
+$pedTotalSaldo = max(0.0, $pedTotalFacturado - $pedTotalAbonado);
+?>
+
 <div class="card p-0">
     <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
+        <table class="table table-hover align-middle mb-0 no-datatable">
             <thead>
                 <tr>
-                    <th>Id</th><th>Tipo</th><th>Pedido</th><th>GLS ped.</th><th>Recibido</th><th>GLS rec.</th><th>Factura</th><th>Observaciones</th><th>Costo</th><th>Pagado</th><th>Estado</th><th></th>
+                    <th>Id</th><th>Tipo</th><th>Pedido</th><th>GLS ped.</th><th>Recibido</th><th>GLS rec.</th><th>Factura</th><th>Observaciones</th><th class="text-end">Costo</th><th class="text-end">Pagado</th><th class="text-end">Saldo</th><th>Estado</th><th></th>
                 </tr>
             </thead>
             <tbody>
             <?php
-            $sql = "
+            $st = $pdo->prepare("
                 SELECT p.*,
                   (SELECT COALESCE(SUM(monto),0) FROM combustible_pedido_pagos x WHERE x.pedido_id = p.id) AS sum_pagado
                 FROM combustible_pedidos p
+                WHERE p.fecha_pedido BETWEEN ? AND ?
                 ORDER BY p.fecha_pedido DESC, p.id DESC
-            ";
-            $st = $pdo->query($sql);
+            ");
+            $st->execute([$desdeFiltro, $hastaFiltro]);
             while ($r = $st->fetch(PDO::FETCH_ASSOC)):
                 $sumP = (float) ($r['sum_pagado'] ?? 0);
+                $costoP = (float) $r['costo_total'];
+                $saldoP = max(0.0, $costoP - $sumP);
             ?>
                 <tr>
                     <td><?= (int) $r['id'] ?></td>
@@ -278,11 +337,12 @@ require_once __DIR__ . '/../includes/layout.php';
                     <td class="text-end"><?= $r['gls_recibido'] !== null ? e((string) $r['gls_recibido']) : '—' ?></td>
                     <td><?= e($r['numero_factura'] ?? '') ?></td>
                     <td class="small text-break" style="max-width:14rem" title="<?= e($r['observaciones'] ?? '') ?>"><?= ($r['observaciones'] ?? '') !== '' ? e($r['observaciones']) : '—' ?></td>
-                    <td class="text-end"><?= dinero((float) $r['costo_total']) ?></td>
+                    <td class="text-end"><?= dinero($costoP) ?></td>
                     <td class="text-end"><?= dinero($sumP) ?></td>
+                    <td class="text-end"><?= $saldoP > 0.00001 ? dinero($saldoP) : '—' ?></td>
                     <td><?= ($r['estado_pago'] ?? '') === 'pagado' ? 'Pagado' : 'Por pagar' ?></td>
                     <td class="text-nowrap">
-                        <a class="btn btn-sm btn-outline-primary" href="<?= MARINA_URL ?>/index.php?p=combustible-pedidos&abonos=<?= (int) $r['id'] ?>">Abonos</a>
+                        <a class="btn btn-sm btn-outline-primary" href="<?= MARINA_URL ?>/index.php?p=combustible-pedidos&amp;abonos=<?= (int) $r['id'] ?>&amp;<?= e($pedFiltroQs) ?>">Abonos</a>
                         <button type="button" class="btn btn-sm btn-secondary btn-editar-pedido"
                             data-pedido="<?= htmlspecialchars(json_encode([
                                 'id' => (int) $r['id'],
@@ -304,6 +364,22 @@ require_once __DIR__ . '/../includes/layout.php';
                 </tr>
             <?php endwhile; ?>
             </tbody>
+            <tfoot class="combustible-tfoot">
+                <tr>
+                    <th colspan="8" class="text-end">Totales</th>
+                    <th class="text-end"><?= dinero($pedTotalFacturado) ?></th>
+                    <th class="text-end"><?= dinero($pedTotalAbonado) ?></th>
+                    <th class="text-end"><?= dinero($pedTotalSaldo) ?></th>
+                    <th colspan="2"></th>
+                </tr>
+                <tr class="combustible-tfoot-labels">
+                    <td colspan="8" class="text-end text-muted small border-0 pt-0"></td>
+                    <td class="text-end text-muted small border-0 pt-0">Total registrado facturado</td>
+                    <td class="text-end text-muted small border-0 pt-0">Total abonado</td>
+                    <td class="text-end text-muted small border-0 pt-0">Total saldo</td>
+                    <td colspan="2" class="border-0"></td>
+                </tr>
+            </tfoot>
         </table>
     </div>
 </div>

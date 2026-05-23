@@ -405,6 +405,19 @@ if (enviado()) {
     }
 }
 
+$desdeFiltro = trim((string) ($_GET['desde'] ?? date('Y-m-01')));
+$hastaFiltro = trim((string) ($_GET['hasta'] ?? date('Y-m-d')));
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $desdeFiltro)) {
+    $desdeFiltro = date('Y-m-01');
+}
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $hastaFiltro)) {
+    $hastaFiltro = date('Y-m-d');
+}
+if ($desdeFiltro > $hastaFiltro) {
+    [$desdeFiltro, $hastaFiltro] = [$hastaFiltro, $desdeFiltro];
+}
+$despFiltroQs = 'desde=' . rawurlencode($desdeFiltro) . '&hasta=' . rawurlencode($hastaFiltro);
+
 $preciosJson = json_encode(marina_combustible_precios_vigentes($pdo), JSON_UNESCAPED_UNICODE);
 $inv = marina_combustible_inventario_por_tipo($pdo);
 $cuentas = $pdo->query('SELECT c.id, CONCAT(b.nombre, " - ", c.nombre) AS nom FROM cuentas c JOIN bancos b ON c.banco_id = b.id ORDER BY b.nombre, c.nombre')->fetchAll(PDO::FETCH_KEY_PAIR);
@@ -451,9 +464,47 @@ require_once __DIR__ . '/../includes/layout.php';
     <a class="btn btn-outline-secondary" href="<?= MARINA_URL ?>/index.php?p=combustible-precios">Precio por galón</a>
 </div>
 
+<form method="get" class="combustible-filtro-form card p-3 mb-3">
+    <input type="hidden" name="p" value="combustible-despacho">
+    <div class="combustible-filtro-form__inner">
+        <div class="combustible-filtro-campo">
+            <label class="form-label small mb-0" for="despFiltroDesde">Desde</label>
+            <input type="date" id="despFiltroDesde" name="desde" class="form-control form-control-sm" value="<?= e($desdeFiltro) ?>">
+        </div>
+        <div class="combustible-filtro-campo">
+            <label class="form-label small mb-0" for="despFiltroHasta">Hasta</label>
+            <input type="date" id="despFiltroHasta" name="hasta" class="form-control form-control-sm" value="<?= e($hastaFiltro) ?>">
+        </div>
+        <div class="combustible-filtro-campo combustible-filtro-campo--btn">
+            <button type="submit" class="btn btn-primary btn-sm">Filtrar</button>
+        </div>
+        <p class="combustible-filtro-hint text-muted small mb-0">
+            Listado y totales por <strong>fecha de despacho</strong> (<?= e(fechaFormato($desdeFiltro)) ?> — <?= e(fechaFormato($hastaFiltro)) ?>).
+        </p>
+    </div>
+</form>
+
+<?php
+$stDespTot = $pdo->prepare("
+    SELECT
+        COALESCE(SUM(d.monto_total), 0) AS total_facturado,
+        COALESCE(SUM(COALESCE(p.pagado, 0)), 0) AS total_abonado
+    FROM combustible_despachos d
+    LEFT JOIN (
+        SELECT despacho_id, SUM(monto) AS pagado FROM combustible_despacho_pagos GROUP BY despacho_id
+    ) p ON p.despacho_id = d.id
+    WHERE d.fecha BETWEEN ? AND ?
+");
+$stDespTot->execute([$desdeFiltro, $hastaFiltro]);
+$despTotRow = $stDespTot->fetch(PDO::FETCH_ASSOC);
+$despTotalFacturado = (float) ($despTotRow['total_facturado'] ?? 0);
+$despTotalAbonado = (float) ($despTotRow['total_abonado'] ?? 0);
+$despTotalSaldo = max(0.0, $despTotalFacturado - $despTotalAbonado);
+?>
+
 <div class="card p-0">
     <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
+        <table class="table table-hover align-middle mb-0 no-datatable">
             <thead>
                 <tr>
                     <th>Id</th>
@@ -469,15 +520,17 @@ require_once __DIR__ . '/../includes/layout.php';
             </thead>
             <tbody>
             <?php
-            $st = $pdo->query("
+            $st = $pdo->prepare("
                 SELECT d.*,
                        COALESCE(p.pagado, 0) AS pagado_sum
                 FROM combustible_despachos d
                 LEFT JOIN (
                     SELECT despacho_id, SUM(monto) AS pagado FROM combustible_despacho_pagos GROUP BY despacho_id
                 ) p ON p.despacho_id = d.id
+                WHERE d.fecha BETWEEN ? AND ?
                 ORDER BY d.fecha DESC, d.id DESC
             ");
+            $st->execute([$desdeFiltro, $hastaFiltro]);
             while ($r = $st->fetch(PDO::FETCH_ASSOC)):
                 $pagadoF = (float) ($r['pagado_sum'] ?? 0);
                 $totalF = (float) $r['monto_total'];
@@ -493,7 +546,7 @@ require_once __DIR__ . '/../includes/layout.php';
                     <td class="text-end"><?= dinero($pagadoF) ?></td>
                     <td class="text-end"><?= $saldoF > 0.00001 ? dinero($saldoF) : '—' ?></td>
                     <td class="text-nowrap">
-                        <a class="btn btn-sm btn-primary" href="<?= MARINA_URL ?>/index.php?p=combustible-despacho&cobrar=<?= (int) $r['id'] ?>">Cobrar</a>
+                        <a class="btn btn-sm btn-primary" href="<?= MARINA_URL ?>/index.php?p=combustible-despacho&amp;cobrar=<?= (int) $r['id'] ?>&amp;<?= e($despFiltroQs) ?>">Cobrar</a>
                         <button type="button" class="btn btn-sm btn-secondary btn-editar-despacho"
                             data-despacho="<?= htmlspecialchars(json_encode([
                                 'id' => (int) $r['id'],
@@ -512,6 +565,22 @@ require_once __DIR__ . '/../includes/layout.php';
                 </tr>
             <?php endwhile; ?>
             </tbody>
+            <tfoot class="combustible-tfoot">
+                <tr>
+                    <th colspan="5" class="text-end">Totales</th>
+                    <th class="text-end"><?= dinero($despTotalFacturado) ?></th>
+                    <th class="text-end"><?= dinero($despTotalAbonado) ?></th>
+                    <th class="text-end"><?= dinero($despTotalSaldo) ?></th>
+                    <th></th>
+                </tr>
+                <tr class="combustible-tfoot-labels">
+                    <td colspan="5" class="text-end text-muted small border-0 pt-0"></td>
+                    <td class="text-end text-muted small border-0 pt-0">Total registrado facturado</td>
+                    <td class="text-end text-muted small border-0 pt-0">Total abonado</td>
+                    <td class="text-end text-muted small border-0 pt-0">Total saldo</td>
+                    <td class="border-0"></td>
+                </tr>
+            </tfoot>
         </table>
     </div>
 </div>
