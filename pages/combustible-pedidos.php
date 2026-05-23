@@ -307,7 +307,7 @@ $pedTotalSaldo = max(0.0, $pedTotalFacturado - $pedTotalAbonado);
 
 <div class="card p-0">
     <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0 no-datatable">
+        <table class="table table-hover align-middle mb-0 no-datatable" data-export-filename="combustible_pedidos" data-export-sheet="Pedidos">
             <thead>
                 <tr>
                     <th>Id</th><th>Tipo</th><th>Pedido</th><th>GLS ped.</th><th>Recibido</th><th>GLS rec.</th><th>Factura</th><th>Observaciones</th><th class="text-end">Costo</th><th class="text-end">Pagado</th><th class="text-end">Saldo</th><th>Estado</th><th></th>

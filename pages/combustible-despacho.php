@@ -504,7 +504,7 @@ $despTotalSaldo = max(0.0, $despTotalFacturado - $despTotalAbonado);
 
 <div class="card p-0">
     <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0 no-datatable">
+        <table class="table table-hover align-middle mb-0 no-datatable" data-export-filename="combustible_despacho" data-export-sheet="Despacho">
             <thead>
                 <tr>
                     <th>Id</th>

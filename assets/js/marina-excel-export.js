@@ -55,31 +55,59 @@
         return cols.map(function(i) { return textoCelda(ths[i]); });
     }
 
-    function filaDesdeTr(tr, cols) {
-        var tds = tr.querySelectorAll('td, th');
-        if (!tds.length) return null;
-        var tieneColspan = false;
-        for (var c = 0; c < tds.length; c++) {
-            if ((parseInt(tds[c].getAttribute('colspan'), 10) || 1) > 1) tieneColspan = true;
+    function numColumnasTabla(table) {
+        var headerRow = table.querySelector('thead tr:last-child');
+        if (!headerRow) return 0;
+        return headerRow.querySelectorAll('th, td').length;
+    }
+
+    /** Expande colspan/rowspan en una fila al ancho del thead (p. ej. totales en tfoot). */
+    function expandirCeldasFila(tr, numCols) {
+        var expanded = [];
+        tr.querySelectorAll('td, th').forEach(function(cell) {
+            var text = textoCelda(cell);
+            var span = parseInt(cell.getAttribute('colspan'), 10) || 1;
+            for (var s = 0; s < span; s++) {
+                expanded.push(s === 0 ? text : '');
+            }
+        });
+        if (numCols > 0) {
+            while (expanded.length < numCols) expanded.push('');
+            if (expanded.length > numCols) expanded = expanded.slice(0, numCols);
         }
-        if (tieneColspan) return null;
-        return cols.map(function(i) { return textoCelda(tds[i]); });
+        return expanded;
+    }
+
+    function filaDesdeTr(tr, cols, numCols) {
+        if (!tr.querySelectorAll('td, th').length) return null;
+        var expanded = expandirCeldasFila(tr, numCols);
+        if (!expanded.length) return null;
+        return cols.map(function(i) {
+            return expanded[i] !== undefined ? expanded[i] : '';
+        });
+    }
+
+    function filasPieTabla(table, cols, numCols) {
+        var pie = [];
+        table.querySelectorAll('tfoot tr').forEach(function(tr) {
+            var row = filaDesdeTr(tr, cols, numCols);
+            if (row && row.some(function(v) { return v !== ''; })) pie.push(row);
+        });
+        return pie;
     }
 
     function extraerFilasTabla(table) {
         var cols = indicesVisibles(table);
         if (!cols.length) return null;
+        var numCols = numColumnasTabla(table);
         var headers = extraerEncabezados(table, cols);
         var rows = [];
         var bodyRows = table.querySelectorAll('tbody tr');
         bodyRows.forEach(function(tr) {
-            var row = filaDesdeTr(tr, cols);
+            var row = filaDesdeTr(tr, cols, numCols);
             if (row && row.some(function(v) { return v !== ''; })) rows.push(row);
         });
-        table.querySelectorAll('tfoot tr').forEach(function(tr) {
-            var row = filaDesdeTr(tr, cols);
-            if (row) rows.push(row);
-        });
+        filasPieTabla(table, cols, numCols).forEach(function(row) { rows.push(row); });
         if (!headers.length && !rows.length) return null;
         return { headers: headers, rows: rows };
     }
@@ -90,12 +118,14 @@
         var api = window.jQuery(table).DataTable();
         var cols = indicesVisibles(table);
         if (!cols.length) return null;
+        var numCols = numColumnasTabla(table);
         var headers = extraerEncabezados(table, cols);
         var rows = [];
         api.rows({ search: 'applied' }).every(function() {
-            var row = filaDesdeTr(this.node(), cols);
+            var row = filaDesdeTr(this.node(), cols, numCols);
             if (row) rows.push(row);
         });
+        filasPieTabla(table, cols, numCols).forEach(function(row) { rows.push(row); });
         return { headers: headers, rows: rows };
     }
 
