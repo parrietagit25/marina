@@ -36,7 +36,14 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $hastaFiltro)) {
 if ($desdeFiltro > $hastaFiltro) {
     [$desdeFiltro, $hastaFiltro] = [$hastaFiltro, $desdeFiltro];
 }
-$pedFiltroQs = 'desde=' . rawurlencode($desdeFiltro) . '&hasta=' . rawurlencode($hastaFiltro);
+$estadoFiltro = marina_combustible_filtro_estado_desde_request();
+$sqlEstadoPed = marina_combustible_sql_filtro_estado_pedido($estadoFiltro, 'p');
+$sqlEstadoPed2 = marina_combustible_sql_filtro_estado_pedido($estadoFiltro, 'p2');
+$pedFiltroParams = ['desde' => $desdeFiltro, 'hasta' => $hastaFiltro];
+if ($estadoFiltro !== '') {
+    $pedFiltroParams['estado'] = $estadoFiltro;
+}
+$pedFiltroQs = http_build_query($pedFiltroParams);
 
 $uid = usuarioId();
 $mensaje = '';
@@ -222,11 +229,20 @@ require_once __DIR__ . '/../includes/layout.php';
             <label class="form-label small mb-0" for="pedFiltroHasta">Hasta</label>
             <input type="date" id="pedFiltroHasta" name="hasta" class="form-control form-control-sm" value="<?= e($hastaFiltro) ?>">
         </div>
+        <div class="combustible-filtro-campo">
+            <label class="form-label small mb-0" for="pedFiltroEstado">Estado</label>
+            <select id="pedFiltroEstado" name="estado" class="form-select form-select-sm">
+                <option value="">Todos</option>
+                <option value="por_pagar" <?= $estadoFiltro === 'por_pagar' ? 'selected' : '' ?>>Por pagar</option>
+                <option value="pagado" <?= $estadoFiltro === 'pagado' ? 'selected' : '' ?>>Pagado</option>
+            </select>
+        </div>
         <div class="combustible-filtro-campo combustible-filtro-campo--btn">
             <button type="submit" class="btn btn-primary btn-sm">Filtrar</button>
         </div>
         <p class="combustible-filtro-hint text-muted small mb-0">
-            Listado y totales por <strong>fecha de pedido</strong> (<?= e(fechaFormato($desdeFiltro)) ?> — <?= e(fechaFormato($hastaFiltro)) ?>).
+            Listado y totales por <strong>fecha de pedido</strong> (<?= e(fechaFormato($desdeFiltro)) ?> — <?= e(fechaFormato($hastaFiltro)) ?>)
+            · Estado: <strong><?= e(marina_combustible_etiqueta_estado_filtro($estadoFiltro)) ?></strong>.
         </p>
     </div>
 </form>
@@ -293,10 +309,10 @@ $stPedTot = $pdo->prepare("
             SELECT SUM(pg.monto)
             FROM combustible_pedido_pagos pg
             INNER JOIN combustible_pedidos p2 ON p2.id = pg.pedido_id
-            WHERE p2.fecha_pedido BETWEEN ? AND ?
+            WHERE p2.fecha_pedido BETWEEN ? AND ?{$sqlEstadoPed2}
         ), 0) AS total_abonado
     FROM combustible_pedidos p
-    WHERE p.fecha_pedido BETWEEN ? AND ?
+    WHERE p.fecha_pedido BETWEEN ? AND ?{$sqlEstadoPed}
 ");
 $stPedTot->execute([$desdeFiltro, $hastaFiltro, $desdeFiltro, $hastaFiltro]);
 $pedTotRow = $stPedTot->fetch(PDO::FETCH_ASSOC);
@@ -319,7 +335,7 @@ $pedTotalSaldo = max(0.0, $pedTotalFacturado - $pedTotalAbonado);
                 SELECT p.*,
                   (SELECT COALESCE(SUM(monto),0) FROM combustible_pedido_pagos x WHERE x.pedido_id = p.id) AS sum_pagado
                 FROM combustible_pedidos p
-                WHERE p.fecha_pedido BETWEEN ? AND ?
+                WHERE p.fecha_pedido BETWEEN ? AND ?{$sqlEstadoPed}
                 ORDER BY p.fecha_pedido DESC, p.id DESC
             ");
             $st->execute([$desdeFiltro, $hastaFiltro]);

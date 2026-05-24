@@ -10,6 +10,7 @@ require_once __DIR__ . '/../includes/combustible_helpers.php';
 $uid = usuarioId();
 $mensaje = '';
 $cobrarId = (int) obtener('cobrar', 0);
+$cobrarFiltroQs = marina_combustible_filtro_qs_from_get();
 
 $formas_pago_opts = $pdo->query("SELECT id, nombre FROM formas_pago WHERE tipo_movimiento = 'ingreso' ORDER BY nombre")->fetchAll(PDO::FETCH_KEY_PAIR);
 
@@ -144,7 +145,7 @@ if ($cobrarId > 0) {
         Total <?= dinero($montoCuota) ?> |
         Pagado <?= dinero($pagado) ?> |
         Saldo <strong><?= dinero($saldo) ?></strong>
-        <a class="ms-2" href="<?= MARINA_URL ?>/index.php?p=combustible-despacho">Volver al listado</a>
+        <a class="ms-2" href="<?= MARINA_URL ?>/index.php?p=combustible-despacho&amp;<?= e($cobrarFiltroQs) ?>">Volver al listado</a>
     </p>
     <?php if ($okCob): ?><div class="alert alert-success py-2"><?= e($okCob) ?></div><?php endif; ?>
     <?php if ($errCob): ?><div class="alert alert-danger py-2"><?= e($errCob) ?></div><?php endif; ?>
@@ -416,7 +417,13 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $hastaFiltro)) {
 if ($desdeFiltro > $hastaFiltro) {
     [$desdeFiltro, $hastaFiltro] = [$hastaFiltro, $desdeFiltro];
 }
-$despFiltroQs = 'desde=' . rawurlencode($desdeFiltro) . '&hasta=' . rawurlencode($hastaFiltro);
+$estadoFiltro = marina_combustible_filtro_estado_desde_request();
+$sqlEstadoDesp = marina_combustible_sql_filtro_estado_despacho($estadoFiltro, 'd', 'p');
+$despFiltroParams = ['desde' => $desdeFiltro, 'hasta' => $hastaFiltro];
+if ($estadoFiltro !== '') {
+    $despFiltroParams['estado'] = $estadoFiltro;
+}
+$despFiltroQs = http_build_query($despFiltroParams);
 
 $preciosJson = json_encode(marina_combustible_precios_vigentes($pdo), JSON_UNESCAPED_UNICODE);
 $inv = marina_combustible_inventario_por_tipo($pdo);
@@ -475,11 +482,20 @@ require_once __DIR__ . '/../includes/layout.php';
             <label class="form-label small mb-0" for="despFiltroHasta">Hasta</label>
             <input type="date" id="despFiltroHasta" name="hasta" class="form-control form-control-sm" value="<?= e($hastaFiltro) ?>">
         </div>
+        <div class="combustible-filtro-campo">
+            <label class="form-label small mb-0" for="despFiltroEstado">Estado</label>
+            <select id="despFiltroEstado" name="estado" class="form-select form-select-sm">
+                <option value="">Todos</option>
+                <option value="por_pagar" <?= $estadoFiltro === 'por_pagar' ? 'selected' : '' ?>>Por pagar</option>
+                <option value="pagado" <?= $estadoFiltro === 'pagado' ? 'selected' : '' ?>>Pagado</option>
+            </select>
+        </div>
         <div class="combustible-filtro-campo combustible-filtro-campo--btn">
             <button type="submit" class="btn btn-primary btn-sm">Filtrar</button>
         </div>
         <p class="combustible-filtro-hint text-muted small mb-0">
-            Listado y totales por <strong>fecha de despacho</strong> (<?= e(fechaFormato($desdeFiltro)) ?> — <?= e(fechaFormato($hastaFiltro)) ?>).
+            Listado y totales por <strong>fecha de despacho</strong> (<?= e(fechaFormato($desdeFiltro)) ?> — <?= e(fechaFormato($hastaFiltro)) ?>)
+            · Estado: <strong><?= e(marina_combustible_etiqueta_estado_filtro($estadoFiltro)) ?></strong>.
         </p>
     </div>
 </form>
@@ -493,7 +509,7 @@ $stDespTot = $pdo->prepare("
     LEFT JOIN (
         SELECT despacho_id, SUM(monto) AS pagado FROM combustible_despacho_pagos GROUP BY despacho_id
     ) p ON p.despacho_id = d.id
-    WHERE d.fecha BETWEEN ? AND ?
+    WHERE d.fecha BETWEEN ? AND ?{$sqlEstadoDesp}
 ");
 $stDespTot->execute([$desdeFiltro, $hastaFiltro]);
 $despTotRow = $stDespTot->fetch(PDO::FETCH_ASSOC);
@@ -515,6 +531,7 @@ $despTotalSaldo = max(0.0, $despTotalFacturado - $despTotalAbonado);
                     <th class="text-end">Total</th>
                     <th class="text-end">Pagado</th>
                     <th class="text-end">Saldo</th>
+                    <th>Estado</th>
                     <th></th>
                 </tr>
             </thead>
@@ -527,7 +544,7 @@ $despTotalSaldo = max(0.0, $despTotalFacturado - $despTotalAbonado);
                 LEFT JOIN (
                     SELECT despacho_id, SUM(monto) AS pagado FROM combustible_despacho_pagos GROUP BY despacho_id
                 ) p ON p.despacho_id = d.id
-                WHERE d.fecha BETWEEN ? AND ?
+                WHERE d.fecha BETWEEN ? AND ?{$sqlEstadoDesp}
                 ORDER BY d.fecha DESC, d.id DESC
             ");
             $st->execute([$desdeFiltro, $hastaFiltro]);
@@ -535,6 +552,7 @@ $despTotalSaldo = max(0.0, $despTotalFacturado - $despTotalAbonado);
                 $pagadoF = (float) ($r['pagado_sum'] ?? 0);
                 $totalF = (float) $r['monto_total'];
                 $saldoF = max(0.0, $totalF - $pagadoF);
+                $estaPagado = marina_combustible_despacho_esta_pagado($totalF, $pagadoF);
                 ?>
                 <tr>
                     <td><?= (int) $r['id'] ?></td>
@@ -545,6 +563,7 @@ $despTotalSaldo = max(0.0, $despTotalFacturado - $despTotalAbonado);
                     <td class="text-end"><?= dinero($totalF) ?></td>
                     <td class="text-end"><?= dinero($pagadoF) ?></td>
                     <td class="text-end"><?= $saldoF > 0.00001 ? dinero($saldoF) : '—' ?></td>
+                    <td><?= $estaPagado ? 'Pagado' : 'Por pagar' ?></td>
                     <td class="text-nowrap">
                         <a class="btn btn-sm btn-primary" href="<?= MARINA_URL ?>/index.php?p=combustible-despacho&amp;cobrar=<?= (int) $r['id'] ?>&amp;<?= e($despFiltroQs) ?>">Cobrar</a>
                         <button type="button" class="btn btn-sm btn-secondary btn-editar-despacho"
@@ -572,12 +591,14 @@ $despTotalSaldo = max(0.0, $despTotalFacturado - $despTotalAbonado);
                     <th class="text-end"><?= dinero($despTotalAbonado) ?></th>
                     <th class="text-end"><?= dinero($despTotalSaldo) ?></th>
                     <th></th>
+                    <th></th>
                 </tr>
                 <tr class="combustible-tfoot-labels">
                     <td colspan="5" class="text-end text-muted small border-0 pt-0"></td>
                     <td class="text-end text-muted small border-0 pt-0">Total registrado facturado</td>
                     <td class="text-end text-muted small border-0 pt-0">Total abonado</td>
                     <td class="text-end text-muted small border-0 pt-0">Total saldo</td>
+                    <td class="border-0"></td>
                     <td class="border-0"></td>
                 </tr>
             </tfoot>

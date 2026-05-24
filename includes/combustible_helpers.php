@@ -413,3 +413,74 @@ function marina_combustible_eliminar_pedido(PDO $pdo, int $pedidoId): void
     }
     $pdo->prepare('DELETE FROM combustible_pedidos WHERE id = ?')->execute([$pedidoId]);
 }
+
+/** @return ''|'pagado'|'por_pagar' */
+function marina_combustible_filtro_estado_desde_request(): string
+{
+    $estado = strtolower(trim((string) ($_GET['estado'] ?? '')));
+
+    return in_array($estado, ['pagado', 'por_pagar'], true) ? $estado : '';
+}
+
+/** Query string (desde, hasta, estado) para enlaces y redirecciones del listado. */
+function marina_combustible_filtro_qs_from_get(?array $get = null): string
+{
+    $get = $get ?? $_GET;
+    $desde = trim((string) ($get['desde'] ?? date('Y-m-01')));
+    $hasta = trim((string) ($get['hasta'] ?? date('Y-m-d')));
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $desde)) {
+        $desde = date('Y-m-01');
+    }
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $hasta)) {
+        $hasta = date('Y-m-d');
+    }
+    if ($desde > $hasta) {
+        [$desde, $hasta] = [$hasta, $desde];
+    }
+    $estado = strtolower(trim((string) ($get['estado'] ?? '')));
+    $estado = in_array($estado, ['pagado', 'por_pagar'], true) ? $estado : '';
+    $params = ['desde' => $desde, 'hasta' => $hasta];
+    if ($estado !== '') {
+        $params['estado'] = $estado;
+    }
+
+    return http_build_query($params);
+}
+
+function marina_combustible_etiqueta_estado_filtro(string $estado): string
+{
+    return match ($estado) {
+        'pagado' => 'Pagado',
+        'por_pagar' => 'Por pagar',
+        default => 'Todos',
+    };
+}
+
+function marina_combustible_despacho_esta_pagado(float $montoTotal, float $pagado): bool
+{
+    return $montoTotal > 0 && $pagado + 0.009 >= $montoTotal;
+}
+
+function marina_combustible_sql_filtro_estado_pedido(string $estado, string $alias = 'p'): string
+{
+    if ($estado === 'pagado') {
+        return " AND {$alias}.estado_pago = 'pagado'";
+    }
+    if ($estado === 'por_pagar') {
+        return " AND {$alias}.estado_pago = 'por_pagar'";
+    }
+
+    return '';
+}
+
+function marina_combustible_sql_filtro_estado_despacho(string $estado, string $aliasDesp = 'd', string $aliasPagos = 'p'): string
+{
+    if ($estado === 'pagado') {
+        return " AND {$aliasDesp}.monto_total > 0 AND COALESCE({$aliasPagos}.pagado, 0) + 0.009 >= {$aliasDesp}.monto_total";
+    }
+    if ($estado === 'por_pagar') {
+        return " AND ({$aliasDesp}.monto_total <= 0 OR COALESCE({$aliasPagos}.pagado, 0) + 0.009 < {$aliasDesp}.monto_total)";
+    }
+
+    return '';
+}
