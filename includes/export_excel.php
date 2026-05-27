@@ -51,7 +51,11 @@ function marinaExportarExcelXlsxZip(string $filename, array $headers, array $row
         }
     }
 
-    $sheetXml = marinaXlsxConstruirSheetXml($sheetRows);
+    $footerStartRow = null;
+    if ($filasPie !== null && count($filasPie) > 0) {
+        $footerStartRow = count($sheetRows) - count($filasPie) + 1; // 1-indexado
+    }
+    $sheetXml = marinaXlsxConstruirSheetXml($sheetRows, $footerStartRow);
     $tmp = tempnam(sys_get_temp_dir(), 'marxlsx_');
     if ($tmp === false) {
         marinaExportarExcelHtml($filename . '.xls', $headers, $rows, $filasPie, $titulo, $nombreBase);
@@ -71,6 +75,7 @@ function marinaExportarExcelXlsxZip(string $filename, array $headers, array $row
         . '<Default Extension="xml" ContentType="application/xml"/>'
         . '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
         . '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+        . '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
         . '</Types>');
     $zip->addFromString('_rels/.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
@@ -83,7 +88,16 @@ function marinaExportarExcelXlsxZip(string $filename, array $headers, array $row
     $zip->addFromString('xl/_rels/workbook.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
         . '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
+        . '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
         . '</Relationships>');
+    $zip->addFromString('xl/styles.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        . '<fonts count="2"><font/><font><b/></font></fonts>'
+        . '<fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE2EFD9"/><bgColor indexed="64"/></patternFill></fill></fills>'
+        . '<borders count="1"><border/></borders>'
+        . '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+        . '<cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="1" borderId="0" xfId="0" applyFont="1" applyFill="1"/></cellXfs>'
+        . '</styleSheet>');
     $zip->addFromString('xl/worksheets/sheet1.xml', $sheetXml);
     $zip->close();
 
@@ -104,7 +118,7 @@ function marinaExportarExcelXlsxZip(string $filename, array $headers, array $row
 /**
  * @param list<list<mixed>> $sheetRows
  */
-function marinaXlsxConstruirSheetXml(array $sheetRows): string
+function marinaXlsxConstruirSheetXml(array $sheetRows, ?int $footerStartRow = null): string
 {
     $xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         . '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
@@ -117,10 +131,12 @@ function marinaXlsxConstruirSheetXml(array $sheetRows): string
             $c++;
             $ref = marinaXlsxColLetter($c - 1) . $r;
             [$txt, $tipo] = marinaXlsxValorCelda($val);
+            $esFooter = $footerStartRow !== null && $r >= $footerStartRow;
+            $style = $esFooter ? ' s="1"' : '';
             if ($tipo === 'n') {
-                $xml .= '<c r="' . $ref . '" t="n"><v>' . $txt . '</v></c>';
+                $xml .= '<c r="' . $ref . '"' . $style . ' t="n"><v>' . $txt . '</v></c>';
             } else {
-                $xml .= '<c r="' . $ref . '" t="inlineStr"><is><t>'
+                $xml .= '<c r="' . $ref . '"' . $style . ' t="inlineStr"><is><t>'
                     . marinaXlsxEsc($txt) . '</t></is></c>';
             }
         }

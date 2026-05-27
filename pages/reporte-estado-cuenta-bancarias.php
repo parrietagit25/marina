@@ -25,6 +25,97 @@ if ($cuenta_id > 0) {
 $labCred = marina_ui_credito();
 $labDeb = marina_ui_debito();
 
+$saldoInicial = 0.0;
+$sParams = [$desde];
+$sCuentaFiltro = '';
+if ($cuenta_id > 0) {
+    $sCuentaFiltro = ' AND co.cuenta_id = ? ';
+    $sParams[] = $cuenta_id;
+}
+$stSaldoCuotas = $pdo->prepare("
+    SELECT COALESCE(SUM(mo.monto), 0)
+    FROM cuotas_movimientos mo
+    JOIN cuotas cu ON mo.cuota_id = cu.id
+    JOIN contratos co ON cu.contrato_id = co.id
+    WHERE mo.fecha_pago < ?
+      AND mo.tipo IN ('pago','abono')
+      $sCuentaFiltro
+");
+$stSaldoCuotas->execute($sParams);
+$saldoInicial += (float) $stSaldoCuotas->fetchColumn();
+
+$sEleParams = [$desde];
+$sEleFiltro = '';
+if ($cuenta_id > 0) {
+    $sEleFiltro = ' AND ep.cuenta_id = ? ';
+    $sEleParams[] = $cuenta_id;
+}
+try {
+    $stSaldoEle = $pdo->prepare("
+        SELECT COALESCE(SUM(ep.monto), 0)
+        FROM contrato_electricidad_pagos ep
+        WHERE ep.fecha_pago < ?
+          $sEleFiltro
+    ");
+    $stSaldoEle->execute($sEleParams);
+    $saldoInicial += (float) $stSaldoEle->fetchColumn();
+} catch (Throwable $e) {
+    // sin tablas de electricidad
+}
+
+$sCombParams = [$desde];
+$sCombFiltro = '';
+if ($cuenta_id > 0) {
+    $sCombFiltro = ' AND p.cuenta_id = ? ';
+    $sCombParams[] = $cuenta_id;
+}
+try {
+    $stSaldoComb = $pdo->prepare("
+        SELECT COALESCE(SUM(p.monto), 0)
+        FROM combustible_despacho_pagos p
+        WHERE p.fecha_pago < ?
+          $sCombFiltro
+    ");
+    $stSaldoComb->execute($sCombParams);
+    $saldoInicial += (float) $stSaldoComb->fetchColumn();
+} catch (Throwable $e) {
+    // sin tablas de combustible
+}
+
+$sGParams = [$desde];
+$sGFiltro = '';
+if ($cuenta_id > 0) {
+    $sGFiltro = ' AND gp.cuenta_id = ? ';
+    $sGParams[] = $cuenta_id;
+}
+$stSaldoGastos = $pdo->prepare("
+    SELECT COALESCE(SUM(gp.monto), 0)
+    FROM gasto_pagos gp
+    WHERE gp.fecha_pago < ?
+      $sGFiltro
+");
+$stSaldoGastos->execute($sGParams);
+$saldoInicial -= (float) $stSaldoGastos->fetchColumn();
+
+$sMParams = [$desde];
+$sMFiltro = '';
+if ($cuenta_id > 0) {
+    $sMFiltro = ' AND mb.cuenta_id = ? ';
+    $sMParams[] = $cuenta_id;
+}
+try {
+    $stSaldoManual = $pdo->prepare("
+        SELECT COALESCE(SUM(CASE WHEN mb.tipo_movimiento = 'costo' THEN -mb.monto ELSE mb.monto END), 0)
+        FROM movimientos_bancarios mb
+        WHERE mb.fecha_movimiento < ?
+          $sMFiltro
+    ");
+    $stSaldoManual->execute($sMParams);
+    $saldoInicial += (float) $stSaldoManual->fetchColumn();
+} catch (Throwable $e) {
+    // sin movimientos manuales
+}
+
 $params = [$desde, $hasta];
 $cuentaFiltro = '';
 if ($cuenta_id > 0) {
@@ -162,7 +253,7 @@ usort($movs, function ($a, $b) {
     return $ta < $tb ? -1 : 1;
 });
 
-$acum = 0.0;
+$acum = $saldoInicial;
 foreach ($movs as &$m) {
     $val = (float) ($m['monto'] ?? 0);
     if (($m['tipo'] ?? '') === $labDeb) {
@@ -202,7 +293,7 @@ if (obtener('export') === 'excel') {
         ];
     }
     $neto = $totIng - $totEgr;
-    $acumFinal = $movs === [] ? 0.0 : (float) ($movs[array_key_last($movs)]['acumulado'] ?? 0);
+    $acumFinal = $movs === [] ? $saldoInicial : (float) ($movs[array_key_last($movs)]['acumulado'] ?? $saldoInicial);
     $pie = [
         ['Total créditos del período', '', '', '', $totIng, '', ''],
         ['Total débitos del período', '', '', '', '', $totEgr, ''],
@@ -224,7 +315,7 @@ if (obtener('export') === 'excel') {
 }
 
 $netoPeriodo = $totIng - $totEgr;
-$acumFinal = $movs === [] ? 0.0 : (float) ($movs[array_key_last($movs)]['acumulado'] ?? 0);
+$acumFinal = $movs === [] ? $saldoInicial : (float) ($movs[array_key_last($movs)]['acumulado'] ?? $saldoInicial);
 
 require_once __DIR__ . '/../includes/layout.php';
 ?>
@@ -269,11 +360,12 @@ require_once __DIR__ . '/../includes/layout.php';
                 <span class="text-muted">Todas las cuentas (los movimientos pueden corresponder a distintas cuentas según su origen).</span>
             <?php endif; ?>
         </div>
+        <div class="col-md-4"><strong>Saldo inicial (antes de <?= e(fechaFormato($desde)) ?>):</strong> <?= dinero($saldoInicial) ?></div>
         <div class="col-md-4"><strong>Total créditos:</strong> <?= dinero($totIng) ?></div>
         <div class="col-md-4"><strong>Total débitos:</strong> <?= dinero($totEgr) ?></div>
         <div class="col-md-4"><strong>Neto período:</strong> <span class="<?= ($totIng - $totEgr) >= 0 ? 'text-success' : 'text-danger' ?>"><?= dinero($totIng - $totEgr) ?></span></div>
     </div>
-    <p class="text-muted small mb-0 mt-2">El acumulado es dentro del período filtrado (no incluye saldo anterior). En créditos por cuota, la <strong>referencia</strong> muestra el <strong>número de recibo del contrato</strong> cuando está cargado en el contrato.</p>
+    <p class="text-muted small mb-0 mt-2">El acumulado del estado de cuenta inicia con el <strong>saldo anterior al rango</strong> y luego suma/resta los movimientos filtrados. En créditos por cuota, la <strong>referencia</strong> muestra el <strong>número de recibo del contrato</strong> cuando está cargado en el contrato.</p>
 </div>
 
 <div class="card p-3">

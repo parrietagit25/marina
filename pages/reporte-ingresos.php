@@ -421,6 +421,14 @@ require_once __DIR__ . '/../includes/layout.php';
                 </tr>
             <?php endif; ?>
             </tbody>
+            <?php if (!empty($agrupadoPorGrupo)): ?>
+            <tfoot>
+                <tr class="table-light fw-bold">
+                    <th>Total general</th>
+                    <th class="text-end"><?= dinero($total) ?></th>
+                </tr>
+            </tfoot>
+            <?php endif; ?>
         </table>
     </div>
 </div>
@@ -470,6 +478,14 @@ require_once __DIR__ . '/../includes/layout.php';
                 <tr><td colspan="7" class="text-muted">No hay créditos en el período.</td></tr>
             <?php endif; ?>
             </tbody>
+            <?php if (!empty($filas)): ?>
+            <tfoot>
+                <tr class="table-light fw-bold">
+                    <th colspan="6" class="text-end">Total general</th>
+                    <th class="text-end"><?= dinero($total) ?></th>
+                </tr>
+            </tfoot>
+            <?php endif; ?>
         </table>
     </div>
 </div>
