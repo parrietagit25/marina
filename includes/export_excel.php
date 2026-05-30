@@ -168,6 +168,20 @@ function marinaXlsxColLetter(int $index): string
     return $s;
 }
 
+/** Texto que debe exportarse siempre como etiqueta (unidad, nombres, etc.). */
+function marinaExcelValorTexto(string $s): string
+{
+    $s = trim($s);
+    if ($s === '') {
+        return '';
+    }
+    if (preg_match('/^\d+([.,]\d+)?$/', $s)) {
+        return "\u{200B}" . $s;
+    }
+
+    return $s;
+}
+
 /** @return array{0: string, 1: 'n'|'str'} */
 function marinaXlsxValorCelda($v): array
 {
@@ -188,22 +202,33 @@ function marinaXlsxValorCelda($v): array
         return [marinaExcelNumeroXml($v), 'n'];
     }
     if (is_string($v)) {
+        if (marinaExcelContieneLetras($v)) {
+            return [marinaExcelValorTexto($v), 'str'];
+        }
         $num = marinaExcelParseNumero($v);
         if ($num !== null) {
             return [marinaExcelNumeroXml($num), 'n'];
         }
 
-        return [$v, 'str'];
+        return [marinaExcelValorTexto($v), 'str'];
     }
 
-    return [(string) $v, 'str'];
+    return [marinaExcelValorTexto((string) $v), 'str'];
 }
 
-/** Convierte texto de pantalla (dinero, miles) a float o null si no es numérico. */
+function marinaExcelContieneLetras(string $s): bool
+{
+    return (bool) preg_match('/[a-zA-ZáéíóúñÁÉÍÓÚÑ]/u', $s);
+}
+
+/** Convierte texto de pantalla (dinero, miles) a float o null si no es numérico puro. */
 function marinaExcelParseNumero(string $s): ?float
 {
     $s = trim($s);
     if ($s === '' || $s === '—' || $s === '-' || $s === '–') {
+        return null;
+    }
+    if (marinaExcelContieneLetras($s)) {
         return null;
     }
     if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $s)) {
@@ -462,14 +487,16 @@ function marinaExcelCelda($v): string
             . htmlspecialchars($txt, ENT_QUOTES, 'UTF-8') . '</td>';
     }
     if (is_string($v)) {
-        $num = marinaExcelParseNumero($v);
-        if ($num !== null) {
-            $txt = number_format($num, 2, '.', '');
+        if (!marinaExcelContieneLetras($v)) {
+            $num = marinaExcelParseNumero($v);
+            if ($num !== null) {
+                $txt = number_format($num, 2, '.', '');
 
-            return '<td style="' . $b . 'mso-number-format:&quot;#,##0.00&quot;;text-align:right;">'
-                . htmlspecialchars($txt, ENT_QUOTES, 'UTF-8') . '</td>';
+                return '<td style="' . $b . 'mso-number-format:&quot;#,##0.00&quot;;text-align:right;">'
+                    . htmlspecialchars($txt, ENT_QUOTES, 'UTF-8') . '</td>';
+            }
         }
     }
 
-    return '<td style="' . $b . '">' . htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8') . '</td>';
+    return '<td style="' . $b . '">' . htmlspecialchars(marinaExcelValorTexto((string) $v), ENT_QUOTES, 'UTF-8') . '</td>';
 }

@@ -29,7 +29,7 @@ if (!defined('DB_HOST')) {
     define('DB_HOST', getenv('DB_HOST') !== false && getenv('DB_HOST') !== '' ? (string) getenv('DB_HOST') : 'localhost');
 }
 if (!defined('DB_NAME')) {
-    define('DB_NAME', getenv('DB_NAME') !== false && getenv('DB_NAME') !== '' ? (string) getenv('DB_NAME') : 'marina');
+    define('DB_NAME', getenv('DB_NAME') !== false && getenv('DB_NAME') !== '' ? (string) getenv('DB_NAME') : 'marina_v2');
 }
 if (!defined('DB_USER')) {
     define('DB_USER', getenv('DB_USER') !== false && getenv('DB_USER') !== '' ? (string) getenv('DB_USER') : 'root');

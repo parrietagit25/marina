@@ -87,9 +87,16 @@
         });
     }
 
+    function filaOmitirExport(tr) {
+        if (!tr) return true;
+        if (tr.classList.contains('reporte-cobranzas-separador')) return true;
+        return false;
+    }
+
     function filasPieTabla(table, cols, numCols) {
         var pie = [];
         table.querySelectorAll('tfoot tr').forEach(function(tr) {
+            if (tr.querySelector('th')) return;
             var row = filaDesdeTr(tr, cols, numCols);
             if (row && row.some(function(v) { return v !== ''; })) pie.push(row);
         });
@@ -104,6 +111,7 @@
         var rows = [];
         var bodyRows = table.querySelectorAll('tbody tr');
         bodyRows.forEach(function(tr) {
+            if (filaOmitirExport(tr)) return;
             var row = filaDesdeTr(tr, cols, numCols);
             if (row && row.some(function(v) { return v !== ''; })) rows.push(row);
         });
@@ -122,17 +130,33 @@
         var headers = extraerEncabezados(table, cols);
         var rows = [];
         api.rows({ search: 'applied' }).every(function() {
-            var row = filaDesdeTr(this.node(), cols, numCols);
+            var tr = this.node();
+            if (filaOmitirExport(tr)) return;
+            var row = filaDesdeTr(tr, cols, numCols);
             if (row) rows.push(row);
         });
         filasPieTabla(table, cols, numCols).forEach(function(row) { rows.push(row); });
         return { headers: headers, rows: rows };
     }
 
+    function contieneLetras(text) {
+        return /[a-zA-ZáéíóúñÁÉÍÓÚÑ]/.test(String(text || ''));
+    }
+
+    function valorTextoExcel(s) {
+        var t = String(s || '').trim();
+        if (t === '') return '';
+        if (/^\d+([.,]\d+)?$/.test(t)) {
+            return '\u200B' + t;
+        }
+        return String(s);
+    }
+
     function parseNumeroCelda(text) {
         if (text == null) return null;
         var raw = String(text).replace(/\s+/g, ' ').trim();
         if (raw === '' || raw === '—' || raw === '-' || raw === '–') return null;
+        if (contieneLetras(raw)) return null;
         if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
         if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(raw)) return null;
         var t = raw.replace(/[^\d.,\-+]/g, '');
@@ -146,25 +170,46 @@
         return isNaN(n) ? null : n;
     }
 
-    function esColumnaNumericaExport(headerText, table, colIndexReal) {
-        var ht = (headerText || '').toLowerCase();
-        if (/monto|pagado|saldo|total|cr[eé]dito|d[eé]bito|acumulado|costo|vencido|pend|∑|suma|abonado|facturado|neto|unid\.|ocup\.|libres/.test(ht)) {
-            return true;
-        }
-        var headerRow = table.querySelector('thead tr:last-child');
-        if (headerRow) {
-            var ths = headerRow.querySelectorAll('th, td');
-            var th = ths[colIndexReal];
-            if (th && th.classList.contains('text-end')) return true;
-        }
-        return false;
+    function normalizarEncabezado(headerText) {
+        return (headerText || '')
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '');
     }
 
-    function aplicarNumerosEnHoja(ws, table, cols, headers) {
+    function esColumnaTextoExport(headerText) {
+        var ht = normalizarEncabezado(headerText);
+        return /tipo|unidad|ocupacion|cliente|navio|muelle|slip|contrato|cuota|estado|vencimiento|fecha|fin contrato|prox|nombre|ambito|grupo/.test(ht);
+    }
+
+    function esColumnaNumericaExport(headerText) {
+        if (esColumnaTextoExport(headerText)) return false;
+        var ht = normalizarEncabezado(headerText);
+        return /monto|pagado|saldo|recaudar|recaudo|credito|debito|acumulado|costo|vencido|vencida|pend\.|suma|abonado|facturado|neto|falta por pagar/.test(ht);
+    }
+
+    function marcarColumnasTextoEnHoja(ws, headers) {
         if (!ws || !ws['!ref']) return;
         var range = XLSX.utils.decode_range(ws['!ref']);
-        var colsNum = headers.map(function(h, i) {
-            return esColumnaNumericaExport(h, table, cols[i]);
+        var colsTexto = headers.map(function(h) { return esColumnaTextoExport(h); });
+        for (var R = 1; R <= range.e.r; R++) {
+            for (var C = 0; C <= range.e.c; C++) {
+                if (!colsTexto[C]) continue;
+                var ref = XLSX.utils.encode_cell({ r: R, c: C });
+                var cell = ws[ref];
+                if (!cell || cell.v == null || cell.v === '') continue;
+                cell.t = 's';
+                cell.v = valorTextoExcel(cell.v);
+                delete cell.z;
+            }
+        }
+    }
+
+    function aplicarNumerosEnHoja(ws, headers) {
+        if (!ws || !ws['!ref']) return;
+        var range = XLSX.utils.decode_range(ws['!ref']);
+        var colsNum = headers.map(function(h) {
+            return esColumnaNumericaExport(h);
         });
         for (var R = 1; R <= range.e.r; R++) {
             for (var C = 0; C <= range.e.c; C++) {
@@ -198,8 +243,8 @@
         if (datos.headers.length) aoa.push(datos.headers);
         datos.rows.forEach(function(r) { aoa.push(r); });
         var ws = XLSX.utils.aoa_to_sheet(aoa);
-        var cols = indicesVisibles(table);
-        aplicarNumerosEnHoja(ws, table, cols, datos.headers);
+        marcarColumnasTextoEnHoja(ws, datos.headers);
+        aplicarNumerosEnHoja(ws, datos.headers);
         var wb = XLSX.utils.book_new();
         var hoja = (table.getAttribute('data-export-sheet') || 'Datos').slice(0, 31);
         XLSX.utils.book_append_sheet(wb, ws, hoja);

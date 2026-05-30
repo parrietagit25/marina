@@ -667,9 +667,9 @@ if (obtener('export') === 'excel') {
             if ($tipoFila === 'subtotal') {
                 $tot = $item['totales'] ?? [];
                 $rowsX[] = [
-                    (string) ($item['bloque_tipo'] ?? ''),
-                    'Total — ' . (string) ($item['bloque_nombre'] ?? ''),
-                    (int) ($tot['n_ocup'] ?? 0) . ' ocup. / ' . (int) ($tot['n_libre'] ?? 0) . ' libres',
+                    marinaExcelValorTexto((string) ($item['bloque_tipo'] ?? '')),
+                    marinaExcelValorTexto('Total — ' . (string) ($item['bloque_nombre'] ?? '')),
+                    marinaExcelValorTexto((int) ($tot['n_ocup'] ?? 0) . ' ocup. / ' . (int) ($tot['n_libre'] ?? 0) . ' libres'),
                     '',
                     (float) ($tot['sum_monto_contrato'] ?? 0),
                     '',
@@ -683,10 +683,10 @@ if (obtener('export') === 'excel') {
             }
             $f = $item['dato'] ?? [];
             $rowsX[] = [
-                $f['tipo'],
-                $f['unidad'],
-                $f['ocupacion'],
-                (string) ($f['cliente'] ?? ''),
+                marinaExcelValorTexto((string) ($f['tipo'] ?? '')),
+                marinaExcelValorTexto((string) ($f['unidad'] ?? '')),
+                marinaExcelValorTexto((string) ($f['ocupacion'] ?? '')),
+                marinaExcelValorTexto((string) ($f['cliente'] ?? '')),
                 $f['monto_contrato'] !== null ? (float) $f['monto_contrato'] : '',
                 (string) ($f['fin_contrato'] ?? ''),
                 (string) ($f['prox_venc'] ?? ''),
@@ -815,7 +815,7 @@ require_once __DIR__ . '/../includes/layout.php';
 
 <?php if ($vista === 'grupos'): ?>
 <div class="table-responsive card p-0 mb-2 reporte-cobranzas-table-wrap">
-    <table class="table table-hover table-sm align-middle mb-0 no-datatable reporte-cobranzas-tabla">
+    <table class="table table-hover table-sm align-middle mb-0 no-datatable no-excel-export reporte-cobranzas-tabla">
         <thead class="table-light">
             <tr>
                 <th>Ámbito</th>
@@ -880,7 +880,7 @@ require_once __DIR__ . '/../includes/layout.php';
 </div>
 <?php else: ?>
 <div class="table-responsive card p-0 reporte-cobranzas-table-wrap">
-    <table class="table table-hover table-sm align-middle mb-0 no-datatable reporte-cobranzas-tabla">
+    <table class="table table-hover table-sm align-middle mb-0 no-datatable no-excel-export reporte-cobranzas-tabla">
         <thead class="table-light">
             <tr>
                 <th>Tipo</th>
