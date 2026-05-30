@@ -39,7 +39,11 @@ $sql = "
            mu.nombre AS muelle_nombre,
            sl.nombre AS slip_nombre,
            g.nombre AS grupo_nombre,
-           i.nombre AS inmueble_nombre
+           i.nombre AS inmueble_nombre,
+           co.muelle_id,
+           co.slip_id,
+           co.grupo_id,
+           co.inmueble_id
     FROM cuotas cu
     JOIN contratos co ON cu.contrato_id = co.id
     JOIN clientes cl ON co.cliente_id = cl.id
@@ -67,7 +71,16 @@ if ($muelle_id > 0) {
     $params[] = $muelle_id;
 }
 
-$sql .= ' ORDER BY cu.fecha_vencimiento ASC, co.id ASC, cu.numero_cuota ASC';
+$sql .= '
+    ORDER BY
+        CASE WHEN COALESCE(mu.nombre, g.nombre, \'\') = \'\' THEN 1 ELSE 0 END,
+        COALESCE(mu.nombre, g.nombre, \'\') ASC,
+        CASE WHEN COALESCE(sl.nombre, i.nombre, \'\') = \'\' THEN 1 ELSE 0 END,
+        COALESCE(sl.nombre, i.nombre, \'\') ASC,
+        cu.fecha_vencimiento ASC,
+        co.id ASC,
+        cu.numero_cuota ASC
+';
 
 $st = $pdo->prepare($sql);
 $st->execute($params);
@@ -101,11 +114,14 @@ foreach ($raw as $r) {
 
     $muelle = (string) ($r['muelle_nombre'] ?? '');
     $slip = (string) ($r['slip_nombre'] ?? '');
-    if ($muelle === '' && !empty($r['grupo_nombre'])) {
-        $muelle = (string) $r['grupo_nombre'];
-    }
-    if ($slip === '' && !empty($r['inmueble_nombre'])) {
-        $slip = (string) $r['inmueble_nombre'];
+    $esMarina = !empty($r['slip_id']);
+    if (!$esMarina) {
+        if ($muelle === '' && !empty($r['grupo_nombre'])) {
+            $muelle = (string) $r['grupo_nombre'];
+        }
+        if ($slip === '' && !empty($r['inmueble_nombre'])) {
+            $slip = (string) $r['inmueble_nombre'];
+        }
     }
 
     $filas[] = [
@@ -116,6 +132,8 @@ foreach ($raw as $r) {
         'navio' => (string) ($r['navio'] ?? ''),
         'muelle' => $muelle !== '' ? $muelle : '—',
         'slip' => $slip !== '' ? $slip : '—',
+        'muelle_orden' => $muelle !== '' ? $muelle : 'zzzz',
+        'slip_orden' => $slip !== '' ? $slip : 'zzzz',
         'vencimiento' => $fv,
         'monto_cuota' => $monto,
         'pagado' => $pagado,
@@ -126,11 +144,110 @@ foreach ($raw as $r) {
     $totalRecaudo += $saldo;
 }
 
+usort($filas, static function (array $a, array $b): int {
+    $cmp = strnatcasecmp((string) ($a['muelle_orden'] ?? ''), (string) ($b['muelle_orden'] ?? ''));
+    if ($cmp !== 0) {
+        return $cmp;
+    }
+    $cmp = strnatcasecmp((string) ($a['slip_orden'] ?? ''), (string) ($b['slip_orden'] ?? ''));
+    if ($cmp !== 0) {
+        return $cmp;
+    }
+    $cmp = strcmp((string) ($a['vencimiento'] ?? ''), (string) ($b['vencimiento'] ?? ''));
+    if ($cmp !== 0) {
+        return $cmp;
+    }
+
+    return ((int) ($a['numero_cuota'] ?? 0)) <=> ((int) ($b['numero_cuota'] ?? 0));
+});
+
+/**
+ * @param list<array<string, mixed>> $filas
+ * @return list<array<string, mixed>>
+ */
+function marina_recaudo_filas_con_subtotales(array $filas): array
+{
+    if ($filas === []) {
+        return [];
+    }
+
+    $out = [];
+    $bloqueActual = null;
+    $buffer = [];
+
+    $cerrarBloque = static function () use (&$out, &$buffer): void {
+        if ($buffer === []) {
+            return;
+        }
+        $muelle = (string) ($buffer[0]['muelle'] ?? '—');
+        $slip = (string) ($buffer[0]['slip'] ?? '—');
+        $sumMonto = 0.0;
+        $sumPagado = 0.0;
+        $sumRecaudo = 0.0;
+        foreach ($buffer as $row) {
+            $out[] = ['tipo_fila' => 'dato', 'dato' => $row];
+            $sumMonto += (float) ($row['monto_cuota'] ?? 0);
+            $sumPagado += (float) ($row['pagado'] ?? 0);
+            $sumRecaudo += (float) ($row['por_recaudar'] ?? 0);
+        }
+        $out[] = [
+            'tipo_fila' => 'subtotal',
+            'muelle' => $muelle,
+            'slip' => $slip,
+            'n_cuotas' => count($buffer),
+            'sum_monto' => round($sumMonto, 2),
+            'sum_pagado' => round($sumPagado, 2),
+            'sum_recaudo' => round($sumRecaudo, 2),
+        ];
+        $out[] = ['tipo_fila' => 'separador'];
+        $buffer = [];
+    };
+
+    foreach ($filas as $row) {
+        $clave = strtolower((string) ($row['muelle_orden'] ?? '')) . '|' . strtolower((string) ($row['slip_orden'] ?? ''));
+        if ($bloqueActual !== null && $clave !== $bloqueActual) {
+            $cerrarBloque();
+        }
+        $bloqueActual = $clave;
+        $buffer[] = $row;
+    }
+    $cerrarBloque();
+
+    if ($out !== [] && ($out[array_key_last($out)]['tipo_fila'] ?? '') === 'separador') {
+        array_pop($out);
+    }
+
+    return $out;
+}
+
+$filasRender = marina_recaudo_filas_con_subtotales($filas);
+
 $totalRecaudo = round($totalRecaudo, 2);
 
 if (obtener('export') === 'excel') {
     $rows = [];
-    foreach ($filas as $r) {
+    foreach ($filasRender as $item) {
+        $tipoFila = (string) ($item['tipo_fila'] ?? 'dato');
+        if ($tipoFila === 'separador') {
+            continue;
+        }
+        if ($tipoFila === 'subtotal') {
+            $rows[] = [
+                '',
+                '',
+                'Total slip',
+                '',
+                (string) ($item['muelle'] ?? ''),
+                (string) ($item['slip'] ?? ''),
+                (int) ($item['n_cuotas'] ?? 0) . ' cuota(s)',
+                (float) ($item['sum_monto'] ?? 0),
+                (float) ($item['sum_pagado'] ?? 0),
+                (float) ($item['sum_recaudo'] ?? 0),
+                '',
+            ];
+            continue;
+        }
+        $r = $item['dato'] ?? [];
         $rows[] = [
             $r['contrato_id'],
             $r['numero_cuota'],
@@ -139,16 +256,16 @@ if (obtener('export') === 'excel') {
             $r['muelle'],
             $r['slip'],
             $r['vencimiento'],
-            $r['monto_cuota'],
-            $r['pagado'],
-            $r['por_recaudar'],
+            (float) $r['monto_cuota'],
+            (float) $r['pagado'],
+            (float) $r['por_recaudar'],
             $r['estado'],
         ];
     }
-    $pie = [['Total por recaudar', '', '', '', '', '', '', '', '', $totalRecaudo, '']];
+    $pie = [['Total por recaudar', '', '', '', '', '', '', '', '', (float) $totalRecaudo, '']];
     exportarExcel(
         'reporte_recaudo',
-        ['Contrato', 'Cuota', 'Cliente', 'Navío', 'Muelle / Grupo', 'Slip / Inmueble', 'Vencimiento', 'Monto cuota', 'Pagado', 'Por recaudar', 'Estado'],
+        ['Contrato', 'Cuota', 'Cliente', 'Navío', 'Muelle', 'Slip', 'Vencimiento', 'Monto cuota', 'Pagado', 'Por recaudar', 'Estado'],
         $rows,
         $pie,
         $titulo . ' — ' . fechaFormato($desde) . ' a ' . fechaFormato($hasta)
@@ -160,7 +277,8 @@ require_once __DIR__ . '/../includes/layout.php';
 <h1 class="h4 mb-2">Reporte de recaudo</h1>
 <p class="text-muted small mb-3">
     Cuotas con <strong>vencimiento</strong> entre las fechas indicadas que aún tienen <strong>saldo por cobrar</strong>.
-    Las cuotas ya pagadas no aparecen; solo el monto pendiente de cada una.
+    Orden: <strong>muelle</strong> → <strong>slip</strong> → vencimiento. En inmuebles, muelle = grupo e slip = inmueble.
+    Las cuotas ya pagadas no aparecen.
 </p>
 
 <form method="get" class="toolbar mb-3">
@@ -223,8 +341,8 @@ require_once __DIR__ . '/../includes/layout.php';
 
 <div class="card p-3">
     <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead>
+        <table class="table table-hover align-middle mb-0 no-datatable" data-export-filename="reporte_recaudo" data-export-sheet="Recaudo">
+            <thead class="table-light">
                 <tr>
                     <th>Contrato</th>
                     <th>Cuota</th>
@@ -241,7 +359,32 @@ require_once __DIR__ . '/../includes/layout.php';
                 </tr>
             </thead>
             <tbody>
-            <?php foreach ($filas as $r): ?>
+            <?php if ($filasRender === []): ?>
+                <tr>
+                    <td colspan="12" class="text-muted">No hay cuotas con saldo pendiente y vencimiento en este rango.</td>
+                </tr>
+            <?php else: ?>
+                <?php foreach ($filasRender as $item):
+                    $tipoFila = (string) ($item['tipo_fila'] ?? 'dato');
+                    if ($tipoFila === 'separador'): ?>
+                <tr class="reporte-cobranzas-separador" aria-hidden="true">
+                    <td colspan="12"></td>
+                </tr>
+                    <?php continue; endif;
+                    if ($tipoFila === 'subtotal'): ?>
+                <tr class="reporte-cobranzas-subtotal">
+                    <td colspan="7">
+                        <strong>Total — <?= e((string) ($item['muelle'] ?? '')) ?> / <?= e((string) ($item['slip'] ?? '')) ?></strong>
+                        <span class="text-muted small ms-1">(<?= (int) ($item['n_cuotas'] ?? 0) ?> cuota(s))</span>
+                    </td>
+                    <td class="text-end"><?= dinero((float) ($item['sum_monto'] ?? 0)) ?></td>
+                    <td class="text-end"><?= dinero((float) ($item['sum_pagado'] ?? 0)) ?></td>
+                    <td class="text-end"><?= dinero((float) ($item['sum_recaudo'] ?? 0)) ?></td>
+                    <td colspan="2"></td>
+                </tr>
+                    <?php continue; endif;
+                    $r = $item['dato'] ?? [];
+                    ?>
                 <tr>
                     <td>#<?= (int) $r['contrato_id'] ?></td>
                     <td>#<?= (int) $r['numero_cuota'] ?></td>
@@ -264,12 +407,7 @@ require_once __DIR__ . '/../includes/layout.php';
                         <a class="btn btn-sm btn-outline-primary" href="<?= MARINA_URL ?>/index.php?p=contratos&amp;accion=cuotas&amp;id=<?= (int) $r['contrato_id'] ?>">Cuotas</a>
                     </td>
                 </tr>
-            <?php endforeach; ?>
-            <?php if ($filas === []): ?>
-                <tr>
-                    <td colspan="12" class="text-muted">No hay cuotas con saldo pendiente y vencimiento en este rango.</td>
-                </tr>
-            <?php else: ?>
+                <?php endforeach; ?>
                 <tr class="table-light fw-semibold">
                     <td colspan="9" class="text-end">Total por recaudar</td>
                     <td class="text-end text-success"><?= dinero($totalRecaudo) ?></td>
