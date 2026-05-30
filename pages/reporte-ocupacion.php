@@ -1,15 +1,36 @@
 <?php
 /**
- * Reporte de ocupación: todos los slips e inmuebles; contrato activo, montos y estado de cuotas.
+ * Reporte de cobranzas: slips e inmuebles con contrato activo; montos de cuotas por vencimiento en el rango.
  */
-$titulo = 'Reporte de Ocupación';
+$titulo = 'Reporte de cobranzas';
 $pdo = getDb();
 require_once __DIR__ . '/../includes/export_excel.php';
 
+$desde = trim((string) obtener('desde', date('Y-m-01')));
+$hasta = trim((string) obtener('hasta', date('Y-m-d')));
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $desde)) {
+    $desde = date('Y-m-01');
+}
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $hasta)) {
+    $hasta = date('Y-m-d');
+}
+if ($desde > $hasta) {
+    [$desde, $hasta] = [$hasta, $desde];
+}
+
 $filtro = trim(obtener('ocupacion', ''));
 $filtro = in_array($filtro, ['todos', 'ocupado', 'libre'], true) ? $filtro : 'todos';
-$tipoFiltro = trim(obtener('tipo', ''));
-$tipoFiltro = in_array($tipoFiltro, ['', 'slip', 'inmueble'], true) ? $tipoFiltro : '';
+$tipoAlquiler = trim(obtener('tipo_alquiler', ''));
+if ($tipoAlquiler === 'grupos') {
+    $tipoAlquiler = 'inmuebles';
+}
+$tipoAlquiler = in_array($tipoAlquiler, ['', 'marina', 'inmuebles'], true) ? $tipoAlquiler : '';
+$tipoFiltro = '';
+if ($tipoAlquiler === 'marina') {
+    $tipoFiltro = 'slip';
+} elseif ($tipoAlquiler === 'inmuebles') {
+    $tipoFiltro = 'inmueble';
+}
 $muelle_id = (int) obtener('muelle_id', 0);
 $grupo_id = (int) obtener('grupo_id', 0);
 
@@ -100,17 +121,20 @@ $hoy = date('Y-m-d');
 
 /**
  * @param list<array<string, mixed>> $cuotas
- * @return array{suma_cuotas: float, pagado: float, saldo: float, vencido: float, por_vencer: float, prox_venc: string, fin_contr: string}
+ * @return array{pagado: float, saldo: float, vencido: float, por_vencer: float, prox_venc: string, fin_contr: string}
  */
-function marina_reporte_ocupacion_metricas_cuotas(array $cuotas, string $hoy, string $fechaFinContr): array
+function marina_reporte_ocupacion_metricas_cuotas(array $cuotas, string $hoy, string $fechaFinContr, string $desde, string $hasta): array
 {
-    $sumaCuotas = 0.0;
     $sumPagado = 0.0;
     $sumSaldo = 0.0;
     $sumVenc = 0.0;
     $sumPorVencer = 0.0;
     $candidatosProx = [];
     foreach ($cuotas as $c) {
+        $fv = (string) ($c['fecha_vencimiento'] ?? '');
+        if ($fv === '' || $fv < $desde || $fv > $hasta) {
+            continue;
+        }
         $monto = (float) ($c['monto'] ?? 0);
         $pagMov = (float) ($c['pagado_mov'] ?? 0);
         $tieneMov = $pagMov > 0.00001;
@@ -122,14 +146,10 @@ function marina_reporte_ocupacion_metricas_cuotas(array $cuotas, string $hoy, st
             $pagado = 0.0;
         }
         $saldo = max(0, $monto - $pagado);
-        $fv = (string) ($c['fecha_vencimiento'] ?? '');
-        $sumaCuotas += $monto;
         $sumPagado += min($monto, $pagado);
         $sumSaldo += $saldo;
         if ($saldo > 0.00001) {
-            if ($fv === '') {
-                $sumVenc += $saldo;
-            } elseif ($fv < $hoy) {
+            if ($fv < $hoy) {
                 $sumVenc += $saldo;
             } else {
                 $sumPorVencer += $saldo;
@@ -144,7 +164,6 @@ function marina_reporte_ocupacion_metricas_cuotas(array $cuotas, string $hoy, st
     }
 
     return [
-        'suma_cuotas' => round($sumaCuotas, 2),
         'pagado' => round($sumPagado, 2),
         'saldo' => round($sumSaldo, 2),
         'vencido' => round($sumVenc, 2),
@@ -162,7 +181,9 @@ function marina_ocupacion_fila_slip(
     array $s,
     array $bySlip,
     array $cuotasPorContrato,
-    string $hoy
+    string $hoy,
+    string $desde,
+    string $hasta
 ): array {
     $idSlip = (int) $s['id'];
     $contr = $bySlip[$idSlip] ?? null;
@@ -170,13 +191,11 @@ function marina_ocupacion_fila_slip(
     $label = trim(($s['muelle_nombre'] ?? '') . ' — ' . ($s['slip_nombre'] ?? ''));
     if (!$ocupado) {
         return [
-            'tipo' => 'Marina (slip)',
+            'tipo' => 'Marina',
             'unidad' => $label !== '' ? $label : '—',
             'ocupacion' => 'Libre',
-            'contrato_id' => 0,
             'cliente' => '',
             'monto_contrato' => null,
-            'suma_cuotas' => null,
             'fin_contrato' => '',
             'prox_venc' => '',
             'pagado' => 0.0,
@@ -194,16 +213,16 @@ function marina_ocupacion_fila_slip(
     $m = marina_reporte_ocupacion_metricas_cuotas(
         $cuo,
         $hoy,
-        (string) ($contr['fecha_fin'] ?? '')
+        (string) ($contr['fecha_fin'] ?? ''),
+        $desde,
+        $hasta
     );
     return [
-        'tipo' => 'Marina (slip)',
+        'tipo' => 'Marina',
         'unidad' => $label,
         'ocupacion' => 'Ocupado',
-        'contrato_id' => $cid,
         'cliente' => (string) ($contr['cliente_nombre'] ?? ''),
         'monto_contrato' => (float) ($contr['monto_total'] ?? 0),
-        'suma_cuotas' => $m['suma_cuotas'],
         'fin_contrato' => (string) ($contr['fecha_fin'] ?? ''),
         'prox_venc' => $m['prox_venc'],
         'pagado' => $m['pagado'],
@@ -225,7 +244,9 @@ function marina_ocupacion_fila_inmueble(
     array $i,
     array $byInm,
     array $cuotasPorContrato,
-    string $hoy
+    string $hoy,
+    string $desde,
+    string $hasta
 ): array {
     $iidU = (int) $i['id'];
     $contr = $byInm[$iidU] ?? null;
@@ -233,13 +254,11 @@ function marina_ocupacion_fila_inmueble(
     $label = trim(($i['grupo_nombre'] ?? '') . ' — ' . ($i['inmueble_nombre'] ?? ''));
     if (!$ocupado) {
         return [
-            'tipo' => 'Inmueble',
+            'tipo' => 'Inmuebles',
             'unidad' => $label !== '' ? $label : '—',
             'ocupacion' => 'Libre',
-            'contrato_id' => 0,
             'cliente' => '',
             'monto_contrato' => null,
-            'suma_cuotas' => null,
             'fin_contrato' => '',
             'prox_venc' => '',
             'pagado' => 0.0,
@@ -257,16 +276,16 @@ function marina_ocupacion_fila_inmueble(
     $m = marina_reporte_ocupacion_metricas_cuotas(
         $cuo,
         $hoy,
-        (string) ($contr['fecha_fin'] ?? '')
+        (string) ($contr['fecha_fin'] ?? ''),
+        $desde,
+        $hasta
     );
     return [
-        'tipo' => 'Inmueble',
+        'tipo' => 'Inmuebles',
         'unidad' => $label,
         'ocupacion' => 'Ocupado',
-        'contrato_id' => $cid,
         'cliente' => (string) ($contr['cliente_nombre'] ?? ''),
         'monto_contrato' => (float) ($contr['monto_total'] ?? 0),
-        'suma_cuotas' => $m['suma_cuotas'],
         'fin_contrato' => (string) ($contr['fecha_fin'] ?? ''),
         'prox_venc' => $m['prox_venc'],
         'pagado' => $m['pagado'],
@@ -314,7 +333,6 @@ function marina_ocupacion_acumular_en_grupo(array &$acc, int $id, string $nombre
             'n_libres' => 0,
             'n_ocupados' => 0,
             'sum_monto_contrato' => 0.0,
-            'sum_suma_cuotas' => 0.0,
             'sum_pagado' => 0.0,
             'sum_saldo' => 0.0,
             'sum_vencido' => 0.0,
@@ -328,7 +346,6 @@ function marina_ocupacion_acumular_en_grupo(array &$acc, int $id, string $nombre
     } else {
         $a['n_ocupados']++;
         $a['sum_monto_contrato'] += (float) ($row['monto_contrato'] ?? 0);
-        $a['sum_suma_cuotas'] += (float) ($row['suma_cuotas'] ?? 0);
         $a['sum_pagado'] += (float) ($row['pagado'] ?? 0);
         $a['sum_saldo'] += (float) ($row['saldo'] ?? 0);
         $a['sum_vencido'] += (float) ($row['vencido'] ?? 0);
@@ -336,8 +353,143 @@ function marina_ocupacion_acumular_en_grupo(array &$acc, int $id, string $nombre
     }
 }
 
+/**
+ * @param array<string, mixed> $row
+ */
+function marina_cobranzas_clave_bloque(array $row): string
+{
+    if (($row['tipo'] ?? '') === 'Marina') {
+        $mid = (int) ($row['muelle_id'] ?? 0);
+
+        return 'marina|' . $mid . '|' . strtolower(trim((string) ($row['muelle_nombre'] ?? '')));
+    }
+    $gid = (int) ($row['grupo_id'] ?? 0);
+
+    return 'inmuebles|' . $gid . '|' . strtolower(trim((string) ($row['grupo_nombre'] ?? '')));
+}
+
+/**
+ * @param array<string, mixed> $row
+ */
+function marina_cobranzas_nombre_bloque(array $row): string
+{
+    if (($row['tipo'] ?? '') === 'Marina') {
+        $nom = trim((string) ($row['muelle_nombre'] ?? ''));
+
+        return $nom !== '' ? $nom : 'Marina';
+    }
+    $nom = trim((string) ($row['grupo_nombre'] ?? ''));
+
+    return $nom !== '' ? $nom : 'Grupo';
+}
+
+/**
+ * @param list<array<string, mixed>> $filasBloque
+ * @return array{n: int, n_ocup: int, n_libre: int, sum_monto_contrato: float, sum_pagado: float, sum_saldo: float, sum_vencido: float, sum_por_vencer: float}
+ */
+function marina_cobranzas_totales_bloque(array $filasBloque): array
+{
+    $t = [
+        'n' => 0,
+        'n_ocup' => 0,
+        'n_libre' => 0,
+        'sum_monto_contrato' => 0.0,
+        'sum_pagado' => 0.0,
+        'sum_saldo' => 0.0,
+        'sum_vencido' => 0.0,
+        'sum_por_vencer' => 0.0,
+    ];
+    foreach ($filasBloque as $r) {
+        $t['n']++;
+        if (($r['ocupacion'] ?? '') === 'Ocupado') {
+            $t['n_ocup']++;
+            $t['sum_monto_contrato'] += (float) ($r['monto_contrato'] ?? 0);
+            $t['sum_pagado'] += (float) ($r['pagado'] ?? 0);
+            $t['sum_saldo'] += (float) ($r['saldo'] ?? 0);
+            $t['sum_vencido'] += (float) ($r['vencido'] ?? 0);
+            $t['sum_por_vencer'] += (float) ($r['por_vencer'] ?? 0);
+        } else {
+            $t['n_libre']++;
+        }
+    }
+
+    return $t;
+}
+
+/**
+ * Ordena por bloque (muelle / grupo) e inserta subtotales y separadores.
+ *
+ * @param list<array<string, mixed>> $filas
+ * @return list<array<string, mixed>>
+ */
+function marina_cobranzas_filas_detalle_con_subtotales(array $filas): array
+{
+    if ($filas === []) {
+        return [];
+    }
+
+    usort($filas, static function (array $a, array $b): int {
+        $ta = ($a['tipo'] ?? '') === 'Marina' ? 0 : 1;
+        $tb = ($b['tipo'] ?? '') === 'Marina' ? 0 : 1;
+        if ($ta !== $tb) {
+            return $ta <=> $tb;
+        }
+        $na = $ta === 0 ? (string) ($a['muelle_nombre'] ?? '') : (string) ($a['grupo_nombre'] ?? '');
+        $nb = $tb === 0 ? (string) ($b['muelle_nombre'] ?? '') : (string) ($b['grupo_nombre'] ?? '');
+        $cmp = strnatcasecmp($na, $nb);
+        if ($cmp !== 0) {
+            return $cmp;
+        }
+
+        return strnatcasecmp((string) ($a['unidad'] ?? ''), (string) ($b['unidad'] ?? ''));
+    });
+
+    $out = [];
+    $bloqueActual = null;
+    $buffer = [];
+
+    $cerrarBloque = static function () use (&$out, &$buffer): void {
+        if ($buffer === []) {
+            return;
+        }
+        $nombreBloque = marina_cobranzas_nombre_bloque($buffer[0]);
+        $tipoBloque = (string) ($buffer[0]['tipo'] ?? '');
+        foreach ($buffer as $row) {
+            $out[] = ['tipo_fila' => 'dato', 'dato' => $row];
+        }
+        $tot = marina_cobranzas_totales_bloque($buffer);
+        $out[] = [
+            'tipo_fila' => 'subtotal',
+            'bloque_nombre' => $nombreBloque,
+            'bloque_tipo' => $tipoBloque,
+            'totales' => $tot,
+        ];
+        $out[] = ['tipo_fila' => 'separador'];
+        $buffer = [];
+    };
+
+    foreach ($filas as $row) {
+        $clave = marina_cobranzas_clave_bloque($row);
+        if ($bloqueActual !== null && $clave !== $bloqueActual) {
+            $cerrarBloque();
+        }
+        $bloqueActual = $clave;
+        $buffer[] = $row;
+    }
+    $cerrarBloque();
+
+    if ($out !== [] && ($out[array_key_last($out)]['tipo_fila'] ?? '') === 'separador') {
+        array_pop($out);
+    }
+
+    return $out;
+}
+
 $vista = trim(obtener('vista', 'detalle'));
 $vista = in_array($vista, ['detalle', 'grupos'], true) ? $vista : 'detalle';
+if ($tipoAlquiler === 'inmuebles' || $tipoAlquiler === 'marina') {
+    $vista = 'detalle';
+}
 
 $filas = [];
 $acumMuelle = [];
@@ -350,17 +502,16 @@ foreach ($slips as $s) {
     if ($tipoFiltro === 'inmueble') {
         continue;
     }
-    $row = marina_ocupacion_fila_slip($s, $bySlip, $cuotasPorContrato, $hoy);
+    $row = marina_ocupacion_fila_slip($s, $bySlip, $cuotasPorContrato, $hoy, $desde, $hasta);
     if ($vista === 'grupos') {
         $mid = (int) $row['muelle_id'];
         if ($mid > 0) {
-            marina_ocupacion_acumular_en_grupo($acumMuelle, $mid, (string) $row['muelle_nombre'], $row, 'Marina (muelle)');
+            marina_ocupacion_acumular_en_grupo($acumMuelle, $mid, (string) $row['muelle_nombre'], $row, 'Marina');
         }
     } else {
         if (!marina_ocupacion_pasa_filtro_ocupacion($row, $filtro)) {
             continue;
         }
-        unset($row['muelle_id'], $row['muelle_nombre'], $row['grupo_id'], $row['grupo_nombre']);
         $filas[] = $row;
     }
 }
@@ -372,20 +523,21 @@ foreach ($inmuebles as $i) {
     if ($tipoFiltro === 'slip') {
         continue;
     }
-    $row = marina_ocupacion_fila_inmueble($i, $byInm, $cuotasPorContrato, $hoy);
+    $row = marina_ocupacion_fila_inmueble($i, $byInm, $cuotasPorContrato, $hoy, $desde, $hasta);
     if ($vista === 'grupos') {
         $gid = (int) $row['grupo_id'];
         if ($gid > 0) {
-            marina_ocupacion_acumular_en_grupo($acumGrupo, $gid, (string) $row['grupo_nombre'], $row, 'Inmueble (grupo)');
+            marina_ocupacion_acumular_en_grupo($acumGrupo, $gid, (string) $row['grupo_nombre'], $row, 'Grupos');
         }
     } else {
         if (!marina_ocupacion_pasa_filtro_ocupacion($row, $filtro)) {
             continue;
         }
-        unset($row['muelle_id'], $row['muelle_nombre'], $row['grupo_id'], $row['grupo_nombre']);
         $filas[] = $row;
     }
 }
+
+$filasDetalleRender = ($vista === 'detalle') ? marina_cobranzas_filas_detalle_con_subtotales($filas) : [];
 
 $filasGrupos = [];
 if ($vista === 'grupos') {
@@ -409,7 +561,6 @@ $totalesGrupos = [
     'n_libres' => 0,
     'n_ocupados' => 0,
     'sum_monto_contrato' => 0.0,
-    'sum_suma_cuotas' => 0.0,
     'sum_pagado' => 0.0,
     'sum_saldo' => 0.0,
     'sum_vencido' => 0.0,
@@ -421,7 +572,6 @@ if ($vista === 'grupos') {
         $totalesGrupos['n_libres'] += (int) ($g['n_libres'] ?? 0);
         $totalesGrupos['n_ocupados'] += (int) ($g['n_ocupados'] ?? 0);
         $totalesGrupos['sum_monto_contrato'] += (float) ($g['sum_monto_contrato'] ?? 0);
-        $totalesGrupos['sum_suma_cuotas'] += (float) ($g['sum_suma_cuotas'] ?? 0);
         $totalesGrupos['sum_pagado'] += (float) ($g['sum_pagado'] ?? 0);
         $totalesGrupos['sum_saldo'] += (float) ($g['sum_saldo'] ?? 0);
         $totalesGrupos['sum_vencido'] += (float) ($g['sum_vencido'] ?? 0);
@@ -449,7 +599,6 @@ if ($vista === 'detalle') {
 
 $totalesDetalle = [
     'sum_monto_contrato' => 0.0,
-    'sum_suma_cuotas' => 0.0,
     'sum_pagado' => 0.0,
     'sum_saldo' => 0.0,
     'sum_vencido' => 0.0,
@@ -458,7 +607,6 @@ $totalesDetalle = [
 if ($vista === 'detalle') {
     foreach ($filas as $f) {
         $totalesDetalle['sum_monto_contrato'] += (float) ($f['monto_contrato'] ?? 0);
-        $totalesDetalle['sum_suma_cuotas'] += (float) ($f['suma_cuotas'] ?? 0);
         $totalesDetalle['sum_pagado'] += (float) ($f['pagado'] ?? 0);
         $totalesDetalle['sum_saldo'] += (float) ($f['saldo'] ?? 0);
         $totalesDetalle['sum_vencido'] += (float) ($f['vencido'] ?? 0);
@@ -477,7 +625,6 @@ if (obtener('export') === 'excel') {
                 (int) ($g['n_libres'] ?? 0),
                 (int) ($g['n_ocupados'] ?? 0),
                 (float) ($g['sum_monto_contrato'] ?? 0),
-                (float) ($g['sum_suma_cuotas'] ?? 0),
                 (float) ($g['sum_pagado'] ?? 0),
                 (float) ($g['sum_saldo'] ?? 0),
                 (float) ($g['sum_vencido'] ?? 0),
@@ -492,21 +639,19 @@ if (obtener('export') === 'excel') {
                 (int) $totalesGrupos['n_libres'],
                 (int) $totalesGrupos['n_ocupados'],
                 (float) $totalesGrupos['sum_monto_contrato'],
-                (float) $totalesGrupos['sum_suma_cuotas'],
                 (float) $totalesGrupos['sum_pagado'],
                 (float) $totalesGrupos['sum_saldo'],
                 (float) $totalesGrupos['sum_vencido'],
                 (float) $totalesGrupos['sum_por_vencer'],
             ],
         ];
-        exportarExcel('reporte_ocupacion_grupos', [
+        exportarExcel('reporte_cobranzas_grupos', [
             'Ámbito',
             'Grupo / muelle',
             'Unidades',
             'Libres',
             'Ocupados',
             'Monto contrato ∑',
-            'Suma cuotas ∑',
             'Pagado ∑',
             'Falta por pagar ∑',
             'Vencido ∑',
@@ -514,15 +659,35 @@ if (obtener('export') === 'excel') {
         ], $rowsX, $pie, $titulo . ' — Totales por grupo');
     } else {
         $rowsX = [];
-        foreach ($filas as $f) {
+        foreach ($filasDetalleRender as $item) {
+            $tipoFila = (string) ($item['tipo_fila'] ?? 'dato');
+            if ($tipoFila === 'separador') {
+                continue;
+            }
+            if ($tipoFila === 'subtotal') {
+                $tot = $item['totales'] ?? [];
+                $rowsX[] = [
+                    (string) ($item['bloque_tipo'] ?? ''),
+                    'Total — ' . (string) ($item['bloque_nombre'] ?? ''),
+                    (int) ($tot['n_ocup'] ?? 0) . ' ocup. / ' . (int) ($tot['n_libre'] ?? 0) . ' libres',
+                    '',
+                    (float) ($tot['sum_monto_contrato'] ?? 0),
+                    '',
+                    '',
+                    (float) ($tot['sum_pagado'] ?? 0),
+                    (float) ($tot['sum_saldo'] ?? 0),
+                    (float) ($tot['sum_vencido'] ?? 0),
+                    (float) ($tot['sum_por_vencer'] ?? 0),
+                ];
+                continue;
+            }
+            $f = $item['dato'] ?? [];
             $rowsX[] = [
                 $f['tipo'],
                 $f['unidad'],
                 $f['ocupacion'],
-                (int) ($f['contrato_id'] ?? 0),
                 (string) ($f['cliente'] ?? ''),
                 $f['monto_contrato'] !== null ? (float) $f['monto_contrato'] : '',
-                $f['suma_cuotas'] !== null ? (float) $f['suma_cuotas'] : '',
                 (string) ($f['fin_contrato'] ?? ''),
                 (string) ($f['prox_venc'] ?? ''),
                 (float) ($f['pagado'] ?? 0),
@@ -537,9 +702,7 @@ if (obtener('export') === 'excel') {
                 '',
                 'Ocupados: ' . (string) $cntOcup . ' | Libres: ' . (string) $cntLibre,
                 '',
-                '',
                 (float) $totalesDetalle['sum_monto_contrato'],
-                (float) $totalesDetalle['sum_suma_cuotas'],
                 '',
                 '',
                 (float) $totalesDetalle['sum_pagado'],
@@ -548,14 +711,12 @@ if (obtener('export') === 'excel') {
                 (float) $totalesDetalle['sum_por_vencer'],
             ],
         ];
-        exportarExcel('reporte_ocupacion', [
+        exportarExcel('reporte_cobranzas', [
             'Tipo',
             'Unidad',
             'Ocupación',
-            'Contrato',
             'Cliente',
             'Monto contrato',
-            'Suma cuotas',
             'Fin contrato',
             'Próx. venc. cuota',
             'Pagado (cuotas)',
@@ -568,21 +729,40 @@ if (obtener('export') === 'excel') {
 
 require_once __DIR__ . '/../includes/layout.php';
 ?>
-<h1 class="h4 mb-2">Reporte de Ocupación</h1>
-<p class="text-muted small mb-3">Listado de <strong>todos los slips (marina)</strong> e <strong>inmuebles</strong> (almacenes, habitaciones, depósitos, etc. según cómo estén creados en <em>Grupos / Inmuebles</em>). <strong>Libre</strong> = sin contrato activo; <strong>Ocupado</strong> = contrato con estado activo. Los montos de cuotas usan abonos/pagos y pago legado, igual que el <a href="<?= MARINA_URL ?>/index.php?p=reporte-cuotas">reporte de cuotas</a>. <strong>Falta por pagar</strong> es el saldo total pendiente; <strong>Vencido</strong> es el saldo de cuotas cuya fecha de vencimiento ya pasó; <strong>Pend. no vencido</strong> es saldo con vencimiento hoy o futuro.</p>
+<h1 class="h4 mb-2">Reporte de cobranzas</h1>
+<p class="text-muted small mb-3">Cobranzas por <strong>cuotas con vencimiento</strong> entre <strong><?= e(fechaFormato($desde)) ?></strong> y <strong><?= e(fechaFormato($hasta)) ?></strong>. Incluye slips (<em>Marina</em>) e inmuebles (<em>Grupos</em>). <strong>Libre</strong> = sin contrato activo; <strong>Ocupado</strong> = contrato activo. Los montos usan abonos/pagos y pago legado, igual que el <a href="<?= MARINA_URL ?>/index.php?p=reporte-cuotas">reporte de cuotas</a>. <strong>Falta por pagar</strong> es el saldo pendiente de esas cuotas; <strong>Vencido</strong> vence antes de hoy; <strong>Pend. no vencido</strong> vence hoy o después.</p>
 <?php if ($vista === 'grupos'): ?>
-    <p class="small alert alert-info py-2 mb-3">Vista <strong>Totales por grupo</strong>: se suma todo por <strong>cada muelle</strong> (todos sus slips) y por <strong>cada grupo de inmuebles</strong> (Astillero, Dique seco, etc. según nombres en el sistema), incluyendo <strong>unidades libres y ocupadas</strong>. El filtro de ocupación (libre/ocupado) <strong>no aplica</strong> en esta vista; sí aplican muelle, grupo, y tipo (slips / inmuebles).</p>
+    <p class="small alert alert-info py-2 mb-3">Vista <strong>Totales por grupo</strong>: suma por <strong>cada muelle</strong> (slips) y por <strong>cada grupo de inmuebles</strong>. El filtro de ocupación (libre/ocupado) <strong>no aplica</strong> en esta vista; sí aplican fechas, muelle, grupo y tipo de alquiler.</p>
 <?php endif; ?>
 
 <form method="get" class="toolbar mb-3">
     <input type="hidden" name="p" value="reporte-ocupacion">
     <div class="row g-2 align-items-end">
-        <div class="col-12 col-md-6 col-lg-3">
+        <div class="col-12 col-md-6 col-lg-2">
+            <label class="form-label mb-1">Vencimiento desde</label>
+            <input type="date" class="form-control" name="desde" value="<?= e($desde) ?>">
+        </div>
+        <div class="col-12 col-md-6 col-lg-2">
+            <label class="form-label mb-1">Vencimiento hasta</label>
+            <input type="date" class="form-control" name="hasta" value="<?= e($hasta) ?>">
+        </div>
+        <div class="col-12 col-md-6 col-lg-2">
+            <label class="form-label mb-1">Tipo de alquiler</label>
+            <select class="form-select" name="tipo_alquiler">
+                <option value="" <?= $tipoAlquiler === '' ? 'selected' : '' ?>>Todos</option>
+                <option value="marina" <?= $tipoAlquiler === 'marina' ? 'selected' : '' ?>>Marina</option>
+                <option value="inmuebles" <?= $tipoAlquiler === 'inmuebles' ? 'selected' : '' ?>>Inmuebles</option>
+            </select>
+        </div>
+        <div class="col-12 col-md-6 col-lg-2">
             <label class="form-label mb-1">Vista</label>
-            <select class="form-select" name="vista" id="ocup-vista">
+            <select class="form-select" name="vista" id="ocup-vista" <?= in_array($tipoAlquiler, ['marina', 'inmuebles'], true) ? 'disabled' : '' ?>>
                 <option value="detalle" <?= $vista === 'detalle' ? 'selected' : '' ?>>Unidad a unidad (detalle)</option>
                 <option value="grupos" <?= $vista === 'grupos' ? 'selected' : '' ?>>Totales por grupo (muelle / grupo)</option>
             </select>
+            <?php if (in_array($tipoAlquiler, ['marina', 'inmuebles'], true)): ?>
+                <input type="hidden" name="vista" value="<?= e($vista) ?>">
+            <?php endif; ?>
         </div>
         <div class="col-12 col-md-6 col-lg-2">
             <label class="form-label mb-1">Ocupación <span class="text-muted fw-normal">(solo detalle)</span></label>
@@ -594,15 +774,7 @@ require_once __DIR__ . '/../includes/layout.php';
             <?php if ($vista === 'grupos'): ?><input type="hidden" name="ocupacion" value="<?= e($filtro) ?>"><?php endif; ?>
         </div>
         <div class="col-12 col-md-6 col-lg-2">
-            <label class="form-label mb-1">Tipo unidad</label>
-            <select class="form-select" name="tipo">
-                <option value="" <?= $tipoFiltro === '' ? 'selected' : '' ?>>Todas</option>
-                <option value="slip" <?= $tipoFiltro === 'slip' ? 'selected' : '' ?>>Solo slips (marina)</option>
-                <option value="inmueble" <?= $tipoFiltro === 'inmueble' ? 'selected' : '' ?>>Solo inmuebles</option>
-            </select>
-        </div>
-        <div class="col-12 col-md-6 col-lg-3">
-            <label class="form-label mb-1">Muelle (slips)</label>
+            <label class="form-label mb-1">Muelle (marina)</label>
             <select class="form-select" name="muelle_id">
                 <option value="0">Todos</option>
                 <?php foreach ($muellesOpts as $mid => $mnom): ?>
@@ -610,7 +782,7 @@ require_once __DIR__ . '/../includes/layout.php';
                 <?php endforeach; ?>
             </select>
         </div>
-        <div class="col-12 col-md-6 col-lg-3">
+        <div class="col-12 col-md-6 col-lg-2">
             <label class="form-label mb-1">Grupo (inmuebles)</label>
             <select class="form-select" name="grupo_id">
                 <option value="0">Todos</option>
@@ -624,6 +796,7 @@ require_once __DIR__ . '/../includes/layout.php';
             <button type="submit" class="btn btn-success" name="export" value="excel">Exportar Excel</button>
         </div>
     </div>
+    <p class="text-muted small mb-0 mt-2"><strong>Marina</strong> solo slips; <strong>Inmuebles</strong> solo unidades de grupo. Con <strong>Todos</strong> puede elegir vista detalle o agrupada.</p>
 </form>
 
 <div class="card p-3 mb-3">
@@ -641,8 +814,8 @@ require_once __DIR__ . '/../includes/layout.php';
 </div>
 
 <?php if ($vista === 'grupos'): ?>
-<div class="table-responsive card p-0 mb-2">
-    <table class="table table-hover table-sm align-middle mb-0 no-datatable">
+<div class="table-responsive card p-0 mb-2 reporte-cobranzas-table-wrap">
+    <table class="table table-hover table-sm align-middle mb-0 no-datatable reporte-cobranzas-tabla">
         <thead class="table-light">
             <tr>
                 <th>Ámbito</th>
@@ -651,7 +824,6 @@ require_once __DIR__ . '/../includes/layout.php';
                 <th class="text-end">Libres</th>
                 <th class="text-end">Ocup.</th>
                 <th class="text-end">Monto contrato ∑</th>
-                <th class="text-end">Suma cuotas ∑</th>
                 <th class="text-end">Pagado ∑</th>
                 <th class="text-end">Falta por pagar ∑</th>
                 <th class="text-end">Vencido ∑</th>
@@ -660,7 +832,7 @@ require_once __DIR__ . '/../includes/layout.php';
         </thead>
         <tbody>
         <?php if (empty($filasGrupos)): ?>
-            <tr><td colspan="11" class="text-muted p-3">Sin grupos con los filtros actuales.</td></tr>
+            <tr><td colspan="10" class="text-muted p-3">Sin grupos con los filtros actuales.</td></tr>
         <?php else: ?>
             <?php foreach ($filasGrupos as $f): ?>
             <tr>
@@ -670,7 +842,6 @@ require_once __DIR__ . '/../includes/layout.php';
                 <td class="text-end"><?= (int) $f['n_libres'] ?></td>
                 <td class="text-end"><?= (int) $f['n_ocupados'] ?></td>
                 <td class="text-end"><?= dinero((float) $f['sum_monto_contrato']) ?></td>
-                <td class="text-end"><?= dinero((float) $f['sum_suma_cuotas']) ?></td>
                 <td class="text-end"><?= dinero((float) $f['sum_pagado']) ?></td>
                 <td class="text-end"><?= dinero((float) $f['sum_saldo']) ?></td>
                 <td class="text-end"><?= dinero((float) $f['sum_vencido']) ?></td>
@@ -686,7 +857,6 @@ require_once __DIR__ . '/../includes/layout.php';
                 <th scope="col" class="text-end">Libres</th>
                 <th scope="col" class="text-end">Ocup.</th>
                 <th scope="col" class="text-end">Monto contrato ∑</th>
-                <th scope="col" class="text-end">Suma cuotas ∑</th>
                 <th scope="col" class="text-end">Pagado ∑</th>
                 <th scope="col" class="text-end">Falta por pagar ∑</th>
                 <th scope="col" class="text-end">Vencido ∑</th>
@@ -699,7 +869,6 @@ require_once __DIR__ . '/../includes/layout.php';
                 <td class="text-end"><?= (int) $totalesGrupos['n_libres'] ?></td>
                 <td class="text-end"><?= (int) $totalesGrupos['n_ocupados'] ?></td>
                 <td class="text-end"><?= dinero((float) $totalesGrupos['sum_monto_contrato']) ?></td>
-                <td class="text-end"><?= dinero((float) $totalesGrupos['sum_suma_cuotas']) ?></td>
                 <td class="text-end"><?= dinero((float) $totalesGrupos['sum_pagado']) ?></td>
                 <td class="text-end"><?= dinero((float) $totalesGrupos['sum_saldo']) ?></td>
                 <td class="text-end"><?= dinero((float) $totalesGrupos['sum_vencido']) ?></td>
@@ -710,17 +879,15 @@ require_once __DIR__ . '/../includes/layout.php';
     </table>
 </div>
 <?php else: ?>
-<div class="table-responsive card p-0">
-    <table class="table table-hover table-sm align-middle mb-0 no-datatable">
+<div class="table-responsive card p-0 reporte-cobranzas-table-wrap">
+    <table class="table table-hover table-sm align-middle mb-0 no-datatable reporte-cobranzas-tabla">
         <thead class="table-light">
             <tr>
                 <th>Tipo</th>
                 <th>Unidad</th>
                 <th>Ocupación</th>
-                <th>Contrato</th>
                 <th>Cliente</th>
                 <th class="text-end">Monto contrato</th>
-                <th class="text-end">Suma cuotas</th>
                 <th>Fin contrato</th>
                 <th>Próx. venc. cuota</th>
                 <th class="text-end">Pagado (cuotas)</th>
@@ -730,10 +897,36 @@ require_once __DIR__ . '/../includes/layout.php';
             </tr>
         </thead>
         <tbody>
-        <?php if (empty($filas)): ?>
-            <tr><td colspan="13" class="text-muted p-3">Sin resultados con los filtros actuales.</td></tr>
+        <?php if (empty($filasDetalleRender)): ?>
+            <tr><td colspan="11" class="text-muted p-3">Sin resultados con los filtros actuales.</td></tr>
         <?php else: ?>
-            <?php foreach ($filas as $f): ?>
+            <?php foreach ($filasDetalleRender as $item):
+                $tipoFila = (string) ($item['tipo_fila'] ?? 'dato');
+                if ($tipoFila === 'separador'): ?>
+            <tr class="reporte-cobranzas-separador" aria-hidden="true">
+                <td colspan="11"></td>
+            </tr>
+                <?php continue; endif;
+                if ($tipoFila === 'subtotal'):
+                    $tot = $item['totales'] ?? [];
+                    $etiqBloque = ((string) ($item['bloque_tipo'] ?? '')) === 'Marina' ? 'muelle' : 'grupo';
+                    ?>
+            <tr class="reporte-cobranzas-subtotal">
+                <td colspan="4">
+                    <strong>Total <?= e($etiqBloque) ?> — <?= e((string) ($item['bloque_nombre'] ?? '')) ?></strong>
+                    <span class="text-muted small ms-1">(<?= (int) ($tot['n'] ?? 0) ?> unid.; <?= (int) ($tot['n_ocup'] ?? 0) ?> ocup. / <?= (int) ($tot['n_libre'] ?? 0) ?> libres)</span>
+                </td>
+                <td class="text-end"><?= dinero((float) ($tot['sum_monto_contrato'] ?? 0)) ?></td>
+                <td>—</td>
+                <td>—</td>
+                <td class="text-end"><?= dinero((float) ($tot['sum_pagado'] ?? 0)) ?></td>
+                <td class="text-end"><?= dinero((float) ($tot['sum_saldo'] ?? 0)) ?></td>
+                <td class="text-end"><?= dinero((float) ($tot['sum_vencido'] ?? 0)) ?></td>
+                <td class="text-end"><?= dinero((float) ($tot['sum_por_vencer'] ?? 0)) ?></td>
+            </tr>
+                <?php continue; endif;
+                $f = $item['dato'] ?? [];
+                ?>
             <tr>
                 <td><?= e($f['tipo']) ?></td>
                 <td><?= e($f['unidad']) ?></td>
@@ -744,10 +937,8 @@ require_once __DIR__ . '/../includes/layout.php';
                         <span class="badge bg-primary">Ocupado</span>
                     <?php endif; ?>
                 </td>
-                <td><?= (int) $f['contrato_id'] > 0 ? (int) $f['contrato_id'] : '—' ?></td>
                 <td><?= $f['ocupacion'] === 'Libre' || trim((string) $f['cliente']) === '' ? '—' : e((string) $f['cliente']) ?></td>
                 <td class="text-end"><?= $f['monto_contrato'] !== null ? dinero((float) $f['monto_contrato']) : '—' ?></td>
-                <td class="text-end"><?= $f['suma_cuotas'] !== null ? dinero((float) $f['suma_cuotas']) : '—' ?></td>
                 <td><?= $f['fin_contrato'] !== '' ? e(fechaFormato($f['fin_contrato'])) : '—' ?></td>
                 <td><?= $f['prox_venc'] !== '' ? e(fechaFormato($f['prox_venc'])) : '—' ?></td>
                 <td class="text-end"><?= $f['ocupacion'] === 'Ocupado' ? dinero((float) $f['pagado']) : '—' ?></td>
@@ -762,10 +953,8 @@ require_once __DIR__ . '/../includes/layout.php';
                 <th scope="col">Tipo</th>
                 <th scope="col">Unidad</th>
                 <th scope="col">Ocupación</th>
-                <th scope="col">Contrato</th>
                 <th scope="col">Cliente</th>
                 <th scope="col" class="text-end">Monto contrato</th>
-                <th scope="col" class="text-end">Suma cuotas</th>
                 <th scope="col">Fin contrato</th>
                 <th scope="col">Próx. venc. cuota</th>
                 <th scope="col" class="text-end">Pagado (cuotas)</th>
@@ -778,9 +967,7 @@ require_once __DIR__ . '/../includes/layout.php';
                 <td>Unidades listadas</td>
                 <td>Ocup.: <?= (int) $cntOcup ?> / Libres: <?= (int) $cntLibre ?></td>
                 <td>—</td>
-                <td>—</td>
                 <td class="text-end"><?= dinero((float) $totalesDetalle['sum_monto_contrato']) ?></td>
-                <td class="text-end"><?= dinero((float) $totalesDetalle['sum_suma_cuotas']) ?></td>
                 <td>—</td>
                 <td>—</td>
                 <td class="text-end"><?= dinero((float) $totalesDetalle['sum_pagado']) ?></td>

@@ -577,7 +577,7 @@ require_once __DIR__ . '/../includes/layout.php';
     <span class="small fw-normal">
         <a href="<?= e($urlMapaMarina) ?>">Mapa marina</a> ·
         <a href="<?= e($urlMapaGrupos) ?>">Mapa grupos</a> ·
-        <a href="<?= e($urlReporteOcupacion) ?>">Reporte ocupación</a>
+        <a href="<?= e($urlReporteOcupacion) ?>">Reporte de cobranzas</a>
     </span>
 </div>
 

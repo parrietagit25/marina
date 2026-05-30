@@ -92,11 +92,17 @@ function marinaExportarExcelXlsxZip(string $filename, array $headers, array $row
         . '</Relationships>');
     $zip->addFromString('xl/styles.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         . '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        . '<numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0.00"/></numFmts>'
         . '<fonts count="2"><font/><font><b/></font></fonts>'
         . '<fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE2EFD9"/><bgColor indexed="64"/></patternFill></fill></fills>'
         . '<borders count="1"><border/></borders>'
         . '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
-        . '<cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="1" borderId="0" xfId="0" applyFont="1" applyFill="1"/></cellXfs>'
+        . '<cellXfs count="4">'
+        . '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
+        . '<xf numFmtId="0" fontId="1" fillId="1" borderId="0" xfId="0" applyFont="1" applyFill="1"/>'
+        . '<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>'
+        . '<xf numFmtId="164" fontId="1" fillId="1" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1"/>'
+        . '</cellXfs>'
         . '</styleSheet>');
     $zip->addFromString('xl/worksheets/sheet1.xml', $sheetXml);
     $zip->close();
@@ -132,10 +138,11 @@ function marinaXlsxConstruirSheetXml(array $sheetRows, ?int $footerStartRow = nu
             $ref = marinaXlsxColLetter($c - 1) . $r;
             [$txt, $tipo] = marinaXlsxValorCelda($val);
             $esFooter = $footerStartRow !== null && $r >= $footerStartRow;
-            $style = $esFooter ? ' s="1"' : '';
             if ($tipo === 'n') {
-                $xml .= '<c r="' . $ref . '"' . $style . ' t="n"><v>' . $txt . '</v></c>';
+                $style = $esFooter ? ' s="3"' : ' s="2"';
+                $xml .= '<c r="' . $ref . '"' . $style . '><v>' . $txt . '</v></c>';
             } else {
+                $style = $esFooter ? ' s="1"' : '';
                 $xml .= '<c r="' . $ref . '"' . $style . ' t="inlineStr"><is><t>'
                     . marinaXlsxEsc($txt) . '</t></is></c>';
             }
@@ -164,7 +171,7 @@ function marinaXlsxColLetter(int $index): string
 /** @return array{0: string, 1: 'n'|'str'} */
 function marinaXlsxValorCelda($v): array
 {
-    if ($v === null) {
+    if ($v === null || $v === '') {
         return ['', 'str'];
     }
     if (is_bool($v)) {
@@ -174,10 +181,60 @@ function marinaXlsxValorCelda($v): array
         return [(string) $v, 'n'];
     }
     if (is_float($v)) {
-        return [sprintf('%.10F', $v), 'n'];
+        if (is_nan($v) || is_infinite($v)) {
+            return ['', 'str'];
+        }
+
+        return [marinaExcelNumeroXml($v), 'n'];
+    }
+    if (is_string($v)) {
+        $num = marinaExcelParseNumero($v);
+        if ($num !== null) {
+            return [marinaExcelNumeroXml($num), 'n'];
+        }
+
+        return [$v, 'str'];
     }
 
     return [(string) $v, 'str'];
+}
+
+/** Convierte texto de pantalla (dinero, miles) a float o null si no es numérico. */
+function marinaExcelParseNumero(string $s): ?float
+{
+    $s = trim($s);
+    if ($s === '' || $s === '—' || $s === '-' || $s === '–') {
+        return null;
+    }
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $s)) {
+        return null;
+    }
+    if (preg_match('/^\d{1,2}\/\d{1,2}\/\d{4}$/', $s)) {
+        return null;
+    }
+    $t = preg_replace('/[^\d.,\-+]/', '', $s) ?? '';
+    if ($t === '' || $t === '-' || $t === '+') {
+        return null;
+    }
+    if (preg_match('/,\d{1,2}$/', $t)) {
+        $t = str_replace('.', '', $t);
+        $t = str_replace(',', '.', $t);
+    } else {
+        $t = str_replace(',', '', $t);
+    }
+    if (!is_numeric($t)) {
+        return null;
+    }
+
+    return (float) $t;
+}
+
+function marinaExcelNumeroXml(float $n): string
+{
+    $s = number_format($n, 10, '.', '');
+    $s = rtrim(rtrim($s, '0'), '.');
+
+    return $s === '' || $s === '-' ? '0' : $s;
 }
 
 function marinaXlsxEsc(string $s): string
@@ -388,20 +445,30 @@ function marinaExcelFilaTitulosSobreTabla(string $marca, string $nombreReporte, 
 function marinaExcelCelda($v): string
 {
     $b = marinaExcelEstiloBordeCelda() . ' padding:4px;';
-    if ($v === null) {
-        $v = '';
+    if ($v === null || $v === '') {
+        return '<td style="' . $b . '"></td>';
     }
     if (is_bool($v)) {
         $v = $v ? 'Sí' : 'No';
     }
     if (is_int($v)) {
-        return '<td style="' . $b . 'text-align:right;">' . htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8') . '</td>';
+        return '<td style="' . $b . 'mso-number-format:&quot;0&quot;;text-align:right;">'
+            . htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8') . '</td>';
     }
     if (is_float($v)) {
         $txt = number_format($v, 2, '.', '');
 
         return '<td style="' . $b . 'mso-number-format:&quot;#,##0.00&quot;;text-align:right;">'
             . htmlspecialchars($txt, ENT_QUOTES, 'UTF-8') . '</td>';
+    }
+    if (is_string($v)) {
+        $num = marinaExcelParseNumero($v);
+        if ($num !== null) {
+            $txt = number_format($num, 2, '.', '');
+
+            return '<td style="' . $b . 'mso-number-format:&quot;#,##0.00&quot;;text-align:right;">'
+                . htmlspecialchars($txt, ENT_QUOTES, 'UTF-8') . '</td>';
+        }
     }
 
     return '<td style="' . $b . '">' . htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8') . '</td>';

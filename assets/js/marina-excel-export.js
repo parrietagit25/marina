@@ -129,6 +129,61 @@
         return { headers: headers, rows: rows };
     }
 
+    function parseNumeroCelda(text) {
+        if (text == null) return null;
+        var raw = String(text).replace(/\s+/g, ' ').trim();
+        if (raw === '' || raw === '—' || raw === '-' || raw === '–') return null;
+        if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
+        if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(raw)) return null;
+        var t = raw.replace(/[^\d.,\-+]/g, '');
+        if (t === '' || t === '-' || t === '+') return null;
+        if (/,\d{1,2}$/.test(t)) {
+            t = t.replace(/\./g, '').replace(',', '.');
+        } else {
+            t = t.replace(/,/g, '');
+        }
+        var n = parseFloat(t);
+        return isNaN(n) ? null : n;
+    }
+
+    function esColumnaNumericaExport(headerText, table, colIndexReal) {
+        var ht = (headerText || '').toLowerCase();
+        if (/monto|pagado|saldo|total|cr[eé]dito|d[eé]bito|acumulado|costo|vencido|pend|∑|suma|abonado|facturado|neto|unid\.|ocup\.|libres/.test(ht)) {
+            return true;
+        }
+        var headerRow = table.querySelector('thead tr:last-child');
+        if (headerRow) {
+            var ths = headerRow.querySelectorAll('th, td');
+            var th = ths[colIndexReal];
+            if (th && th.classList.contains('text-end')) return true;
+        }
+        return false;
+    }
+
+    function aplicarNumerosEnHoja(ws, table, cols, headers) {
+        if (!ws || !ws['!ref']) return;
+        var range = XLSX.utils.decode_range(ws['!ref']);
+        var colsNum = headers.map(function(h, i) {
+            return esColumnaNumericaExport(h, table, cols[i]);
+        });
+        for (var R = 1; R <= range.e.r; R++) {
+            for (var C = 0; C <= range.e.c; C++) {
+                if (!colsNum[C]) continue;
+                var ref = XLSX.utils.encode_cell({ r: R, c: C });
+                var cell = ws[ref];
+                if (!cell) continue;
+                var num = parseNumeroCelda(cell.v);
+                if (num !== null) {
+                    cell.t = 'n';
+                    cell.v = num;
+                    cell.z = '#,##0.00';
+                } else if (cell.v === '' || cell.v === '—' || cell.v === '-') {
+                    delete ws[ref];
+                }
+            }
+        }
+    }
+
     function exportarTabla(table) {
         if (!window.XLSX) {
             alert('No se cargó la librería de Excel. Recargue la página.');
@@ -143,6 +198,8 @@
         if (datos.headers.length) aoa.push(datos.headers);
         datos.rows.forEach(function(r) { aoa.push(r); });
         var ws = XLSX.utils.aoa_to_sheet(aoa);
+        var cols = indicesVisibles(table);
+        aplicarNumerosEnHoja(ws, table, cols, datos.headers);
         var wb = XLSX.utils.book_new();
         var hoja = (table.getAttribute('data-export-sheet') || 'Datos').slice(0, 31);
         XLSX.utils.book_append_sheet(wb, ws, hoja);

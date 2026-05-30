@@ -98,7 +98,7 @@ function marina_menu_permisos_definicion(): array
                 ['pagina' => 'reporte-inmuebles-contratos', 'etiqueta' => 'Reporte Inmuebles → contratos'],
                 ['pagina' => 'reporte-cliente-aislado', 'etiqueta' => 'Clientes por movimientos bancarios'],
                 ['pagina' => 'reporte-electricidad', 'etiqueta' => 'Electricidad (contratos)'],
-                ['pagina' => 'reporte-ocupacion', 'etiqueta' => 'Reporte de Ocupación'],
+                ['pagina' => 'reporte-ocupacion', 'etiqueta' => 'Reporte de cobranzas'],
                 ['pagina' => 'reporte-recaudo', 'etiqueta' => 'Reporte de recaudo'],
             ],
         ],
