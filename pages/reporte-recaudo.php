@@ -216,8 +216,9 @@ require_once __DIR__ . '/../includes/layout.php';
 <h1 class="h4 mb-2">Reporte de recaudo</h1>
 <p class="text-muted small mb-3">
     Cuotas con <strong>vencimiento</strong> entre las fechas indicadas que aún tienen <strong>saldo por cobrar</strong>.
-    Orden: <strong>muelle</strong> → <strong>slip</strong> → vencimiento. En inmuebles, muelle = grupo e slip = inmueble.
-    Las cuotas ya pagadas no aparecen.
+    Listado por cuota (sin subtotales por unidad). Orden: muelle → slip → vencimiento.
+    En inmuebles, muelle = grupo e slip = inmueble. Las cuotas ya pagadas no aparecen.
+    Los subtotales por muelle/slip están en el <a href="<?= MARINA_URL ?>/index.php?p=reporte-ocupacion">Reporte de cobranzas</a>.
 </p>
 
 <form method="get" class="toolbar mb-3">
@@ -251,34 +252,25 @@ require_once __DIR__ . '/../includes/layout.php';
         <div class="col-12 col-md-auto">
             <button type="submit" class="btn btn-primary">Consultar</button>
         </div>
-        <div class="col-12 col-md-auto">
-            <button type="submit" class="btn btn-success" name="export" value="excel">Exportar Excel</button>
-        </div>
     </div>
 </form>
 
-<div class="row g-3 mb-3">
-    <div class="col-12 col-md-4">
-        <div class="card p-3 border-0 shadow-sm">
-            <div class="text-muted small mb-1">Período</div>
-            <div class="fs-6 fw-semibold"><?= fechaFormato($desde) ?> — <?= fechaFormato($hasta) ?></div>
-        </div>
-    </div>
-    <div class="col-12 col-md-4">
-        <div class="card p-3 border-0 shadow-sm">
-            <div class="text-muted small mb-1">Cuotas por recaudar</div>
-            <div class="fs-5 fw-semibold"><?= count($filas) ?></div>
-        </div>
-    </div>
-    <div class="col-12 col-md-4">
-        <div class="card p-3 border-0 shadow-sm bg-success bg-opacity-10">
-            <div class="text-muted small mb-1">Total por recaudar</div>
-            <div class="fs-5 fw-bold text-success"><?= dinero($totalRecaudo) ?></div>
-        </div>
-    </div>
-</div>
+<p class="text-muted small mb-2">
+    <strong><?= count($filas) ?></strong> cuota(s) con saldo · Período <?= fechaFormato($desde) ?> — <?= fechaFormato($hasta) ?>
+    · Total por recaudar: <strong class="text-success"><?= dinero($totalRecaudo) ?></strong>
+</p>
 
-<div class="card p-3 reporte-recaudo-table-wrap">
+<div class="card p-0 border-0 shadow-sm reporte-recaudo-table-wrap">
+    <div class="d-flex flex-wrap justify-content-end align-items-center gap-2 px-3 py-2 border-bottom bg-white">
+        <form method="get" class="m-0">
+            <input type="hidden" name="p" value="reporte-recaudo">
+            <input type="hidden" name="desde" value="<?= e($desde) ?>">
+            <input type="hidden" name="hasta" value="<?= e($hasta) ?>">
+            <input type="hidden" name="muelle_id" value="<?= (int) $muelle_id ?>">
+            <input type="hidden" name="tipo_unidad" value="<?= e($tipoUnidad) ?>">
+            <button type="submit" class="btn btn-success btn-sm" name="export" value="excel">Exportar Excel</button>
+        </form>
+    </div>
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0 no-datatable no-excel-export reporte-recaudo-tabla" data-export-filename="reporte_recaudo" data-export-sheet="Recaudo">
             <thead class="table-light">
@@ -327,15 +319,19 @@ require_once __DIR__ . '/../includes/layout.php';
                     </td>
                 </tr>
                 <?php endforeach; ?>
-                <tr class="reporte-recaudo-total table-light fw-semibold">
+            <?php endif; ?>
+            </tbody>
+            <?php if ($filas !== []): ?>
+            <tfoot class="reporte-recaudo-tfoot">
+                <tr class="table-light fw-semibold">
                     <td colspan="7" class="text-end">Totales (<?= $nCuotas ?> cuota<?= $nCuotas === 1 ? '' : 's' ?>)</td>
                     <td class="text-end"><?= dinero($totalMonto) ?></td>
                     <td class="text-end"><?= dinero($totalPagado) ?></td>
-                    <td class="text-end text-success"><?= dinero($totalRecaudo) ?></td>
+                    <td class="text-end text-success fw-bold"><?= dinero($totalRecaudo) ?></td>
                     <td colspan="2"></td>
                 </tr>
+            </tfoot>
             <?php endif; ?>
-            </tbody>
         </table>
     </div>
 </div>

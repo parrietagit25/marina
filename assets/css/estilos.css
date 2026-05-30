@@ -1147,10 +1147,16 @@ body {
     top: 56px;
   }
 }
-.reporte-recaudo-tabla tr.reporte-recaudo-total td {
-  font-weight: 600;
-  background-color: #f1f5f9;
-  border-top: 2px solid #cbd5e1;
+.reporte-recaudo-tabla tbody tr td {
+  border-bottom: 1px solid #e9ecef;
+}
+.reporte-recaudo-tfoot td {
+  background-color: #f8f9fa;
+  border-top: 2px solid #198754 !important;
+  font-size: 0.95rem;
+}
+.reporte-recaudo-tfoot .text-success {
+  font-size: 1.05rem;
 }
 
 /* Reporte ocupación / cobranzas: encabezados repetidos sobre totales */
