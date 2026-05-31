@@ -218,7 +218,7 @@ if (obtener('export') === 'excel') {
         'Cuota',
         'Cliente',
         'Tipo',
-        'Unidad (muelle/slip o grupo/inmueble)',
+        'Unidad (muelle/slip o alquiler/inmueble)',
         'Monto',
         'Pagado',
         'Saldo',
@@ -231,7 +231,7 @@ if (obtener('export') === 'excel') {
 require_once __DIR__ . '/../includes/layout.php';
 ?>
 <h1 class="h4 mb-2">Reporte de cuotas</h1>
-<p class="text-muted small mb-3">Cuotas de contratos de <strong>marina</strong> (muelle/slip) e <strong>inmuebles</strong> (grupo/inmueble). El rango aplica a la <strong><?= $fecha_campo === 'pago' ? 'fecha de pago' : 'fecha de vencimiento' ?></strong> de cada cuota. Estados: <strong>Pagada</strong> (cubierta por movimientos o pago único antiguo), <strong>Pendiente</strong> (saldo y aún no vence), <strong>Vencida</strong> (saldo y vencimiento anterior a hoy).</p>
+<p class="text-muted small mb-3">Cuotas de contratos de <strong>marina</strong> (muelle/slip) e <strong>inmuebles</strong> (alquiler/inmueble). El rango aplica a la <strong><?= $fecha_campo === 'pago' ? 'fecha de pago' : 'fecha de vencimiento' ?></strong> de cada cuota. Estados: <strong>Pagada</strong> (cubierta por movimientos o pago único antiguo), <strong>Pendiente</strong> (saldo y aún no vence), <strong>Vencida</strong> (saldo y vencimiento anterior a hoy).</p>
 
 <form method="get" class="toolbar mb-3">
     <input type="hidden" name="p" value="reporte-cuotas">
@@ -279,7 +279,7 @@ require_once __DIR__ . '/../includes/layout.php';
             </select>
         </div>
         <div class="col-12 col-md-6 col-lg-2">
-            <label class="form-label mb-1">Grupo</label>
+            <label class="form-label mb-1">Alquiler</label>
             <select class="form-select" name="grupo_id">
                 <option value="0">Todos</option>
                 <?php foreach ($gruposOpts as $gid => $gnom): ?>

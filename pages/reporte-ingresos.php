@@ -238,6 +238,39 @@ $total = array_sum(array_map(static function ($r) {
     return (float) ($r['monto'] ?? 0);
 }, $filas));
 
+$filasDetalleRender = [];
+if ($vista === 'detallado') {
+    $grupoActualRender = null;
+    $sumGrupoRender = 0.0;
+    foreach ($filas as $r) {
+        $gCab = trim((string) ($r['grupo_nombre'] ?? ''));
+        if ($gCab === '') {
+            $gCab = 'Sin ubicación';
+        }
+        if ($grupoActualRender !== null && $gCab !== $grupoActualRender) {
+            $filasDetalleRender[] = [
+                'tipo' => 'subtotal',
+                'grupo_nombre' => $grupoActualRender,
+                'monto' => $sumGrupoRender,
+            ];
+            $sumGrupoRender = 0.0;
+        }
+        if ($gCab !== $grupoActualRender) {
+            $filasDetalleRender[] = ['tipo' => 'cabecera', 'grupo_nombre' => $gCab];
+            $grupoActualRender = $gCab;
+        }
+        $filasDetalleRender[] = ['tipo' => 'dato', 'row' => $r];
+        $sumGrupoRender += (float) ($r['monto'] ?? 0);
+    }
+    if ($grupoActualRender !== null) {
+        $filasDetalleRender[] = [
+            'tipo' => 'subtotal',
+            'grupo_nombre' => $grupoActualRender,
+            'monto' => $sumGrupoRender,
+        ];
+    }
+}
+
 $agrupadoPorGrupo = [];
 if ($vista === 'agrupado') {
     foreach ($filas as $r) {
@@ -268,10 +301,26 @@ if (obtener('export') === 'excel') {
             $rows[] = [$nom, $m];
         }
         $pie = [['Total', $total]];
-        exportarExcel('reporte_ingresos_agrupado', ['Muelle / grupo', 'Monto'], $rows, $pie, $titulo . ' — Agrupado (totales por muelle / grupo)');
+        exportarExcel('reporte_ingresos_agrupado', ['Muelle / alquiler', 'Monto'], $rows, $pie, $titulo . ' — Agrupado (totales por muelle / alquiler)');
     } else {
         $rows = [];
-        foreach ($filas as $r) {
+        foreach ($filasDetalleRender as $item) {
+            if (($item['tipo'] ?? '') === 'cabecera') {
+                continue;
+            }
+            if (($item['tipo'] ?? '') === 'subtotal') {
+                $rows[] = [
+                    '',
+                    '',
+                    'Total ' . ($item['grupo_nombre'] ?? ''),
+                    '',
+                    '',
+                    '',
+                    (float) ($item['monto'] ?? 0),
+                ];
+                continue;
+            }
+            $r = $item['row'] ?? [];
             $rows[] = [
                 $r['fecha'] ?? '',
                 $r['cliente_nombre'] ?? '',
@@ -282,8 +331,8 @@ if (obtener('export') === 'excel') {
                 (float) ($r['monto'] ?? 0),
             ];
         }
-        $pie = [['Total', '', '', '', '', '', $total]];
-        exportarExcel('reporte_ingresos', ['Fecha', 'Cliente', 'Grupo', 'Slip / inmueble', 'Concepto', 'Referencia', 'Monto'], $rows, $pie, $titulo . ' — Detallado');
+        $pie = [['Total general', '', '', '', '', '', $total]];
+        exportarExcel('reporte_ingresos', ['Fecha', 'Cliente', 'Alquiler', 'Slip / inmueble', 'Concepto', 'Referencia', 'Monto'], $rows, $pie, $titulo . ' — Detallado');
     }
 }
 
@@ -337,7 +386,7 @@ require_once __DIR__ . '/../includes/layout.php';
             </select>
         </div>
         <div class="col-12 col-md-6 col-lg-2">
-            <label class="form-label mb-1">Grupo</label>
+            <label class="form-label mb-1">Alquiler</label>
             <select class="form-select" name="grupo_id">
                 <option value="0">Todos</option>
                 <?php foreach ($gruposOpts as $gid => $gnom): ?>
@@ -380,7 +429,7 @@ require_once __DIR__ . '/../includes/layout.php';
             <label class="form-label mb-1">Vista</label>
             <select class="form-select" name="vista">
                 <option value="detallado" <?= $vista === 'detallado' ? 'selected' : '' ?>>Detallado</option>
-                <option value="agrupado" <?= $vista === 'agrupado' ? 'selected' : '' ?>>Agrupado (totales por muelle / grupo)</option>
+                <option value="agrupado" <?= $vista === 'agrupado' ? 'selected' : '' ?>>Agrupado (totales por muelle / alquiler)</option>
             </select>
         </div>
         <div class="col-12 col-md-auto d-flex flex-wrap gap-2">
@@ -388,7 +437,7 @@ require_once __DIR__ . '/../includes/layout.php';
             <button type="submit" class="btn btn-success" name="export" value="excel">Exportar Excel</button>
         </div>
     </div>
-    <p class="text-muted small mb-0 mt-2">Con <strong>muelle, grupo, slip, inmueble, contrato o estado cuota</strong> solo se listan líneas ligadas a contratos (no aparecen movimientos manuales ni combustible). Con <strong>estado cuota</strong> tampoco electricidad. El <strong>grupo</strong> en cuotas es el grupo de locales o el muelle; el filtro por cuenta no se muestra en la tabla.</p>
+    <p class="text-muted small mb-0 mt-2">Con <strong>muelle, alquiler, slip, inmueble, contrato o estado cuota</strong> solo se listan líneas ligadas a contratos (no aparecen movimientos manuales ni combustible). Con <strong>estado cuota</strong> tampoco electricidad. El <strong>alquiler</strong> en cuotas es el alquiler de locales o el muelle; el filtro por cuenta no se muestra en la tabla.</p>
 </form>
 
 <div class="card p-3 mb-3">
@@ -401,7 +450,7 @@ require_once __DIR__ . '/../includes/layout.php';
         <table class="table table-hover align-middle">
             <thead>
                 <tr>
-                <th>Muelle / grupo</th>
+                <th>Muelle / alquiler</th>
                     <th class="text-end">Total crédito</th>
                 </tr>
             </thead>
@@ -435,12 +484,12 @@ require_once __DIR__ . '/../includes/layout.php';
 <?php else: ?>
 <div class="card p-3">
     <div class="table-responsive">
-        <table class="table table-hover align-middle">
+        <table class="table table-hover align-middle no-datatable">
             <thead>
                 <tr>
                     <th>Fecha</th>
                     <th>Cliente</th>
-                    <th>Grupo</th>
+                    <th>Alquiler</th>
                     <th>Slip / inmueble</th>
                     <th>Concepto</th>
                     <th>Referencia</th>
@@ -448,21 +497,20 @@ require_once __DIR__ . '/../includes/layout.php';
                 </tr>
             </thead>
             <tbody>
-            <?php
-            $prevGrupoCabecera = null;
-            foreach ($filas as $r):
-                $gCab = trim((string) ($r['grupo_nombre'] ?? ''));
-                if ($gCab === '') {
-                    $gCab = 'Sin ubicación';
-                }
-                if ($gCab !== $prevGrupoCabecera):
-                    $prevGrupoCabecera = $gCab;
-                    ?>
+            <?php foreach ($filasDetalleRender as $item):
+                $tipoItem = (string) ($item['tipo'] ?? '');
+                if ($tipoItem === 'cabecera'): ?>
                 <tr class="table-light">
-                    <td colspan="7" class="fw-bold py-2 border-top border-secondary-subtle"><?= e($gCab) ?></td>
+                    <td colspan="7" class="fw-bold py-2 border-top border-secondary-subtle"><?= e((string) ($item['grupo_nombre'] ?? '')) ?></td>
                 </tr>
-                    <?php
-                endif;
+                <?php continue; endif;
+                if ($tipoItem === 'subtotal'): ?>
+                <tr class="table-secondary">
+                    <td colspan="6" class="text-end fw-semibold">Total <?= e((string) ($item['grupo_nombre'] ?? '')) ?></td>
+                    <td class="text-end fw-semibold"><?= dinero((float) ($item['monto'] ?? 0)) ?></td>
+                </tr>
+                <?php continue; endif;
+                $r = $item['row'] ?? [];
                 ?>
                 <tr>
                     <td><?= fechaFormato($r['fecha']) ?></td>

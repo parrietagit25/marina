@@ -1,9 +1,9 @@
 <?php
 /**
- * Mapa Grupos: grupos y sus inmuebles.
+ * Mapa Alquileres: alquileres y sus inmuebles.
  * - Inmueble en verde si tiene contrato activo (estado = activo).
  */
-$titulo = 'Mapa Grupos';
+$titulo = 'Mapa Alquileres';
 
 $pdo = getDb();
 $mensaje = '';
@@ -105,8 +105,8 @@ $ok = obtener('ok');
 
 <div class="mapa-grupos-page d-flex align-items-center justify-content-between mb-3">
     <div>
-        <h1 class="mb-1">Mapa Grupos</h1>
-        <div class="text-muted">Grupo → inmuebles. Color según vencimiento del contrato activo.</div>
+        <h1 class="mb-1">Mapa Alquileres</h1>
+        <div class="text-muted">Alquiler → inmuebles. Color según vencimiento del contrato activo.</div>
     </div>
     <div class="d-flex flex-wrap gap-2 align-items-center">
         <span class="badge bg-success">Ocupado</span>
@@ -119,7 +119,7 @@ $ok = obtener('ok');
 <?php if ($mensaje): ?><div class="alert alert-danger"><?= e($mensaje) ?></div><?php endif; ?>
 
 <?php if (empty($grupos)): ?>
-    <div class="error">No hay grupos registrados.</div>
+    <div class="error">No hay alquileres registrados.</div>
 <?php else: ?>
     <div class="mapa-grid">
         <?php foreach ($grupos as $g): ?>
@@ -197,7 +197,7 @@ $ok = obtener('ok');
                     <div class="col-12 col-md-4"><strong>Contrato:</strong> <span id="dciContratoId">—</span></div>
                     <div class="col-12 col-md-4"><strong>Cliente:</strong> <span id="dciCliente">—</span></div>
                     <div class="col-12 col-md-4"><strong>Cuenta:</strong> <span id="dciCuenta">—</span></div>
-                    <div class="col-12 col-md-4"><strong>Grupo:</strong> <span id="dciGrupo">—</span></div>
+                    <div class="col-12 col-md-4"><strong>Alquiler:</strong> <span id="dciGrupo">—</span></div>
                     <div class="col-12 col-md-4"><strong>Inmueble:</strong> <span id="dciInmueble">—</span></div>
                     <div class="col-12 col-md-4"><strong>Monto total:</strong> <span id="dciMontoTotal">—</span></div>
                     <div class="col-12 col-md-4"><strong>Inicio:</strong> <span id="dciFechaInicio">—</span></div>

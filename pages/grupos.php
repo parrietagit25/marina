@@ -1,8 +1,8 @@
 <?php
 /**
- * Grupos - listar, crear/editar con modal, eliminar con modal
+ * Alquileres - listar, crear/editar con modal, eliminar con modal
  */
-$titulo = 'Grupos';
+$titulo = 'Alquileres';
 
 $pdo = getDb();
 $accion = obtener('accion');
@@ -16,7 +16,7 @@ if ($accion === 'eliminar' && $id > 0 && enviado()) {
     }
     try {
         $pdo->prepare('DELETE FROM grupos WHERE id = ?')->execute([$id]);
-        redirigir(MARINA_URL . '/index.php?p=grupos&ok=' . rawurlencode('Grupo eliminado'));
+        redirigir(MARINA_URL . '/index.php?p=grupos&ok=' . rawurlencode('Alquiler eliminado'));
     } catch (Throwable $e) {
         redirigir(MARINA_URL . '/index.php?p=grupos&err=' . rawurlencode(marinaMensajeErrorIntegridad($e)));
     }
@@ -53,13 +53,13 @@ $modalDatos = ['id' => $id, 'nombre' => $registro['nombre'] ?? ($_POST['nombre']
 ?>
 <?php require_once __DIR__ . '/../includes/layout.php'; ?>
 
-<h1>Grupos</h1>
+<h1>Alquileres</h1>
 <?php if ($ok): ?><p class="success"><?= e($ok) ?></p><?php endif; ?>
 <?php if ($err): ?><p class="error"><?= e($err) ?></p><?php endif; ?>
 <?php if ($mensaje && !$mostrarModal): ?><p class="error"><?= e($mensaje) ?></p><?php endif; ?>
 
 <div class="toolbar d-flex gap-2">
-    <button type="button" class="btn btn-primary" id="btnNuevoGrupo" data-bs-toggle="modal" data-bs-target="#grupoModal">Nuevo grupo</button>
+    <button type="button" class="btn btn-primary" id="btnNuevoGrupo" data-bs-toggle="modal" data-bs-target="#grupoModal">Nuevo alquiler</button>
 </div>
 
 <table>
@@ -89,7 +89,7 @@ $modalDatos = ['id' => $id, 'nombre' => $registro['nombre'] ?? ($_POST['nombre']
                 <input type="hidden" name="accion" id="grupoFormAccion" value="crear">
                 <input type="hidden" name="id" id="grupoFormId" value="">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="grupoModalTitle">Nuevo grupo</h5>
+                    <h5 class="modal-title" id="grupoModalTitle">Nuevo alquiler</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
@@ -112,7 +112,7 @@ $modalDatos = ['id' => $id, 'nombre' => $registro['nombre'] ?? ($_POST['nombre']
             <form method="post" action="?p=grupos&accion=eliminar">
                 <input type="hidden" name="id" id="grupoDeleteId" value="">
                 <div class="modal-header"><h5 class="modal-title">Confirmar eliminación</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-                <div class="modal-body">¿Eliminar grupo <span id="grupoDeleteNombre" class="fw-semibold"></span>?</div>
+                <div class="modal-body">¿Eliminar alquiler <span id="grupoDeleteNombre" class="fw-semibold"></span>?</div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                     <button type="submit" class="btn btn-danger">Eliminar</button>

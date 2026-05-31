@@ -106,7 +106,7 @@ if (obtener('export') === 'excel') {
     $pie = [['Total ingreso del día', '', '', '', '', '', '', $totalDia]];
     exportarExcel(
         'ingreso_x_dia',
-        ['Navío', 'Muelle / Grupo', 'Slip / Inmueble', 'Inicio', 'Fin', 'Días estadía', 'Monto contrato', 'Ingreso del día'],
+        ['Navío', 'Muelle / Alquiler', 'Slip / Inmueble', 'Inicio', 'Fin', 'Días estadía', 'Monto contrato', 'Ingreso del día'],
         $rows,
         $pie,
         $titulo . ' — ' . fechaFormato($fecha)

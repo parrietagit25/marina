@@ -102,3 +102,32 @@ function marina_gasto_migrar_legacy_si_falta(PDO $pdo): void {
         }
     }
 }
+
+/** @return ''|'pagada'|'pendiente' */
+function marina_gasto_filtro_estado_desde_request(): string
+{
+    $estado = strtolower(trim((string) ($_GET['estado'] ?? '')));
+
+    return in_array($estado, ['pagada', 'pendiente'], true) ? $estado : '';
+}
+
+function marina_gasto_etiqueta_estado_filtro(string $estado): string
+{
+    return match ($estado) {
+        'pagada' => 'Pagada',
+        'pendiente' => 'Pendiente',
+        default => 'Todos',
+    };
+}
+
+function marina_gasto_sql_filtro_estado(string $estado, string $alias = 'g'): string
+{
+    if ($estado === 'pagada') {
+        return " AND {$alias}.estado = 'pagada'";
+    }
+    if ($estado === 'pendiente') {
+        return " AND {$alias}.estado = 'pendiente'";
+    }
+
+    return '';
+}

@@ -186,24 +186,24 @@ function marinaBloqueoEliminarProveedor(PDO $pdo, int $id): ?string
 function marinaBloqueoEliminarGrupo(PDO $pdo, int $id): ?string
 {
     if ($id < 1) {
-        return 'Grupo no válido.';
+        return 'Alquiler no válido.';
     }
     $bloqueos = [];
     $st = $pdo->prepare('SELECT COUNT(*) FROM inmuebles WHERE grupo_id = ?');
     $st->execute([$id]);
     if ((int) $st->fetchColumn() > 0) {
-        $bloqueos[] = 'inmuebles del grupo';
+        $bloqueos[] = 'inmuebles del alquiler';
     }
     $st = $pdo->prepare('SELECT COUNT(*) FROM contratos WHERE grupo_id = ?');
     $st->execute([$id]);
     if ((int) $st->fetchColumn() > 0) {
-        $bloqueos[] = 'contratos que usan este grupo';
+        $bloqueos[] = 'contratos que usan este alquiler';
     }
     if ($bloqueos === []) {
         return null;
     }
 
-    return 'No se puede eliminar el grupo: aún hay ' . implode(' y ', $bloqueos) . '.';
+    return 'No se puede eliminar el alquiler: aún hay ' . implode(' y ', $bloqueos) . '.';
 }
 
 function marinaBloqueoEliminarInmueble(PDO $pdo, int $id): ?string

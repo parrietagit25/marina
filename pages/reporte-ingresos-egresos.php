@@ -249,7 +249,7 @@ if (obtener('export') === 'excel') {
     if ($vista === 'agrupado') {
         $rows = [];
         foreach ($agrupadoIngresos as $nom => $m) {
-            $rows[] = ['Crédito (por grupo)', $nom, '', '', (float) $m];
+            $rows[] = ['Crédito (por alquiler)', $nom, '', '', (float) $m];
         }
         foreach ($lineasEgr as $E) {
             $rows[] = [
@@ -265,7 +265,7 @@ if (obtener('export') === 'excel') {
             ['Totales', 'Débitos', '', '', $totEgr],
             ['Neto', '', '', '', $totIng - $totEgr],
         ];
-        exportarExcel('reporte_ingresos_egresos', ['Tipo', 'Grupo o fecha', 'Concepto', 'Proveedor / —', 'Monto'], $rows, $pie, $titulo . ' — Agrupado (ingresos por grupo + egresos en detalle)');
+        exportarExcel('reporte_ingresos_egresos', ['Tipo', 'Alquiler o fecha', 'Concepto', 'Proveedor / —', 'Monto'], $rows, $pie, $titulo . ' — Agrupado (ingresos por alquiler + egresos en detalle)');
     } else {
         $rows = [];
         foreach ($lineas as $L) {
@@ -287,7 +287,7 @@ if (obtener('export') === 'excel') {
             ['Neto del período', '', '', '', '', '', '', $totIng - $totEgr, ''],
             ['Saldo acumulado final', '', '', '', '', '', '', '', $acum],
         ];
-        exportarExcel('reporte_ingresos_egresos', ['Fecha', 'Naturaleza', 'Grupo', 'Slip / inmueble', 'Concepto', 'Cliente / Proveedor', 'Referencia', 'Monto', 'Acumulado'], $rows, $pie, $titulo . ' — Detallado (línea a línea)');
+        exportarExcel('reporte_ingresos_egresos', ['Fecha', 'Naturaleza', 'Alquiler', 'Slip / inmueble', 'Concepto', 'Cliente / Proveedor', 'Referencia', 'Monto', 'Acumulado'], $rows, $pie, $titulo . ' — Detallado (línea a línea)');
     }
 }
 
@@ -326,7 +326,7 @@ require_once __DIR__ . '/../includes/layout.php';
             <label class="form-label mb-1">Vista</label>
             <select class="form-select" name="vista">
                 <option value="detallado" <?= $vista === 'detallado' ? 'selected' : '' ?>>Detallado (línea a línea)</option>
-                <option value="agrupado" <?= $vista === 'agrupado' ? 'selected' : '' ?>>Agrupado (ingresos por grupo + egresos en detalle)</option>
+                <option value="agrupado" <?= $vista === 'agrupado' ? 'selected' : '' ?>>Agrupado (ingresos por alquiler + egresos en detalle)</option>
             </select>
         </div>
         <div class="col-12 col-md-auto">
@@ -336,7 +336,7 @@ require_once __DIR__ . '/../includes/layout.php';
             <button type="submit" class="btn btn-success" name="export" value="excel">Exportar Excel</button>
         </div>
     </div>
-    <p class="text-muted small mb-0 mt-2">Los ingresos por cuota muestran <strong>grupo</strong> (muelle o grupo de locales) y <strong>slip / inmueble</strong>. No se listan banco ni cuenta. En vista agrupada no hay columna acumulada día a día.</p>
+    <p class="text-muted small mb-0 mt-2">Los ingresos por cuota muestran <strong>alquiler</strong> (muelle o alquiler de locales) y <strong>slip / inmueble</strong>. No se listan banco ni cuenta. En vista agrupada no hay columna acumulada día a día.</p>
 </form>
 
 <div class="card p-3 mb-3">
@@ -352,12 +352,12 @@ require_once __DIR__ . '/../includes/layout.php';
 
 <?php if ($vista === 'agrupado'): ?>
 <div class="card p-3 mb-3">
-    <h2 class="h6 mb-3">Créditos por grupo / origen</h2>
+    <h2 class="h6 mb-3">Créditos por alquiler / origen</h2>
     <div class="table-responsive">
         <table class="table table-sm table-hover align-middle mb-0">
             <thead>
                 <tr>
-                    <th>Grupo / origen</th>
+                    <th>Alquiler / origen</th>
                     <th class="text-end">Total</th>
                 </tr>
             </thead>
@@ -413,7 +413,7 @@ require_once __DIR__ . '/../includes/layout.php';
                 <tr>
                     <th>Fecha</th>
                     <th>Naturaleza</th>
-                    <th>Grupo</th>
+                    <th>Alquiler</th>
                     <th>Slip / inmueble</th>
                     <th>Concepto</th>
                     <th>Cliente / Proveedor</th>

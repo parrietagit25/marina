@@ -442,10 +442,9 @@ $diff = $ingresos_total - $costos_total;
 
 $urlBase = MARINA_URL . '/index.php';
 $urlCreditos = $urlBase . '?p=reporte-ingresos&desde=' . rawurlencode($desde) . '&hasta=' . rawurlencode($hasta);
-$urlCreditosComb = $urlBase . '?p=reporte-combustible&desde=' . rawurlencode($desde) . '&hasta=' . rawurlencode($hasta);
+$urlCreditosComb = $urlBase . '?p=reportes&desde=' . rawurlencode($desde) . '&hasta=' . rawurlencode($hasta);
+$urlDebitosComb = $urlCreditosComb;
 $urlDebitos = $urlBase . '?p=reporte-egresos&desde=' . rawurlencode($desde) . '&hasta=' . rawurlencode($hasta);
-$urlDebitosComb = $urlBase . '?p=reporte-egresos&desde=' . rawurlencode($desde) . '&hasta=' . rawurlencode($hasta)
-    . ($partida_combustible_id > 0 ? '&partida_id=' . $partida_combustible_id : '');
 $urlCuotasPagadas = $urlBase . '?p=reporte-cuotas&desde=' . rawurlencode($desde) . '&hasta=' . rawurlencode($hasta)
     . '&estado=pagada&fecha_campo=pago';
 $urlCuotasVencidas = $urlBase . '?p=reporte-cuotas&desde=' . rawurlencode($desde) . '&hasta=' . rawurlencode($hasta)
@@ -464,7 +463,7 @@ require_once __DIR__ . '/../includes/layout.php';
     </div>
     <div class="d-flex flex-wrap gap-2">
         <a class="btn btn-outline-primary btn-sm" href="<?= e($urlCreditos) ?>">Reporte ingresos</a>
-        <a class="btn btn-outline-secondary btn-sm" href="<?= MARINA_URL ?>/index.php?p=reportes&amp;desde=<?= e($desde) ?>&amp;hasta=<?= e($hasta) ?>">Resumen I/E</a>
+        <a class="btn btn-outline-secondary btn-sm" href="<?= e($urlCreditosComb) ?>">I/E combustible</a>
     </div>
 </div>
 </div>
@@ -502,12 +501,12 @@ require_once __DIR__ . '/../includes/layout.php';
     <a class="kpi-card kpi-card--link" href="<?= e($urlCreditosComb) ?>">
         <div class="kpi-title"><i data-lucide="fuel" class="menu-ico"></i>Crédito combustible</div>
         <div class="kpi-value"><?= dinero($combustible_despacho_mes) ?></div>
-        <span class="kpi-card-hint">Reporte combustible →</span>
+        <span class="kpi-card-hint">Ingresos y egresos →</span>
     </a>
     <a class="kpi-card kpi-card--link" href="<?= e($urlDebitosComb) ?>">
         <div class="kpi-title"><i data-lucide="truck" class="menu-ico"></i>Débito combustible</div>
         <div class="kpi-value"><?= dinero($costos_combustible) ?></div>
-        <span class="kpi-card-hint">Egresos combustible →</span>
+        <span class="kpi-card-hint">Ingresos y egresos →</span>
     </a>
     <div class="kpi-card">
         <div class="kpi-title"><i data-lucide="droplets" class="menu-ico"></i>Inventario combustible</div>
@@ -552,11 +551,11 @@ require_once __DIR__ . '/../includes/layout.php';
             <a class="d-block" href="<?= MARINA_URL ?>/index.php?p=combustible-despacho">Despacho</a>
             <a class="d-block" href="<?= MARINA_URL ?>/index.php?p=combustible-ajuste">Ajuste de inventario</a>
             <a class="d-block" href="<?= MARINA_URL ?>/index.php?p=combustible-precios">Precio por galón</a>
+            <a class="d-block" href="<?= e($urlCreditosComb) ?>">Ingresos y egresos</a>
             <a class="d-block" href="<?= MARINA_URL ?>/index.php?p=reporte-combustible">Reporte combustible</a>
         </div>
         <div class="col-12 col-md-4">
             <strong class="d-block mb-1">Finanzas y reportes</strong>
-            <a class="d-block" href="<?= MARINA_URL ?>/index.php?p=reportes">Reporte de ingresos y egresos</a>
             <a class="d-block" href="<?= MARINA_URL ?>/index.php?p=reporte-ingresos">Reporte de ingreso</a>
             <a class="d-block" href="<?= MARINA_URL ?>/index.php?p=reporte-egresos">Reporte de egresos</a>
             <a class="d-block" href="<?= MARINA_URL ?>/index.php?p=reporte-ingresos-egresos">Reporte de ingresos y egresos</a>
@@ -576,7 +575,7 @@ require_once __DIR__ . '/../includes/layout.php';
     <span>Ocupación actual</span>
     <span class="small fw-normal">
         <a href="<?= e($urlMapaMarina) ?>">Mapa marina</a> ·
-        <a href="<?= e($urlMapaGrupos) ?>">Mapa grupos</a> ·
+        <a href="<?= e($urlMapaGrupos) ?>">Mapa alquileres</a> ·
         <a href="<?= e($urlReporteOcupacion) ?>">Reporte de cobranzas</a>
     </span>
 </div>
@@ -608,7 +607,7 @@ require_once __DIR__ . '/../includes/layout.php';
         </div>
     </div>
     <div class="card chart-card p-3">
-        <h2 class="h5 mb-2">Marina vs grupos (% ocupado)</h2>
+        <h2 class="h5 mb-2">Marina vs alquileres (% ocupado)</h2>
         <p class="text-muted small mb-2">Porcentaje de slips ocupados frente a inmuebles ocupados.</p>
         <div class="chart-canvas-wrap chart-canvas-wrap--bar">
             <canvas id="chartOcupacionMarinaGrupos"></canvas>
@@ -623,7 +622,7 @@ require_once __DIR__ . '/../includes/layout.php';
     </div>
 </div>
 
-<div class="dashboard-section-title mb-2">Ocupación por muelle y por grupo</div>
+<div class="dashboard-section-title mb-2">Ocupación por muelle y por alquiler</div>
 <div class="charts-grid dashboard-charts dashboard-charts--ocupacion mb-4">
     <div class="card chart-card chart-card--wide p-3">
         <h2 class="h5 mb-2">Slips por muelle</h2>
@@ -633,8 +632,8 @@ require_once __DIR__ . '/../includes/layout.php';
         </div>
     </div>
     <div class="card chart-card chart-card--wide p-3">
-        <h2 class="h5 mb-2">Inmuebles por grupo</h2>
-        <p class="text-muted small mb-2">Contrato activo por inmueble en cada grupo.</p>
+        <h2 class="h5 mb-2">Inmuebles por alquiler</h2>
+        <p class="text-muted small mb-2">Contrato activo por inmueble en cada alquiler.</p>
         <div class="chart-canvas-wrap" style="height: <?= (int) $occAltGrupo ?>px">
             <canvas id="chartOcupacionGrupos"></canvas>
         </div>
@@ -676,7 +675,7 @@ require_once __DIR__ . '/../includes/layout.php';
 </div>
 
 <div class="mt-4 text-muted small">
-    Los totales del mes siguen la misma lógica que el <a href="<?= MARINA_URL ?>/index.php?p=reportes">reporte de ingresos y egresos</a> y el <a href="<?= MARINA_URL ?>/index.php?p=reporte-ingresos">reporte de ingreso</a>. El <?= e(marina_ui_debito()) ?> por compra de combustible queda en gastos con partida Combustible al recibir el pedido.
+    Los totales del mes de marina siguen la lógica del <a href="<?= MARINA_URL ?>/index.php?p=reporte-ingresos">reporte de ingreso</a> y del <a href="<?= MARINA_URL ?>/index.php?p=reporte-egresos">reporte de egresos</a>. El combustible se resume en <a href="<?= e($urlCreditosComb) ?>">ingresos y egresos — combustible</a>; el <?= e(marina_ui_debito()) ?> por compra queda en gastos con partida Combustible al recibir el pedido.
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous"></script>
@@ -757,7 +756,7 @@ foreach ([
         libre: <?= (int) $ocupacionDash['total_libres'] ?>
     };
     const ocupMarinaGrupos = {
-        labels: ['Slips (marina)', 'Inmuebles (grupos)'],
+        labels: ['Slips (marina)', 'Inmuebles (alquileres)'],
         pct: [<?= (float) $ocupacionDash['pct_slips'] ?>, <?= (float) $ocupacionDash['pct_inmuebles'] ?>]
     };
     const ocupSlipsInm = {

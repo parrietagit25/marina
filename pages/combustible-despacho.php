@@ -142,6 +142,7 @@ if ($cobrarId > 0) {
         <?= fechaFormato($desp['fecha']) ?> —
         <strong><?= e($desp['embarcacion']) ?></strong> —
         <?= e((string) $desp['gls']) ?> GLS —
+        <?= e(marina_cliente_tipo_embarcacion_etiqueta($desp['tipo_embarcacion'] ?? null)) ?> —
         Total <?= dinero($montoCuota) ?> |
         Pagado <?= dinero($pagado) ?> |
         Saldo <strong><?= dinero($saldo) ?></strong>
@@ -345,13 +346,17 @@ if (enviado()) {
         $tipo = strtolower(trim((string) ($_POST['tipo_combustible'] ?? '')));
         $fecha = trim((string) ($_POST['fecha'] ?? ''));
         $emb = trim((string) ($_POST['embarcacion'] ?? ''));
-        $gls = (float) str_replace(',', '.', (string) ($_POST['gls'] ?? 0));
+        $tipoEmbRaw = trim((string) ($_POST['tipo_embarcacion'] ?? ''));
+        $tipoEmb = marina_cliente_tipo_embarcacion_valido($tipoEmbRaw);
+        $glsRaw = trim((string) ($_POST['gls'] ?? ''));
+        $gls = (float) str_replace(',', '.', $glsRaw);
         $monto = (float) str_replace(',', '.', (string) ($_POST['monto_total'] ?? 0));
         $cuenta_id = (int) ($_POST['cuenta_id'] ?? 0);
-        $cuenta_id = $cuenta_id > 0 ? $cuenta_id : null;
+        $fechaValida = preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha) === 1;
+        $glsValido = $glsRaw !== '' && $gls > 0;
 
-        if (!isset(MARINA_COMB_TIPOS[$tipo]) || $fecha === '' || $emb === '' || $gls <= 0 || $monto < 0) {
-            $mensaje = 'Complete tipo, fecha, embarcación, GLS y monto válidos.';
+        if (!isset(MARINA_COMB_TIPOS[$tipo]) || !$fechaValida || $emb === '' || $tipoEmb === null || !$glsValido || $monto < 0 || $cuenta_id < 1) {
+            $mensaje = 'Complete tipo combustible, fecha, embarcación, tipo de embarcación (CAT/MYT/MT), GLS, monto y cuenta sugerida al cobrar.';
         } else {
             $tieneCobros = false;
             if ($id > 0) {
@@ -374,8 +379,8 @@ if (enviado()) {
                         $mensaje = 'No se puede cambiar tipo, GLS ni monto total mientras existan cobros. Elimine los cobros desde la base si necesita corregir (o cree una factura nueva).';
                     } else {
                         try {
-                            $pdo->prepare('UPDATE combustible_despachos SET fecha=?, embarcacion=?, cuenta_id=?, updated_by=? WHERE id=?')
-                                ->execute([$fecha, $emb, $cuenta_id, $uid, $id]);
+                            $pdo->prepare('UPDATE combustible_despachos SET fecha=?, embarcacion=?, tipo_embarcacion=?, cuenta_id=?, updated_by=? WHERE id=?')
+                                ->execute([$fecha, $emb, $tipoEmb, $cuenta_id, $uid, $id]);
                             redirigir(MARINA_URL . '/index.php?p=combustible-despacho&ok=' . rawurlencode('Despacho actualizado'));
                         } catch (Throwable $e) {
                             $mensaje = 'No se pudo guardar.';
@@ -388,13 +393,17 @@ if (enviado()) {
                     $mensaje = 'No hay inventario suficiente para este despacho. Disponible (' . (MARINA_COMB_TIPOS[$tipo] ?? $tipo) . '): ' . number_format($disp, 3, '.', ',') . ' gal.';
                 } else {
                     try {
+                        $precioGalon = marina_combustible_precio_venta_en_fecha($pdo, $tipo, $fecha);
+                        if ($precioGalon === null && $gls > 0 && $monto > 0) {
+                            $precioGalon = round($monto / $gls, 4);
+                        }
                         if ($id > 0) {
-                            $pdo->prepare('UPDATE combustible_despachos SET tipo_combustible=?, fecha=?, embarcacion=?, gls=?, monto_total=?, cuenta_id=?, updated_by=? WHERE id=?')
-                                ->execute([$tipo, $fecha, $emb, $gls, $monto, $cuenta_id, $uid, $id]);
+                            $pdo->prepare('UPDATE combustible_despachos SET tipo_combustible=?, fecha=?, embarcacion=?, tipo_embarcacion=?, gls=?, precio_venta_galon=?, monto_total=?, cuenta_id=?, updated_by=? WHERE id=?')
+                                ->execute([$tipo, $fecha, $emb, $tipoEmb, $gls, $precioGalon, $monto, $cuenta_id, $uid, $id]);
                             redirigir(MARINA_URL . '/index.php?p=combustible-despacho&ok=' . rawurlencode('Despacho actualizado'));
                         } else {
-                            $pdo->prepare('INSERT INTO combustible_despachos (tipo_combustible, fecha, embarcacion, gls, monto_total, cuenta_id, created_by, updated_by) VALUES (?,?,?,?,?,?,?,?)')
-                                ->execute([$tipo, $fecha, $emb, $gls, $monto, $cuenta_id, $uid, $uid]);
+                            $pdo->prepare('INSERT INTO combustible_despachos (tipo_combustible, fecha, embarcacion, tipo_embarcacion, gls, precio_venta_galon, monto_total, cuenta_id, created_by, updated_by) VALUES (?,?,?,?,?,?,?,?,?,?)')
+                                ->execute([$tipo, $fecha, $emb, $tipoEmb, $gls, $precioGalon, $monto, $cuenta_id, $uid, $uid]);
                             redirigir(MARINA_URL . '/index.php?p=combustible-despacho&ok=' . rawurlencode('Factura de despacho registrada (inventario descontado; registre cobros en «Cobrar»).'));
                         }
                     } catch (Throwable $e) {
@@ -428,6 +437,7 @@ $despFiltroQs = http_build_query($despFiltroParams);
 $preciosJson = json_encode(marina_combustible_precios_vigentes($pdo), JSON_UNESCAPED_UNICODE);
 $inv = marina_combustible_inventario_por_tipo($pdo);
 $cuentas = $pdo->query('SELECT c.id, CONCAT(b.nombre, " - ", c.nombre) AS nom FROM cuentas c JOIN bancos b ON c.banco_id = b.id ORDER BY b.nombre, c.nombre')->fetchAll(PDO::FETCH_KEY_PAIR);
+$cuentaCombustibleDefaultId = 2;
 
 $edit = null;
 $ui = trim((string) obtener('ui', ''));
@@ -441,6 +451,26 @@ if ($ui === 'editar' && $editId > 0) {
     }
 }
 
+if ($edit !== null) {
+    $cuentaModalDespacho = (int) ($edit['cuenta_id'] ?? 0);
+    if ($cuentaModalDespacho < 1) {
+        $cuentaModalDespacho = $cuentaCombustibleDefaultId;
+    }
+} elseif (enviado() && ($_POST['marina_comb_accion'] ?? '') === 'guardar') {
+    $cuentaModalDespacho = (int) ($_POST['cuenta_id'] ?? 0);
+} else {
+    $cuentaModalDespacho = isset($cuentas[$cuentaCombustibleDefaultId])
+        ? $cuentaCombustibleDefaultId
+        : (int) (array_key_first($cuentas) ?? 0);
+}
+
+$tipoEmbModal = '';
+if ($edit !== null) {
+    $tipoEmbModal = marina_cliente_tipo_embarcacion_valido($edit['tipo_embarcacion'] ?? null) ?? '';
+} elseif (enviado() && ($_POST['marina_comb_accion'] ?? '') === 'guardar') {
+    $tipoEmbModal = marina_cliente_tipo_embarcacion_valido($_POST['tipo_embarcacion'] ?? null) ?? '';
+}
+
 $ok = obtener('ok');
 $err = obtener('err');
 $abrirModal = ($ui === 'nuevo') || ($edit !== null) || (enviado() && ($_POST['marina_comb_accion'] ?? '') === 'guardar' && $mensaje !== '');
@@ -448,7 +478,7 @@ $abrirModal = ($ui === 'nuevo') || ($edit !== null) || (enviado() && ($_POST['ma
 require_once __DIR__ . '/../includes/layout.php';
 ?>
 <h1 class="h4 mb-3">Combustible — Despacho</h1>
-<p class="text-muted small"><strong>La factura no mueve el banco:</strong> solo descuenta inventario (GLS) y define el monto total del pagaré. Los ingresos a cuenta (una o varias veces: pagos y/o abonos hasta completar el total) se registran en <strong>Cobrar</strong>. La cuenta en el alta es opcional y solo sirve como valor sugerido al cobrar.</p>
+<p class="text-muted small"><strong>La factura no mueve el banco:</strong> solo descuenta inventario (GLS) y define el monto total del pagaré. Los ingresos a cuenta (una o varias veces: pagos y/o abonos hasta completar el total) se registran en <strong>Cobrar</strong>. La cuenta sugerida al cobrar es obligatoria y se usa como valor predeterminado al registrar cobros.</p>
 
 <?php if ($ok): ?><div class="alert alert-success py-2"><?= e($ok) ?></div><?php endif; ?>
 <?php if ($err): ?><div class="alert alert-danger py-2"><?= e($err) ?></div><?php endif; ?>
@@ -520,17 +550,19 @@ $despTotalSaldo = max(0.0, $despTotalFacturado - $despTotalAbonado);
 
 <div class="card p-0">
     <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0 no-datatable" data-export-filename="combustible_despacho" data-export-sheet="Despacho">
+        <table id="combustibleDespachoTabla" class="table table-hover align-middle mb-0 w-100" data-export-filename="combustible_despacho" data-export-sheet="Despacho">
             <thead>
                 <tr>
                     <th>Id</th>
                     <th>Fecha</th>
                     <th>Tipo</th>
                     <th>Embarcación</th>
+                    <th>Tipo emb.</th>
                     <th class="text-end">GLS</th>
+                    <th class="text-end">Precio/galón</th>
                     <th class="text-end">Total</th>
                     <th class="text-end">Pagado</th>
-                    <th class="text-end">Saldo</th>
+                    <th class="text-end">Por pagar</th>
                     <th>Estado</th>
                     <th></th>
                 </tr>
@@ -553,13 +585,17 @@ $despTotalSaldo = max(0.0, $despTotalFacturado - $despTotalAbonado);
                 $totalF = (float) $r['monto_total'];
                 $saldoF = max(0.0, $totalF - $pagadoF);
                 $estaPagado = marina_combustible_despacho_esta_pagado($totalF, $pagadoF);
+                $precioGal = marina_combustible_despacho_precio_galon($r, $pdo);
+                $sinCuenta = (int) ($r['cuenta_id'] ?? 0) < 1;
                 ?>
-                <tr>
+                <tr class="<?= $sinCuenta ? 'combustible-despacho-sin-cuenta' : '' ?>">
                     <td><?= (int) $r['id'] ?></td>
                     <td><?= fechaFormato($r['fecha']) ?></td>
                     <td><?= e(MARINA_COMB_TIPOS[$r['tipo_combustible']] ?? $r['tipo_combustible']) ?></td>
                     <td><?= e($r['embarcacion']) ?></td>
+                    <td><?= e(marina_cliente_tipo_embarcacion_etiqueta($r['tipo_embarcacion'] ?? null)) ?></td>
                     <td class="text-end"><?= e((string) $r['gls']) ?></td>
+                    <td class="text-end"><?= $precioGal !== null ? dinero($precioGal) : '—' ?></td>
                     <td class="text-end"><?= dinero($totalF) ?></td>
                     <td class="text-end"><?= dinero($pagadoF) ?></td>
                     <td class="text-end"><?= $saldoF > 0.00001 ? dinero($saldoF) : '—' ?></td>
@@ -572,6 +608,7 @@ $despTotalSaldo = max(0.0, $despTotalFacturado - $despTotalAbonado);
                                 'tipo_combustible' => $r['tipo_combustible'],
                                 'fecha' => $r['fecha'],
                                 'embarcacion' => $r['embarcacion'],
+                                'tipo_embarcacion' => (string) ($r['tipo_embarcacion'] ?? ''),
                                 'gls' => (string) $r['gls'],
                                 'monto_total' => (string) $r['monto_total'],
                                 'cuenta_id' => (int) ($r['cuenta_id'] ?? 0),
@@ -586,7 +623,13 @@ $despTotalSaldo = max(0.0, $despTotalFacturado - $despTotalAbonado);
             </tbody>
             <tfoot class="combustible-tfoot">
                 <tr>
-                    <th colspan="5" class="text-end">Totales</th>
+                    <th></th>
+                    <th></th>
+                    <th></th>
+                    <th></th>
+                    <th></th>
+                    <th></th>
+                    <th class="text-end">Totales</th>
                     <th class="text-end"><?= dinero($despTotalFacturado) ?></th>
                     <th class="text-end"><?= dinero($despTotalAbonado) ?></th>
                     <th class="text-end"><?= dinero($despTotalSaldo) ?></th>
@@ -594,10 +637,16 @@ $despTotalSaldo = max(0.0, $despTotalFacturado - $despTotalAbonado);
                     <th></th>
                 </tr>
                 <tr class="combustible-tfoot-labels">
-                    <td colspan="5" class="text-end text-muted small border-0 pt-0"></td>
+                    <td class="border-0"></td>
+                    <td class="border-0"></td>
+                    <td class="border-0"></td>
+                    <td class="border-0"></td>
+                    <td class="border-0"></td>
+                    <td class="border-0"></td>
+                    <td class="text-end text-muted small border-0 pt-0"></td>
                     <td class="text-end text-muted small border-0 pt-0">Total registrado facturado</td>
                     <td class="text-end text-muted small border-0 pt-0">Total abonado</td>
-                    <td class="text-end text-muted small border-0 pt-0">Total saldo</td>
+                    <td class="text-end text-muted small border-0 pt-0">Total por pagar</td>
                     <td class="border-0"></td>
                     <td class="border-0"></td>
                 </tr>
@@ -620,7 +669,7 @@ $despTotalSaldo = max(0.0, $despTotalFacturado - $despTotalAbonado);
         ?>
         <input type="hidden" name="id" id="inputDespachoId" value="<?= $despIdModal > 0 ? $despIdModal : '' ?>">
         <div class="mb-2">
-            <label class="form-label">Tipo</label>
+            <label class="form-label">Tipo <span class="text-danger">*</span></label>
             <select class="form-select" name="tipo_combustible" id="dTipo" required>
                 <?php foreach (MARINA_COMB_TIPOS as $k => $lab): ?>
                     <option value="<?= e($k) ?>" <?= (($edit['tipo_combustible'] ?? $_POST['tipo_combustible'] ?? 'diesel') === $k) ? 'selected' : '' ?>><?= e($lab) ?></option>
@@ -628,29 +677,39 @@ $despTotalSaldo = max(0.0, $despTotalFacturado - $despTotalAbonado);
             </select>
         </div>
         <div class="mb-2">
-            <label class="form-label">Fecha</label>
+            <label class="form-label">Fecha <span class="text-danger">*</span></label>
             <input type="date" class="form-control" name="fecha" required value="<?= e($edit['fecha'] ?? $_POST['fecha'] ?? date('Y-m-d')) ?>">
         </div>
         <div class="mb-2">
-            <label class="form-label">Embarcación</label>
-            <input type="text" class="form-control" name="embarcacion" required value="<?= e($edit['embarcacion'] ?? $_POST['embarcacion'] ?? '') ?>">
+            <label class="form-label">Embarcación <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" name="embarcacion" required maxlength="200" value="<?= e($edit['embarcacion'] ?? $_POST['embarcacion'] ?? '') ?>">
         </div>
         <div class="mb-2">
-            <label class="form-label">GLS</label>
-            <input type="text" class="form-control" name="gls" id="dGls" inputmode="decimal" required value="<?= e((string) ($edit['gls'] ?? $_POST['gls'] ?? '')) ?>">
+            <label class="form-label d-block">Tipo de embarcación <span class="text-danger">*</span></label>
+            <div class="d-flex flex-wrap gap-3" id="dTipoEmbarcacionGroup">
+                <?php foreach (marina_cliente_tipos_embarcacion() as $cod => $lab): ?>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="tipo_embarcacion" id="dTipoEmbarcacion<?= e($cod) ?>" value="<?= e($cod) ?>" <?= $cod === 'CAT' ? 'required' : '' ?> <?= $tipoEmbModal === $cod ? 'checked' : '' ?>>
+                    <label class="form-check-label" for="dTipoEmbarcacion<?= e($cod) ?>"><?= e($lab) ?></label>
+                </div>
+                <?php endforeach; ?>
+            </div>
         </div>
         <div class="mb-2">
-            <label class="form-label">Monto total (factura / pagaré)</label>
+            <label class="form-label">GLS <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" name="gls" id="dGls" inputmode="decimal" required min="0.001" step="any" value="<?= e((string) ($edit['gls'] ?? $_POST['gls'] ?? '')) ?>">
+        </div>
+        <div class="mb-2">
+            <label class="form-label">Monto total (factura / pagaré) <span class="text-danger">*</span></label>
             <input type="text" class="form-control" name="monto_total" id="dMonto" inputmode="decimal" required value="<?= e((string) ($edit['monto_total'] ?? $_POST['monto_total'] ?? '')) ?>">
             <div class="form-text small">Se calcula al escribir <strong>GLS</strong> o al cambiar el <strong>tipo</strong> (precio venta vigente × GLS).</div>
             <button type="button" class="btn btn-link btn-sm p-0 mt-1" id="btnCalcVenta">Volver a calcular</button>
         </div>
         <div class="mb-2">
-            <label class="form-label">Cuenta sugerida al cobrar <span class="text-muted fw-normal">(opcional)</span></label>
-            <select class="form-select" name="cuenta_id" id="dCuenta">
-                <option value="0">— Definir al cobrar —</option>
+            <label class="form-label">Cuenta sugerida al cobrar <span class="text-danger">*</span></label>
+            <select class="form-select" name="cuenta_id" id="dCuenta" required>
                 <?php foreach ($cuentas as $cid => $nom): ?>
-                    <option value="<?= (int) $cid ?>" <?= (int) ($edit['cuenta_id'] ?? $_POST['cuenta_id'] ?? 0) === (int) $cid ? 'selected' : '' ?>><?= e($nom) ?></option>
+                    <option value="<?= (int) $cid ?>" <?= (int) $cuentaModalDespacho === (int) $cid ? 'selected' : '' ?>><?= e($nom) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
@@ -687,6 +746,7 @@ $despTotalSaldo = max(0.0, $despTotalFacturado - $despTotalAbonado);
 (function(){
   const precios = <?= $preciosJson ?>;
   const abrirAlCargar = <?= $abrirModal ? 'true' : 'false' ?>;
+  const cuentaCombustibleDefaultId = <?= (int) $cuentaCombustibleDefaultId ?>;
 
   function initCombustibleDespacho() {
     if (!window.bootstrap) return;
@@ -709,7 +769,7 @@ $despTotalSaldo = max(0.0, $despTotalFacturado - $despTotalAbonado);
         const tot = Math.round(gls * unit * 100) / 100;
         el.value = String(tot);
       } else {
-        el.value = '0';
+        el.value = '';
       }
     }
     document.getElementById('btnCalcVenta')?.addEventListener('click', aplicarMontoAutomaticoDespacho);
@@ -717,9 +777,27 @@ $despTotalSaldo = max(0.0, $despTotalFacturado - $despTotalAbonado);
     document.getElementById('dGls')?.addEventListener('input', aplicarMontoAutomaticoDespacho);
     document.getElementById('dGls')?.addEventListener('change', aplicarMontoAutomaticoDespacho);
 
+    modalDespachoEl?.querySelector('form')?.addEventListener('submit', function(ev) {
+      const tipo = String(document.getElementById('dTipo')?.value || '').trim();
+      const emb = String(document.querySelector('#modalDespacho [name=embarcacion]')?.value || '').trim();
+      const glsRaw = String(document.getElementById('dGls')?.value || '').trim();
+      const gls = parseFloat(glsRaw.replace(',', '.')) || 0;
+      const tipoEmb = document.querySelector('#modalDespacho input[name="tipo_embarcacion"]:checked');
+      if (!tipo || !emb || !tipoEmb || glsRaw === '' || gls <= 0) {
+        ev.preventDefault();
+        alert('Complete tipo combustible, embarcación, tipo de embarcación (CAT/MYT/MT) y GLS (mayor a cero).');
+      }
+    });
+
     function setV(id, v) {
       const el = document.getElementById(id);
       if (el) el.value = v != null ? String(v) : '';
+    }
+    function setTipoEmbarcacionDespacho(cod) {
+      const val = String(cod || '').toUpperCase();
+      document.querySelectorAll('#modalDespacho input[name="tipo_embarcacion"]').forEach(function(r) {
+        r.checked = val !== '' && r.value === val;
+      });
     }
     document.getElementById('btnNuevoDespacho')?.addEventListener('click', function() {
       document.getElementById('modalDespachoTitulo').textContent = 'Nueva factura de despacho';
@@ -729,29 +807,37 @@ $despTotalSaldo = max(0.0, $despTotalFacturado - $despTotalAbonado);
       if (fe) fe.value = '<?= date('Y-m-d') ?>';
       const em = document.querySelector('#modalDespacho [name=embarcacion]');
       if (em) em.value = '';
+      setTipoEmbarcacionDespacho('');
       setV('dGls', '');
-      setV('dMonto', '0');
+      setV('dMonto', '');
       const cu = document.querySelector('#modalDespacho select[name=cuenta_id]');
-      if (cu) cu.value = '0';
+      if (cu) {
+        const def = String(cuentaCombustibleDefaultId);
+        cu.value = cu.querySelector('option[value="' + def + '"]') ? def : (cu.options[0]?.value || def);
+      }
       showModalDespacho();
     });
-    document.querySelectorAll('.btn-editar-despacho').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        let d = {};
-        try { d = JSON.parse(btn.getAttribute('data-despacho') || '{}'); } catch (e) {}
-        document.getElementById('modalDespachoTitulo').textContent = 'Editar despacho';
-        setV('inputDespachoId', d.id || '');
-        setV('dTipo', d.tipo_combustible || 'diesel');
-        const fe2 = document.querySelector('#modalDespacho [name=fecha]');
-        if (fe2) fe2.value = d.fecha || '';
-        const em2 = document.querySelector('#modalDespacho [name=embarcacion]');
-        if (em2) em2.value = d.embarcacion || '';
-        setV('dGls', d.gls || '');
-        setV('dMonto', d.monto_total || '');
-        const cu2 = document.querySelector('#modalDespacho select[name=cuenta_id]');
-        if (cu2) cu2.value = String(d.cuenta_id || '0');
-        showModalDespacho();
-      });
+    document.getElementById('combustibleDespachoTabla')?.addEventListener('click', function(ev) {
+      const btn = ev.target.closest('.btn-editar-despacho');
+      if (!btn) return;
+      let d = {};
+      try { d = JSON.parse(btn.getAttribute('data-despacho') || '{}'); } catch (e) {}
+      document.getElementById('modalDespachoTitulo').textContent = 'Editar despacho';
+      setV('inputDespachoId', d.id || '');
+      setV('dTipo', d.tipo_combustible || 'diesel');
+      const fe2 = document.querySelector('#modalDespacho [name=fecha]');
+      if (fe2) fe2.value = d.fecha || '';
+      const em2 = document.querySelector('#modalDespacho [name=embarcacion]');
+      if (em2) em2.value = d.embarcacion || '';
+      setTipoEmbarcacionDespacho(d.tipo_embarcacion || '');
+      setV('dGls', d.gls || '');
+      setV('dMonto', d.monto_total || '');
+      const cu2 = document.querySelector('#modalDespacho select[name=cuenta_id]');
+      if (cu2) {
+        const cid = String(d.cuenta_id && parseInt(d.cuenta_id, 10) > 0 ? d.cuenta_id : cuentaCombustibleDefaultId);
+        cu2.value = cu2.querySelector('option[value="' + cid + '"]') ? cid : (cu2.options[0]?.value || cid);
+      }
+      showModalDespacho();
     });
     document.getElementById('modalEliminarDespacho')?.addEventListener('show.bs.modal', function(ev) {
       const t = ev.relatedTarget;

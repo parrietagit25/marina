@@ -150,6 +150,8 @@ $u = function (string $p, string $label): string {
                     <dd class="col-sm-9">Tarifas de venta vigentes por tipo de combustible.</dd>
                     <dt class="col-sm-3"><?= $u('reporte-combustible', 'Reporte') ?></dt>
                     <dd class="col-sm-9">Operación e inventario de combustible en un período.</dd>
+                    <dt class="col-sm-3"><?= $u('reportes', 'Ingresos y egresos') ?></dt>
+                    <dd class="col-sm-9">Detalle línea a línea de cobros de despacho y pagos de compras (partida Combustible).</dd>
                 </dl>
             </div>
         </div>
@@ -170,14 +172,14 @@ $u = function (string $p, string $label): string {
                     <dd class="col-sm-9">Estructura física de la marina; organiza slips.</dd>
                     <dt class="col-sm-3"><?= $u('slips', 'Slips') ?></dt>
                     <dd class="col-sm-9">Espacios de amarre asociados a muelle; suelen usarse en contratos de marina.</dd>
-                    <dt class="col-sm-3"><?= $u('grupos', 'Grupos') ?></dt>
+                    <dt class="col-sm-3"><?= $u('grupos', 'Alquileres') ?></dt>
                     <dd class="col-sm-9">Agrupaciones de inmuebles (por ejemplo edificios o sectores).</dd>
                     <dt class="col-sm-3"><?= $u('inmuebles', 'Inmuebles') ?></dt>
-                    <dd class="col-sm-9">Unidades arrendables dentro de grupos.</dd>
+                    <dd class="col-sm-9">Unidades arrendables dentro de alquileres.</dd>
                     <dt class="col-sm-3"><?= $u('mapa-marina', 'Mapa Marina') ?></dt>
                     <dd class="col-sm-9">Vista gráfica de muelles y slips y su ocupación.</dd>
-                    <dt class="col-sm-3"><?= $u('mapa-grupos', 'Mapa Grupos') ?></dt>
-                    <dd class="col-sm-9">Vista de grupos e inmuebles.</dd>
+                    <dt class="col-sm-3"><?= $u('mapa-grupos', 'Mapa Alquileres') ?></dt>
+                    <dd class="col-sm-9">Vista de alquileres e inmuebles.</dd>
                     <dt class="col-sm-3"><?= $u('contratos', 'Contratos') ?></dt>
                     <dd class="col-sm-9">Contratos de amarre o inmueble: cliente, cuenta de cobro, período, montos y <strong>cuotas</strong>.
                         Los contratos pueden estar <strong>activos</strong> o <strong>terminados</strong>; un terminado limita ciertas acciones (por ejemplo eliminar).
@@ -185,7 +187,7 @@ $u = function (string $p, string $label): string {
                     <dt class="col-sm-3"><?= $u('contratos-electricidad', 'Electricidad (contrato)') ?></dt>
                     <dd class="col-sm-9">Facturas y cobros de electricidad ligados a un contrato; los pagos aparecen como créditos bancarios en reportes y movimiento bancario.</dd>
                     <dt class="col-sm-3"><?= $u('reporte-cuotas', 'Reporte de cuotas') ?></dt>
-                    <dd class="col-sm-9">Cuotas por vencimiento, estado (pagada / pendiente / vencida), marina (muelle/slip) o inmueble (grupo/inmueble).</dd>
+                    <dd class="col-sm-9">Cuotas por vencimiento, estado (pagada / pendiente / vencida), marina (muelle/slip) o inmueble (alquiler/inmueble).</dd>
                 </dl>
             </div>
         </div>
@@ -201,10 +203,9 @@ $u = function (string $p, string $label): string {
             <div class="accordion-body">
                 <ul class="mb-0">
                     <li><?= $u('reporte-ingresos', 'Reporte de ingreso') ?> y <?= $u('reporte-egresos', 'Reporte de egresos') ?> — concentrados por tipo.</li>
-                    <li><?= $u('reportes', 'Reporte de ingresos y egresos') ?> — resumen del período (totales por cuenta y por partida).</li>
                     <li><?= $u('reporte-ingresos-egresos', 'Ingresos y egresos (detalle)') ?> — listado conjunto con filtros (cuenta, vista agrupada, etc.).</li>
                     <li><?= $u('reporte-marina-contratos', 'Reporte Marina → contratos') ?> — relación muelle/slip y contratos.</li>
-                    <li><?= $u('reporte-inmuebles-contratos', 'Reporte Inmuebles → contratos') ?> — relación grupo/inmueble y contratos.</li>
+                    <li><?= $u('reporte-inmuebles-contratos', 'Reporte Inmuebles → contratos') ?> — relación alquiler/inmueble y contratos.</li>
                 </ul>
             </div>
         </div>

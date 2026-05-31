@@ -260,6 +260,61 @@ function marina_ui_debito(): string {
     return 'Débito';
 }
 
+/**
+ * Mapa id → partida (id, parent_id, nombre) para armar rutas jerárquicas.
+ *
+ * @return array<int, array{id: int, parent_id: int|null, nombre: string}>
+ */
+function marina_partidas_map(PDO $pdo): array
+{
+    static $cache = null;
+    if (is_array($cache)) {
+        return $cache;
+    }
+    $cache = [];
+    try {
+        foreach ($pdo->query('SELECT id, parent_id, nombre FROM partidas') as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id < 1) {
+                continue;
+            }
+            $parent = $row['parent_id'] ?? null;
+            $cache[$id] = [
+                'id' => $id,
+                'parent_id' => ($parent !== null && $parent !== '') ? (int) $parent : null,
+                'nombre' => (string) ($row['nombre'] ?? ''),
+            ];
+        }
+    } catch (Throwable $e) {
+        $cache = [];
+    }
+
+    return $cache;
+}
+
+/** Ruta de partida desde raíz hasta la hoja: Madre → Hijo → Nieta */
+function marina_partida_ruta(PDO $pdo, int $partidaId, string $separador = ' → '): string
+{
+    if ($partidaId < 1) {
+        return '';
+    }
+    $map = marina_partidas_map($pdo);
+    if (!isset($map[$partidaId])) {
+        return '';
+    }
+    $partes = [];
+    $visitados = [];
+    $cur = $partidaId;
+    while ($cur > 0 && isset($map[$cur]) && !isset($visitados[$cur])) {
+        $visitados[$cur] = true;
+        array_unshift($partes, $map[$cur]['nombre']);
+        $parent = $map[$cur]['parent_id'];
+        $cur = ($parent !== null && $parent > 0) ? $parent : 0;
+    }
+
+    return implode($separador, $partes);
+}
+
 function obtener(string $key, $default = '') {
     return $_GET[$key] ?? $_POST[$key] ?? $default;
 }
@@ -426,6 +481,42 @@ function marina_normalizar_email_cliente(string $email): string {
     }
 
     return strtolower($email);
+}
+
+/**
+ * Tipos de embarcación del cliente (navío).
+ *
+ * @return array<string, string> código => etiqueta
+ */
+function marina_cliente_tipos_embarcacion(): array
+{
+    return [
+        'CAT' => 'Catamarán (CAT)',
+        'MYT' => 'Megayate (MYT)',
+        'MT' => 'A motor (MT)',
+    ];
+}
+
+function marina_cliente_tipo_embarcacion_etiqueta(?string $codigo): string
+{
+    $cod = strtoupper(trim((string) $codigo));
+    if ($cod === '') {
+        return '—';
+    }
+    $tipos = marina_cliente_tipos_embarcacion();
+
+    return $tipos[$cod] ?? $cod;
+}
+
+function marina_cliente_tipo_embarcacion_valido(?string $codigo): ?string
+{
+    $cod = strtoupper(trim((string) $codigo));
+    if ($cod === '') {
+        return null;
+    }
+    $tipos = marina_cliente_tipos_embarcacion();
+
+    return isset($tipos[$cod]) ? $cod : null;
 }
 
 /**

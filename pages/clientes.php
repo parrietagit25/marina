@@ -125,10 +125,23 @@ if (enviado() && ($accion === 'crear' || $accion === 'editar')) {
     $email = trim($_POST['email'] ?? '');
     $direccion = trim($_POST['direccion'] ?? '');
     $dueno_capitan = trim($_POST['dueno_capitan'] ?? '');
+    $tipo_embarcacion_raw = trim((string) ($_POST['tipo_embarcacion'] ?? ''));
+    $tipo_embarcacion = marina_cliente_tipo_embarcacion_valido($tipo_embarcacion_raw);
+    if ($tipo_embarcacion_raw !== '' && $tipo_embarcacion === null) {
+        $mensaje = 'Tipo de embarcación no válido.';
+    }
+    $cantidad_pies_raw = trim((string) ($_POST['cantidad_pies'] ?? ''));
+    $cantidad_pies = null;
+    if ($cantidad_pies_raw !== '') {
+        $cantidad_pies = (float) str_replace(',', '.', $cantidad_pies_raw);
+        if ($cantidad_pies <= 0) {
+            $mensaje = 'La cantidad de pies debe ser mayor a cero.';
+        }
+    }
     $uid = usuarioId();
     if ($nombre === '') {
         $mensaje = 'Nombre obligatorio.';
-    } else {
+    } elseif ($mensaje === '') {
         $excluirDup = ($accion === 'editar' && $id > 0) ? $id : 0;
         $dupMsg = marina_cliente_mensaje_si_duplicado($pdo, $nombre, $documento, $telefono, $email, $excluirDup);
         if ($dupMsg !== null) {
@@ -136,12 +149,12 @@ if (enviado() && ($accion === 'crear' || $accion === 'editar')) {
         }
         if ($mensaje === '') {
             if ($accion === 'editar' && $id > 0) {
-                $pdo->prepare('UPDATE clientes SET nombre=?, documento=?, telefono=?, email=?, direccion=?, dueno_capitan=?, updated_by=? WHERE id=?')
-                    ->execute([$nombre, $documento, $telefono, $email, $direccion, $dueno_capitan !== '' ? $dueno_capitan : null, $uid, $id]);
+                $pdo->prepare('UPDATE clientes SET nombre=?, documento=?, telefono=?, email=?, direccion=?, dueno_capitan=?, tipo_embarcacion=?, cantidad_pies=?, updated_by=? WHERE id=?')
+                    ->execute([$nombre, $documento, $telefono, $email, $direccion, $dueno_capitan !== '' ? $dueno_capitan : null, $tipo_embarcacion, $cantidad_pies, $uid, $id]);
                 redirigir(MARINA_URL . '/index.php?p=clientes&ok=Actualizado');
             } else {
-                $pdo->prepare('INSERT INTO clientes (nombre, documento, telefono, email, direccion, dueno_capitan, created_by, updated_by) VALUES (?,?,?,?,?,?,?,?)')
-                    ->execute([$nombre, $documento, $telefono, $email, $direccion, $dueno_capitan !== '' ? $dueno_capitan : null, $uid, $uid]);
+                $pdo->prepare('INSERT INTO clientes (nombre, documento, telefono, email, direccion, dueno_capitan, tipo_embarcacion, cantidad_pies, created_by, updated_by) VALUES (?,?,?,?,?,?,?,?,?,?)')
+                    ->execute([$nombre, $documento, $telefono, $email, $direccion, $dueno_capitan !== '' ? $dueno_capitan : null, $tipo_embarcacion, $cantidad_pies, $uid, $uid]);
                 redirigir(MARINA_URL . '/index.php?p=clientes&ok=Creado');
             }
         }
@@ -166,6 +179,10 @@ $modalDatos = [
     'email' => $registro['email'] ?? ($_POST['email'] ?? ''),
     'direccion' => $registro['direccion'] ?? ($_POST['direccion'] ?? ''),
     'duenoCapitan' => $registro['dueno_capitan'] ?? ($_POST['dueno_capitan'] ?? ''),
+    'tipoEmbarcacion' => $registro['tipo_embarcacion'] ?? ($_POST['tipo_embarcacion'] ?? ''),
+    'cantidadPies' => isset($registro['cantidad_pies']) && $registro['cantidad_pies'] !== null && $registro['cantidad_pies'] !== ''
+        ? (string) $registro['cantidad_pies']
+        : ($_POST['cantidad_pies'] ?? ''),
 ];
 
 $movimientosClienteById = [];
@@ -214,7 +231,7 @@ try {
 <div class="toolbar d-flex gap-2"><button type="button" class="btn btn-primary" id="btnNuevoCliente">Nuevo cliente</button></div>
 
 <table>
-    <thead><tr><th>Id</th><th>Nombre</th><th>Dueño / Capitán</th><th>Teléfono</th><th>Creado</th><th></th></tr></thead>
+    <thead><tr><th>Id</th><th>Nombre</th><th>Tipo embarcación</th><th>Pies</th><th>Dueño / Capitán</th><th>Teléfono</th><th>Creado</th><th></th></tr></thead>
     <tbody>
     <?php
     $st = $pdo->query('SELECT c.* FROM clientes c ORDER BY c.nombre');
@@ -222,12 +239,14 @@ try {
         <tr>
             <td><?= (int)$r['id'] ?></td>
             <td><?= e($r['nombre']) ?></td>
+            <td><?= e(marina_cliente_tipo_embarcacion_etiqueta($r['tipo_embarcacion'] ?? null)) ?></td>
+            <td class="text-end"><?= isset($r['cantidad_pies']) && $r['cantidad_pies'] !== null && $r['cantidad_pies'] !== '' ? e(rtrim(rtrim(number_format((float) $r['cantidad_pies'], 2, '.', ''), '0'), '.')) : '—' ?></td>
             <td><?= e($r['dueno_capitan'] ?? '—') ?></td>
             <td><?= e($r['telefono'] ?? '—') ?></td>
             <td><?= fechaHoraFormato($r['created_at']) ?></td>
             <td class="acciones">
                 <button type="button" class="btn btn-danger btn-sm btn-eliminar-cliente" data-id="<?= (int)$r['id'] ?>" data-nombre="<?= e($r['nombre']) ?>">Eliminar</button>
-                <button type="button" class="btn btn-secondary btn-sm btn-editar-cliente" data-id="<?= (int)$r['id'] ?>" data-nombre="<?= e($r['nombre']) ?>" data-documento="<?= e($r['documento'] ?? '') ?>" data-telefono="<?= e($r['telefono'] ?? '') ?>" data-email="<?= e($r['email'] ?? '') ?>" data-direccion="<?= e($r['direccion'] ?? '') ?>" data-dueno-capitan="<?= e($r['dueno_capitan'] ?? '') ?>">Editar</button>
+                <button type="button" class="btn btn-secondary btn-sm btn-editar-cliente" data-id="<?= (int)$r['id'] ?>" data-nombre="<?= e($r['nombre']) ?>" data-documento="<?= e($r['documento'] ?? '') ?>" data-telefono="<?= e($r['telefono'] ?? '') ?>" data-email="<?= e($r['email'] ?? '') ?>" data-direccion="<?= e($r['direccion'] ?? '') ?>" data-dueno-capitan="<?= e($r['dueno_capitan'] ?? '') ?>" data-tipo-embarcacion="<?= e($r['tipo_embarcacion'] ?? '') ?>" data-cantidad-pies="<?= e(isset($r['cantidad_pies']) && $r['cantidad_pies'] !== null ? (string) $r['cantidad_pies'] : '') ?>">Editar</button>
             </td>
         </tr>
     <?php endwhile; ?>
@@ -248,16 +267,27 @@ try {
                     <div id="clienteModalMensaje" class="alert alert-danger d-none"></div>
                     <label>Nombre *</label>
                     <input type="text" class="form-control" id="clienteNombre" name="nombre" required>
-                    <label class="mt-2">Documento</label>
-                    <input type="text" class="form-control" id="clienteDocumento" name="documento">
+                    <div class="d-none" aria-hidden="true">
+                        <input type="text" class="form-control" id="clienteDocumento" name="documento" tabindex="-1">
+                        <textarea class="form-control" id="clienteDireccion" name="direccion" rows="2" tabindex="-1"></textarea>
+                    </div>
                     <label class="mt-2">Teléfono</label>
                     <input type="text" class="form-control" id="clienteTelefono" name="telefono">
                     <label class="mt-2">Email</label>
                     <input type="email" class="form-control" id="clienteEmail" name="email">
-                    <label class="mt-2">Dirección</label>
-                    <textarea class="form-control" id="clienteDireccion" name="direccion" rows="2"></textarea>
                     <label class="mt-2">Dueño / Capitán</label>
                     <input type="text" class="form-control" id="clienteDuenoCapitan" name="dueno_capitan" maxlength="150" placeholder="Nombre del dueño o capitán">
+                    <label class="mt-2 d-block">Tipo de embarcación</label>
+                    <div class="d-flex flex-wrap gap-3" id="clienteTipoEmbarcacionGroup">
+                        <?php foreach (marina_cliente_tipos_embarcacion() as $cod => $lab): ?>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="tipo_embarcacion" id="clienteTipoEmbarcacion<?= e($cod) ?>" value="<?= e($cod) ?>">
+                            <label class="form-check-label" for="clienteTipoEmbarcacion<?= e($cod) ?>"><?= e($lab) ?></label>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <label class="mt-2">Pies (cantidad)</label>
+                    <input type="text" class="form-control" id="clienteCantidadPies" name="cantidad_pies" inputmode="decimal" placeholder="Ej: 50">
                 </div>
                 <div class="modal-footer">
                     <button type="submit" class="btn btn-primary">Guardar</button>

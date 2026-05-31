@@ -199,6 +199,20 @@ $err = obtener('err');
 $mostrarModal = enviado() && ($accion === 'crear' || $accion === 'editar') && $mensaje !== '';
 $mostrarModalAbono = enviado() && $accion === 'abonar' && $mensaje !== '';
 
+$desdeFiltro = trim((string) ($_GET['desde'] ?? date('Y-m-01')));
+$hastaFiltro = trim((string) ($_GET['hasta'] ?? date('Y-m-d')));
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $desdeFiltro)) {
+    $desdeFiltro = date('Y-m-01');
+}
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $hastaFiltro)) {
+    $hastaFiltro = date('Y-m-d');
+}
+if ($desdeFiltro > $hastaFiltro) {
+    [$desdeFiltro, $hastaFiltro] = [$hastaFiltro, $desdeFiltro];
+}
+$estadoFiltro = marina_gasto_filtro_estado_desde_request();
+$sqlEstadoGasto = marina_gasto_sql_filtro_estado($estadoFiltro);
+
 $modalDatos = [
     'id' => $id,
     'partida_id' => $registro['partida_id'] ?? ($_POST['partida_id'] ?? ''),
@@ -230,6 +244,35 @@ $modalAbonoDatos = [
 
 <div class="toolbar d-flex gap-2"><button type="button" class="btn btn-primary" id="btnNuevoGasto">Nueva factura</button></div>
 
+<form method="get" class="combustible-filtro-form card p-3 mb-3">
+    <input type="hidden" name="p" value="gastos">
+    <div class="combustible-filtro-form__inner">
+        <div class="combustible-filtro-campo">
+            <label class="form-label small mb-0" for="gastoFiltroDesde">Desde</label>
+            <input type="date" id="gastoFiltroDesde" name="desde" class="form-control form-control-sm" value="<?= e($desdeFiltro) ?>">
+        </div>
+        <div class="combustible-filtro-campo">
+            <label class="form-label small mb-0" for="gastoFiltroHasta">Hasta</label>
+            <input type="date" id="gastoFiltroHasta" name="hasta" class="form-control form-control-sm" value="<?= e($hastaFiltro) ?>">
+        </div>
+        <div class="combustible-filtro-campo">
+            <label class="form-label small mb-0" for="gastoFiltroEstado">Estado</label>
+            <select id="gastoFiltroEstado" name="estado" class="form-select form-select-sm">
+                <option value="">Todos</option>
+                <option value="pendiente" <?= $estadoFiltro === 'pendiente' ? 'selected' : '' ?>>Pendiente</option>
+                <option value="pagada" <?= $estadoFiltro === 'pagada' ? 'selected' : '' ?>>Pagada</option>
+            </select>
+        </div>
+        <div class="combustible-filtro-campo combustible-filtro-campo--btn">
+            <button type="submit" class="btn btn-primary btn-sm">Filtrar</button>
+        </div>
+        <p class="combustible-filtro-hint text-muted small mb-0">
+            Listado por <strong>fecha de factura</strong> (<?= e(fechaFormato($desdeFiltro)) ?> — <?= e(fechaFormato($hastaFiltro)) ?>)
+            · Estado: <strong><?= e(marina_gasto_etiqueta_estado_filtro($estadoFiltro)) ?></strong>.
+        </p>
+    </div>
+</form>
+
 <?php if (empty($partidas_hoja)): ?>
 <p class="error">No hay partidas hoja. Cree partidas en el módulo Partidas; los gastos se registran en las que no tienen subpartidas.</p>
 <?php endif; ?>
@@ -250,14 +293,16 @@ $modalAbonoDatos = [
     </thead>
     <tbody>
     <?php
-    $st = $pdo->query("
+    $st = $pdo->prepare("
         SELECT g.*, p.nombre AS partida_nombre, pr.nombre AS proveedor_nombre,
                (SELECT COALESCE(SUM(gp.monto), 0) FROM gasto_pagos gp WHERE gp.gasto_id = g.id) AS total_pagado
         FROM gastos g
         JOIN partidas p ON g.partida_id = p.id
         JOIN proveedores pr ON g.proveedor_id = pr.id
+        WHERE g.fecha_gasto BETWEEN ? AND ?{$sqlEstadoGasto}
         ORDER BY g.fecha_gasto DESC, g.id DESC
     ");
+    $st->execute([$desdeFiltro, $hastaFiltro]);
     $facturas = $st->fetchAll(PDO::FETCH_ASSOC);
     $abonosPorGasto = [];
     $idsFacturas = array_map(static function ($row) {

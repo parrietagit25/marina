@@ -56,7 +56,7 @@ if (obtener('export') === 'excel') {
         return (float) ($r['monto_total'] ?? 0);
     }, $filas));
     $pie = [['Total', '', '', '', '', '', $sumMontos, '']];
-    exportarExcel('reporte_inmuebles_contratos', ['ID', 'Grupo', 'Inmueble', 'Cliente', 'Inicio', 'Fin', 'Monto total', 'Estado'], $rows, $pie, $titulo);
+    exportarExcel('reporte_inmuebles_contratos', ['ID', 'Alquiler', 'Inmueble', 'Cliente', 'Inicio', 'Fin', 'Monto total', 'Estado'], $rows, $pie, $titulo);
 }
 
 require_once __DIR__ . '/../includes/contrato_estado_cuenta.php';
@@ -68,7 +68,7 @@ require_once __DIR__ . '/../includes/layout.php';
     <input type="hidden" name="p" value="reporte-inmuebles-contratos">
     <div class="row g-2 align-items-end">
         <div class="col-12 col-md-3">
-            <label class="form-label mb-1">Grupo</label>
+            <label class="form-label mb-1">Alquiler</label>
             <select class="form-select" name="grupo_id">
                 <option value="0">Todos</option>
                 <?php foreach ($gruposOpts as $gid => $gnom): ?>
@@ -99,7 +99,7 @@ require_once __DIR__ . '/../includes/layout.php';
             <thead>
                 <tr>
                     <th>ID</th>
-                    <th>Grupo</th>
+                    <th>Alquiler</th>
                     <th>Inmueble</th>
                     <th>Cliente</th>
                     <th>Inicio</th>

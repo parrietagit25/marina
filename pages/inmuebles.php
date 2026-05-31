@@ -27,7 +27,7 @@ if (enviado() && ($accion === 'crear' || $accion === 'editar')) {
     $nombre = trim($_POST['nombre'] ?? '');
     $uid = usuarioId();
     if ($grupo_id < 1 || $nombre === '') {
-        $mensaje = 'Grupo y nombre obligatorios.';
+        $mensaje = 'Alquiler y nombre obligatorios.';
     } else {
         if ($accion === 'editar' && $id > 0) {
             $pdo->prepare('UPDATE inmuebles SET grupo_id=?, nombre=?, updated_by=? WHERE id=?')->execute([$grupo_id, $nombre, $uid, $id]);
@@ -69,7 +69,7 @@ $modalDatos = [
 </div>
 
 <table>
-    <thead><tr><th>Id</th><th>Grupo</th><th>Nombre inmueble</th><th>Creado</th><th>Creado por</th><th></th></tr></thead>
+    <thead><tr><th>Id</th><th>Alquiler</th><th>Nombre inmueble</th><th>Creado</th><th>Creado por</th><th></th></tr></thead>
     <tbody>
     <?php
     $st = $pdo->query('SELECT i.*, g.nombre AS grupo_nombre, u.nombre AS creado_por FROM inmuebles i JOIN grupos g ON i.grupo_id = g.id LEFT JOIN usuarios u ON i.created_by = u.id ORDER BY g.nombre, i.nombre');
@@ -101,7 +101,7 @@ $modalDatos = [
                 </div>
                 <div class="modal-body">
                     <div id="inmuebleModalMensaje" class="alert alert-danger d-none"></div>
-                    <label>Grupo</label>
+                    <label>Alquiler</label>
                     <select class="form-select" id="inmuebleGrupoId" name="grupo_id" required>
                         <option value="">Seleccione</option>
                         <?php foreach ($grupos as $gid => $gnom): ?>

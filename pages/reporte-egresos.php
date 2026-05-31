@@ -36,6 +36,7 @@ $st = $pdo->prepare("
     SELECT gp.fecha_pago AS fecha,
            'Gasto' AS origen,
            gp.monto,
+           g.partida_id,
            CONCAT('Gasto — ', p.nombre) AS concepto,
            p.nombre AS grupo_nombre,
            CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre,
@@ -54,6 +55,10 @@ $st = $pdo->prepare("
 ");
 $st->execute($gParams);
 $gastos = $st->fetchAll(PDO::FETCH_ASSOC);
+foreach ($gastos as &$gRow) {
+    $gRow['partida_ruta'] = marina_partida_ruta($pdo, (int) ($gRow['partida_id'] ?? 0));
+}
+unset($gRow);
 
 $manuales = [];
 try {
@@ -82,6 +87,10 @@ try {
     ");
     $mov->execute($mParams);
     $manuales = $mov->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($manuales as &$mRow) {
+        $mRow['partida_ruta'] = '';
+    }
+    unset($mRow);
 } catch (Throwable $e) {
     $manuales = [];
 }
@@ -100,7 +109,10 @@ $total = array_sum(array_map(static function ($r) {
 $agrupadoPorGrupo = [];
 if ($vista === 'agrupado') {
     foreach ($filas as $r) {
-        $g = trim((string) ($r['grupo_nombre'] ?? ''));
+        $g = trim((string) ($r['partida_ruta'] ?? ''));
+        if ($g === '') {
+            $g = trim((string) ($r['grupo_nombre'] ?? ''));
+        }
         if ($g === '') {
             $g = 'Sin partida / origen';
         }
@@ -126,14 +138,15 @@ if (obtener('export') === 'excel') {
             $rows[] = [
                 $r['fecha'] ?? '',
                 $r['origen'] ?? '',
+                $r['partida_ruta'] ?? '',
                 $r['concepto'] ?? '',
                 $r['proveedor_nombre'] ?? '',
                 $r['referencia'] ?? '',
                 (float) ($r['monto'] ?? 0),
             ];
         }
-        $pie = [['Total', '', '', '', '', $total]];
-        exportarExcel('reporte_egresos', ['Fecha', 'Origen', 'Concepto', 'Proveedor', 'Referencia', 'Monto'], $rows, $pie, $titulo . ' — Detallado');
+        $pie = [['Total', '', '', '', '', '', $total]];
+        exportarExcel('reporte_egresos', ['Fecha', 'Origen', 'Procedencia partida', 'Concepto', 'Proveedor', 'Referencia', 'Monto'], $rows, $pie, $titulo . ' — Detallado');
     }
 }
 
@@ -222,6 +235,7 @@ require_once __DIR__ . '/../includes/layout.php';
                 <tr>
                     <th>Fecha</th>
                     <th>Origen</th>
+                    <th>Procedencia partida</th>
                     <th>Concepto</th>
                     <th>Proveedor</th>
                     <th>Referencia</th>
@@ -233,6 +247,7 @@ require_once __DIR__ . '/../includes/layout.php';
                 <tr>
                     <td><?= fechaFormato($r['fecha']) ?></td>
                     <td><?= e($r['origen'] ?? '') ?></td>
+                    <td><?= e($r['partida_ruta'] ?? '') ?: '—' ?></td>
                     <td><?= e($r['concepto'] ?? '') ?></td>
                     <td><?= e($r['proveedor_nombre'] ?? '—') ?></td>
                     <td><?= e($r['referencia'] ?? '') ?></td>
@@ -240,7 +255,7 @@ require_once __DIR__ . '/../includes/layout.php';
                 </tr>
             <?php endforeach; ?>
             <?php if (empty($filas)): ?>
-                <tr><td colspan="6" class="text-muted">No hay débitos en el período.</td></tr>
+                <tr><td colspan="7" class="text-muted">No hay débitos en el período.</td></tr>
             <?php endif; ?>
             </tbody>
         </table>

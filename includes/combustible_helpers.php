@@ -95,6 +95,49 @@ function marina_combustible_precios_vigentes(PDO $pdo): array
     return $out;
 }
 
+/** Precio de venta por galón vigente en una fecha (vigente_desde <= fecha). */
+function marina_combustible_precio_venta_en_fecha(PDO $pdo, string $tipo, string $fecha): ?float
+{
+    $tipo = strtolower(trim($tipo));
+    if (!isset(MARINA_COMB_TIPOS[$tipo]) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha)) {
+        return null;
+    }
+    try {
+        $st = $pdo->prepare('
+            SELECT precio_venta_galon
+            FROM combustible_precios
+            WHERE tipo_combustible = ? AND vigente_desde <= ?
+            ORDER BY vigente_desde DESC, id DESC
+            LIMIT 1
+        ');
+        $st->execute([$tipo, $fecha]);
+        $v = $st->fetchColumn();
+        return $v !== false ? (float) $v : null;
+    } catch (Throwable $e) {
+        return null;
+    }
+}
+
+/** Precio/galón a mostrar en despachos (guardado, histórico o derivado de monto/GLS). */
+function marina_combustible_despacho_precio_galon(array $row, ?PDO $pdo = null): ?float
+{
+    if (array_key_exists('precio_venta_galon', $row) && $row['precio_venta_galon'] !== null && $row['precio_venta_galon'] !== '') {
+        return (float) $row['precio_venta_galon'];
+    }
+    if ($pdo !== null && !empty($row['tipo_combustible']) && !empty($row['fecha'])) {
+        $hist = marina_combustible_precio_venta_en_fecha($pdo, (string) $row['tipo_combustible'], (string) $row['fecha']);
+        if ($hist !== null) {
+            return $hist;
+        }
+    }
+    $gls = (float) ($row['gls'] ?? 0);
+    $monto = (float) ($row['monto_total'] ?? 0);
+    if ($gls > 0 && $monto >= 0) {
+        return round($monto / $gls, 4);
+    }
+    return null;
+}
+
 /**
  * @return array<string, float> gls en inventario por tipo
  */

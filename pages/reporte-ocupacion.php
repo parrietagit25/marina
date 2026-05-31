@@ -380,7 +380,7 @@ function marina_cobranzas_nombre_bloque(array $row): string
     }
     $nom = trim((string) ($row['grupo_nombre'] ?? ''));
 
-    return $nom !== '' ? $nom : 'Grupo';
+    return $nom !== '' ? $nom : 'Alquiler';
 }
 
 /**
@@ -527,7 +527,7 @@ foreach ($inmuebles as $i) {
     if ($vista === 'grupos') {
         $gid = (int) $row['grupo_id'];
         if ($gid > 0) {
-            marina_ocupacion_acumular_en_grupo($acumGrupo, $gid, (string) $row['grupo_nombre'], $row, 'Grupos');
+            marina_ocupacion_acumular_en_grupo($acumGrupo, $gid, (string) $row['grupo_nombre'], $row, 'Alquileres');
         }
     } else {
         if (!marina_ocupacion_pasa_filtro_ocupacion($row, $filtro)) {
@@ -647,7 +647,7 @@ if (obtener('export') === 'excel') {
         ];
         exportarExcel('reporte_cobranzas_grupos', [
             'Ámbito',
-            'Grupo / muelle',
+            'Alquiler / muelle',
             'Unidades',
             'Libres',
             'Ocupados',
@@ -656,7 +656,7 @@ if (obtener('export') === 'excel') {
             'Falta por pagar ∑',
             'Vencido ∑',
             'Pend. no venc. ∑',
-        ], $rowsX, $pie, $titulo . ' — Totales por grupo');
+        ], $rowsX, $pie, $titulo . ' — Totales por alquiler');
     } else {
         $rowsX = [];
         foreach ($filasDetalleRender as $item) {
@@ -730,9 +730,9 @@ if (obtener('export') === 'excel') {
 require_once __DIR__ . '/../includes/layout.php';
 ?>
 <h1 class="h4 mb-2">Reporte de cobranzas</h1>
-<p class="text-muted small mb-3">Cobranzas por <strong>cuotas con vencimiento</strong> entre <strong><?= e(fechaFormato($desde)) ?></strong> y <strong><?= e(fechaFormato($hasta)) ?></strong>. Incluye slips (<em>Marina</em>) e inmuebles (<em>Grupos</em>). <strong>Libre</strong> = sin contrato activo; <strong>Ocupado</strong> = contrato activo. Los montos usan abonos/pagos y pago legado, igual que el <a href="<?= MARINA_URL ?>/index.php?p=reporte-cuotas">reporte de cuotas</a>. <strong>Falta por pagar</strong> es el saldo pendiente de esas cuotas; <strong>Vencido</strong> vence antes de hoy; <strong>Pend. no vencido</strong> vence hoy o después.</p>
+<p class="text-muted small mb-3">Cobranzas por <strong>cuotas con vencimiento</strong> entre <strong><?= e(fechaFormato($desde)) ?></strong> y <strong><?= e(fechaFormato($hasta)) ?></strong>. Incluye slips (<em>Marina</em>) e inmuebles (<em>Alquileres</em>). <strong>Libre</strong> = sin contrato activo; <strong>Ocupado</strong> = contrato activo. Los montos usan abonos/pagos y pago legado, igual que el <a href="<?= MARINA_URL ?>/index.php?p=reporte-cuotas">reporte de cuotas</a>. <strong>Falta por pagar</strong> es el saldo pendiente de esas cuotas; <strong>Vencido</strong> vence antes de hoy; <strong>Pend. no vencido</strong> vence hoy o después.</p>
 <?php if ($vista === 'grupos'): ?>
-    <p class="small alert alert-info py-2 mb-3">Vista <strong>Totales por grupo</strong>: suma por <strong>cada muelle</strong> (slips) y por <strong>cada grupo de inmuebles</strong>. El filtro de ocupación (libre/ocupado) <strong>no aplica</strong> en esta vista; sí aplican fechas, muelle, grupo y tipo de alquiler.</p>
+    <p class="small alert alert-info py-2 mb-3">Vista <strong>Totales por alquiler</strong>: suma por <strong>cada muelle</strong> (slips) y por <strong>cada alquiler de inmuebles</strong>. El filtro de ocupación (libre/ocupado) <strong>no aplica</strong> en esta vista; sí aplican fechas, muelle, alquiler y tipo de alquiler.</p>
 <?php endif; ?>
 
 <form method="get" class="toolbar mb-3">
@@ -758,7 +758,7 @@ require_once __DIR__ . '/../includes/layout.php';
             <label class="form-label mb-1">Vista</label>
             <select class="form-select" name="vista" id="ocup-vista" <?= in_array($tipoAlquiler, ['marina', 'inmuebles'], true) ? 'disabled' : '' ?>>
                 <option value="detalle" <?= $vista === 'detalle' ? 'selected' : '' ?>>Unidad a unidad (detalle)</option>
-                <option value="grupos" <?= $vista === 'grupos' ? 'selected' : '' ?>>Totales por grupo (muelle / grupo)</option>
+                <option value="grupos" <?= $vista === 'grupos' ? 'selected' : '' ?>>Totales por alquiler (muelle / alquiler)</option>
             </select>
             <?php if (in_array($tipoAlquiler, ['marina', 'inmuebles'], true)): ?>
                 <input type="hidden" name="vista" value="<?= e($vista) ?>">
@@ -783,7 +783,7 @@ require_once __DIR__ . '/../includes/layout.php';
             </select>
         </div>
         <div class="col-12 col-md-6 col-lg-2">
-            <label class="form-label mb-1">Grupo (inmuebles)</label>
+            <label class="form-label mb-1">Alquiler (inmuebles)</label>
             <select class="form-select" name="grupo_id">
                 <option value="0">Todos</option>
                 <?php foreach ($gruposOpts as $gid => $gnom): ?>
@@ -796,7 +796,7 @@ require_once __DIR__ . '/../includes/layout.php';
             <button type="submit" class="btn btn-success" name="export" value="excel">Exportar Excel</button>
         </div>
     </div>
-    <p class="text-muted small mb-0 mt-2"><strong>Marina</strong> solo slips; <strong>Inmuebles</strong> solo unidades de grupo. Con <strong>Todos</strong> puede elegir vista detalle o agrupada.</p>
+    <p class="text-muted small mb-0 mt-2"><strong>Marina</strong> solo slips; <strong>Inmuebles</strong> solo unidades de alquiler. Con <strong>Todos</strong> puede elegir vista detalle o agrupada.</p>
 </form>
 
 <div class="card p-3 mb-3">
@@ -805,8 +805,8 @@ require_once __DIR__ . '/../includes/layout.php';
             <div class="col-md-6"><strong>Filas listadas:</strong> <?= (int) count($filas) ?> (Ocupados: <strong><?= (int) $cntOcup ?></strong> — Libres: <strong><?= (int) $cntLibre ?></strong>)</div>
         <?php else: ?>
             <div class="col-md-8">
-                <strong>Grupos en el listado:</strong> <?= (int) count($filasGrupos) ?>
-                (Muelles: <strong><?= (int) count($acumMuelle) ?></strong> — Grupos inmueble: <strong><?= (int) count($acumGrupo) ?></strong>).
+                <strong>Alquileres en el listado:</strong> <?= (int) count($filasGrupos) ?>
+                (Muelles: <strong><?= (int) count($acumMuelle) ?></strong> — Alquileres inmueble: <strong><?= (int) count($acumGrupo) ?></strong>).
                 Unidades totales en suma: ocupados <strong><?= (int) $cntOcup ?></strong>, libres <strong><?= (int) $cntLibre ?></strong>.
             </div>
         <?php endif; ?>
@@ -819,7 +819,7 @@ require_once __DIR__ . '/../includes/layout.php';
         <thead class="table-light">
             <tr>
                 <th>Ámbito</th>
-                <th>Grupo / muelle</th>
+                <th>Alquiler / muelle</th>
                 <th class="text-end">Unid.</th>
                 <th class="text-end">Libres</th>
                 <th class="text-end">Ocup.</th>
@@ -832,7 +832,7 @@ require_once __DIR__ . '/../includes/layout.php';
         </thead>
         <tbody>
         <?php if (empty($filasGrupos)): ?>
-            <tr><td colspan="10" class="text-muted p-3">Sin grupos con los filtros actuales.</td></tr>
+            <tr><td colspan="10" class="text-muted p-3">Sin alquileres con los filtros actuales.</td></tr>
         <?php else: ?>
             <?php foreach ($filasGrupos as $f): ?>
             <tr>
@@ -852,7 +852,7 @@ require_once __DIR__ . '/../includes/layout.php';
         <tfoot class="reporte-ocupacion-tfoot">
             <tr class="table-secondary">
                 <th scope="col">Ámbito</th>
-                <th scope="col">Grupo / muelle</th>
+                <th scope="col">Alquiler / muelle</th>
                 <th scope="col" class="text-end">Unid.</th>
                 <th scope="col" class="text-end">Libres</th>
                 <th scope="col" class="text-end">Ocup.</th>
@@ -864,7 +864,7 @@ require_once __DIR__ . '/../includes/layout.php';
             </tr>
             <tr class="table-light fw-bold">
                 <td>Total general</td>
-                <td>Todos los grupos</td>
+                <td>Todos los alquileres</td>
                 <td class="text-end"><?= (int) $totalesGrupos['n_unidades'] ?></td>
                 <td class="text-end"><?= (int) $totalesGrupos['n_libres'] ?></td>
                 <td class="text-end"><?= (int) $totalesGrupos['n_ocupados'] ?></td>
@@ -909,7 +909,7 @@ require_once __DIR__ . '/../includes/layout.php';
                 <?php continue; endif;
                 if ($tipoFila === 'subtotal'):
                     $tot = $item['totales'] ?? [];
-                    $etiqBloque = ((string) ($item['bloque_tipo'] ?? '')) === 'Marina' ? 'muelle' : 'grupo';
+                    $etiqBloque = ((string) ($item['bloque_tipo'] ?? '')) === 'Marina' ? 'muelle' : 'alquiler';
                     ?>
             <tr class="reporte-cobranzas-subtotal">
                 <td colspan="4">

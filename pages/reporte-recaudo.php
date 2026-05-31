@@ -34,7 +34,7 @@ $sql = "
            cu.fecha_pago AS fecha_pago_legacy,
            COALESCE(co.estado, 'activo') AS contrato_estado,
            COALESCE(mov.pagado_mov, 0) AS pagado_mov,
-           cl.nombre AS navio,
+           cl.nombre AS embarcacion,
            NULLIF(TRIM(cl.dueno_capitan), '') AS cliente_nombre,
            mu.nombre AS muelle_nombre,
            sl.nombre AS slip_nombre,
@@ -129,7 +129,7 @@ foreach ($raw as $r) {
         'cuota_id' => (int) $r['cuota_id'],
         'numero_cuota' => (int) $r['numero_cuota'],
         'cliente' => (string) ($r['cliente_nombre'] ?? '') !== '' ? (string) $r['cliente_nombre'] : '—',
-        'navio' => (string) ($r['navio'] ?? ''),
+        'embarcacion' => (string) ($r['embarcacion'] ?? ''),
         'muelle' => $muelle !== '' ? $muelle : '—',
         'slip' => $slip !== '' ? $slip : '—',
         'muelle_orden' => $muelle !== '' ? $muelle : 'zzzz',
@@ -179,7 +179,7 @@ if (obtener('export') === 'excel') {
             $r['contrato_id'],
             $r['numero_cuota'],
             marinaExcelValorTexto((string) ($r['cliente'] ?? '')),
-            marinaExcelValorTexto((string) ($r['navio'] ?? '')),
+            marinaExcelValorTexto((string) ($r['embarcacion'] ?? '')),
             marinaExcelValorTexto((string) ($r['muelle'] ?? '')),
             marinaExcelValorTexto((string) ($r['slip'] ?? '')),
             marinaExcelValorTexto((string) ($r['vencimiento'] ?? '')),
@@ -204,7 +204,7 @@ if (obtener('export') === 'excel') {
     ]];
     exportarExcel(
         'reporte_recaudo',
-        ['Contrato', 'Cuota', 'Cliente', 'Navío', 'Muelle', 'Slip', 'Vencimiento', 'Monto cuota', 'Pagado', 'Por recaudar', 'Estado'],
+        ['Contrato', 'Cuota', 'Cliente', 'Embarcación', 'Muelle', 'Slip', 'Vencimiento', 'Monto cuota', 'Pagado', 'Por recaudar', 'Estado'],
         $rows,
         $pie,
         $titulo . ' — ' . fechaFormato($desde) . ' a ' . fechaFormato($hasta)
@@ -217,7 +217,7 @@ require_once __DIR__ . '/../includes/layout.php';
 <p class="text-muted small mb-3">
     Cuotas con <strong>vencimiento</strong> entre las fechas indicadas que aún tienen <strong>saldo por cobrar</strong>.
     Listado por cuota (sin subtotales por unidad). Orden: muelle → slip → vencimiento.
-    En inmuebles, muelle = grupo e slip = inmueble. Las cuotas ya pagadas no aparecen.
+    En inmuebles, muelle = alquiler e slip = inmueble. Las cuotas ya pagadas no aparecen.
     Los subtotales por muelle/slip están en el <a href="<?= MARINA_URL ?>/index.php?p=reporte-ocupacion">Reporte de cobranzas</a>.
 </p>
 
@@ -278,7 +278,7 @@ require_once __DIR__ . '/../includes/layout.php';
                     <th>Contrato</th>
                     <th>Cuota</th>
                     <th>Cliente</th>
-                    <th>Navío</th>
+                    <th>Embarcación</th>
                     <th>Muelle</th>
                     <th>Slip</th>
                     <th>Vencimiento</th>
@@ -300,7 +300,7 @@ require_once __DIR__ . '/../includes/layout.php';
                     <td>#<?= (int) $r['contrato_id'] ?></td>
                     <td>#<?= (int) $r['numero_cuota'] ?></td>
                     <td><?= e($r['cliente']) ?></td>
-                    <td><?= e($r['navio']) ?></td>
+                    <td><?= e($r['embarcacion']) ?></td>
                     <td><?= e($r['muelle']) ?></td>
                     <td><?= e($r['slip']) ?></td>
                     <td><?= fechaFormato($r['vencimiento']) ?></td>

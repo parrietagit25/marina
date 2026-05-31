@@ -408,7 +408,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     })();
 
-    // Grupos
+    // Alquileres
     (function() {
         var el = document.getElementById('grupoModal');
         if (!el) return;
@@ -420,11 +420,11 @@ document.addEventListener('DOMContentLoaded', function () {
         var modal = new bootstrap.Modal(el);
         function setErr(m) { if (msg) { msg.textContent = m || ''; msg.classList.toggle('d-none', !m); } }
         document.getElementById('btnNuevoGrupo') && document.getElementById('btnNuevoGrupo').addEventListener('click', function() {
-            title.textContent = 'Nuevo grupo'; accion.value = 'crear'; fid.value = ''; nombre.value = ''; setErr(''); modal.show();
+            title.textContent = 'Nuevo alquiler'; accion.value = 'crear'; fid.value = ''; nombre.value = ''; setErr(''); modal.show();
         });
         document.querySelectorAll('.btn-editar-grupo').forEach(function(b) {
             b.addEventListener('click', function() {
-                title.textContent = 'Editar grupo'; accion.value = 'editar'; fid.value = b.getAttribute('data-id') || ''; nombre.value = b.getAttribute('data-nombre') || ''; setErr(''); modal.show();
+                title.textContent = 'Editar alquiler'; accion.value = 'editar'; fid.value = b.getAttribute('data-id') || ''; nombre.value = b.getAttribute('data-nombre') || ''; setErr(''); modal.show();
             });
         });
         var delEl = document.getElementById('confirmEliminarGrupoModal');
@@ -440,7 +440,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         if (window.__grupoModal && window.__grupoModal.mostrar && window.__grupoModal.datos) {
             var w = window.__grupoModal;
-            title.textContent = 'Editar grupo'; accion.value = 'editar'; fid.value = w.datos.id || ''; nombre.value = w.datos.nombre || ''; setErr(w.error || ''); modal.show();
+            title.textContent = 'Editar alquiler'; accion.value = 'editar'; fid.value = w.datos.id || ''; nombre.value = w.datos.nombre || ''; setErr(w.error || ''); modal.show();
         }
     })();
 
@@ -484,7 +484,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     })();
 
-    // Clientes (nombre, documento, telefono, email, direccion, duenoCapitan)
+    // Clientes (nombre, documento, telefono, email, direccion, duenoCapitan, tipoEmbarcacion)
     (function() {
         var el = document.getElementById('clienteModal');
         if (!el) return;
@@ -493,10 +493,22 @@ document.addEventListener('DOMContentLoaded', function () {
         var fid = document.getElementById('clienteFormId');
         var modal = new bootstrap.Modal(el);
         var msg = document.getElementById('clienteModalMensaje');
-        var fields = ['nombre','documento','telefono','email','direccion','duenoCapitan'];
+        var fields = ['nombre','documento','telefono','email','direccion','duenoCapitan','cantidadPies'];
         function setErr(m) { if (msg) { msg.textContent = m || ''; msg.classList.toggle('d-none', !m); } }
-        function clearForm() { fields.forEach(function(f) { var e = document.getElementById('cliente' + f.charAt(0).toUpperCase() + f.slice(1)); if (e) e.value = ''; }); }
-        function fillForm(data) { fields.forEach(function(f) { var e = document.getElementById('cliente' + f.charAt(0).toUpperCase() + f.slice(1)); if (e && data[f] !== undefined) e.value = data[f] || ''; }); }
+        function setTipoEmbarcacion(val) {
+            var v = val ? String(val).toUpperCase() : '';
+            document.querySelectorAll('#clienteModal input[name="tipo_embarcacion"]').forEach(function(r) {
+                r.checked = (r.value === v);
+            });
+        }
+        function clearForm() {
+            fields.forEach(function(f) { var e = document.getElementById('cliente' + f.charAt(0).toUpperCase() + f.slice(1)); if (e) e.value = ''; });
+            setTipoEmbarcacion('');
+        }
+        function fillForm(data) {
+            fields.forEach(function(f) { var e = document.getElementById('cliente' + f.charAt(0).toUpperCase() + f.slice(1)); if (e && data[f] !== undefined) e.value = data[f] || ''; });
+            setTipoEmbarcacion(data.tipoEmbarcacion || data.tipo_embarcacion || '');
+        }
         document.getElementById('btnNuevoCliente') && document.getElementById('btnNuevoCliente').addEventListener('click', function() {
             title.textContent = 'Nuevo cliente'; accion.value = 'crear'; fid.value = ''; clearForm(); setErr(''); modal.show();
         });
@@ -504,7 +516,7 @@ document.addEventListener('DOMContentLoaded', function () {
             b.addEventListener('click', function() {
                 title.textContent = 'Editar cliente'; accion.value = 'editar';
                 fid.value = b.getAttribute('data-id') || '';
-                fillForm({ nombre: b.getAttribute('data-nombre'), documento: b.getAttribute('data-documento'), telefono: b.getAttribute('data-telefono'), email: b.getAttribute('data-email'), direccion: b.getAttribute('data-direccion'), duenoCapitan: b.getAttribute('data-dueno-capitan') });
+                fillForm({ nombre: b.getAttribute('data-nombre'), documento: b.getAttribute('data-documento'), telefono: b.getAttribute('data-telefono'), email: b.getAttribute('data-email'), direccion: b.getAttribute('data-direccion'), duenoCapitan: b.getAttribute('data-dueno-capitan'), tipoEmbarcacion: b.getAttribute('data-tipo-embarcacion'), cantidadPies: b.getAttribute('data-cantidad-pies') });
                 setErr(''); modal.show();
             });
         });
@@ -807,7 +819,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
                 inmuebleSel.disabled = false;
             } else {
-                html = '<option value="">Seleccione un grupo primero</option>';
+                html = '<option value="">Seleccione un alquiler primero</option>';
                 inmuebleSel.disabled = true;
             }
             inmuebleSel.innerHTML = html;

@@ -1,153 +1,114 @@
 <?php
 /**
- * Reportes: visualización de ingresos y costos.
- * Ingresos = cuotas pagadas (acreditadas a cuentas).
- * Costos = gastos por partida.
+ * Reporte de ingresos y egresos — solo combustible (detalle en dos tablas).
  */
-$titulo = 'Reporte de ingresos y egresos';
+$titulo = 'Ingresos y egresos — Combustible';
 require_once __DIR__ . '/../includes/export_excel.php';
+require_once __DIR__ . '/../includes/combustible_helpers.php';
 
 $pdo = getDb();
 $desde = obtener('desde', date('Y-m-01'));
 $hasta = obtener('hasta', date('Y-m-d'));
+$partida_combustible_id = marina_combustible_partida_id($pdo);
+$labCred = marina_ui_credito();
+$labDeb = marina_ui_debito();
 
-// Ingresos: suma de movimientos (pago/abono) por fecha_pago.
-// Compatibilidad: si una cuota no tiene movimientos en `cuotas_movimientos`, tomamos el pago viejo de `cuotas.fecha_pago`.
-// Incluye despachos de combustible acreditados a cuenta (si existe la tabla).
-$sqlIngresosCuotas = "
-    SELECT t.cuenta_id, t.cuenta_nombre, SUM(t.total) AS total
-    FROM (
-        SELECT co.cuenta_id, CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre, mo.monto AS total
-        FROM cuotas_movimientos mo
-        JOIN cuotas cu ON mo.cuota_id = cu.id
-        JOIN contratos co ON cu.contrato_id = co.id
-        JOIN cuentas c ON co.cuenta_id = c.id
-        JOIN bancos b ON c.banco_id = b.id
-        WHERE mo.fecha_pago BETWEEN ? AND ?
-
-        UNION ALL
-
-        SELECT co.cuenta_id, CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre, cu.monto AS total
-        FROM cuotas cu
-        JOIN contratos co ON cu.contrato_id = co.id
-        JOIN cuentas c ON co.cuenta_id = c.id
-        JOIN bancos b ON c.banco_id = b.id
-        WHERE cu.fecha_pago BETWEEN ? AND ?
-          AND NOT EXISTS (SELECT 1 FROM cuotas_movimientos x WHERE x.cuota_id = cu.id)
-    ) t
-    GROUP BY t.cuenta_id, t.cuenta_nombre
-";
-$sqlIngresosConCombustible = "
-    SELECT t.cuenta_id, t.cuenta_nombre, SUM(t.total) AS total
-    FROM (
-        SELECT co.cuenta_id, CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre, mo.monto AS total
-        FROM cuotas_movimientos mo
-        JOIN cuotas cu ON mo.cuota_id = cu.id
-        JOIN contratos co ON cu.contrato_id = co.id
-        JOIN cuentas c ON co.cuenta_id = c.id
-        JOIN bancos b ON c.banco_id = b.id
-        WHERE mo.fecha_pago BETWEEN ? AND ?
-
-        UNION ALL
-
-        SELECT co.cuenta_id, CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre, cu.monto AS total
-        FROM cuotas cu
-        JOIN contratos co ON cu.contrato_id = co.id
-        JOIN cuentas c ON co.cuenta_id = c.id
-        JOIN bancos b ON c.banco_id = b.id
-        WHERE cu.fecha_pago BETWEEN ? AND ?
-          AND NOT EXISTS (SELECT 1 FROM cuotas_movimientos x WHERE x.cuota_id = cu.id)
-
-        UNION ALL
-
-        SELECT p.cuenta_id, CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre, p.monto AS total
+$creditos = [];
+try {
+    $st = $pdo->prepare("
+        SELECT p.fecha_pago AS fecha,
+               p.monto,
+               cd.embarcacion,
+               cd.tipo_combustible,
+               cd.gls
         FROM combustible_despacho_pagos p
-        JOIN cuentas c ON c.id = p.cuenta_id
-        JOIN bancos b ON b.id = c.banco_id
+        JOIN combustible_despachos cd ON cd.id = p.despacho_id
         WHERE p.fecha_pago BETWEEN ? AND ?
-    ) t
-    GROUP BY t.cuenta_id, t.cuenta_nombre
-";
-$ingresos_por_cuenta = [];
-try {
-    $st = $pdo->prepare($sqlIngresosConCombustible);
-    $st->execute([$desde, $hasta, $desde, $hasta, $desde, $hasta]);
-    $ingresos_por_cuenta = $st->fetchAll(PDO::FETCH_ASSOC);
-} catch (Throwable $e) {
-    $st = $pdo->prepare($sqlIngresosCuotas);
-    $st->execute([$desde, $hasta, $desde, $hasta]);
-    $ingresos_por_cuenta = $st->fetchAll(PDO::FETCH_ASSOC);
-}
-try {
-    $stEl = $pdo->prepare("
-        SELECT ep.cuenta_id, CONCAT(b.nombre, ' - ', c.nombre) AS cuenta_nombre, SUM(ep.monto) AS total
-        FROM contrato_electricidad_pagos ep
-        JOIN cuentas c ON c.id = ep.cuenta_id
-        JOIN bancos b ON b.id = c.banco_id
-        WHERE ep.fecha_pago BETWEEN ? AND ?
-        GROUP BY ep.cuenta_id, b.nombre, c.nombre
+        ORDER BY p.fecha_pago, p.id
     ");
-    $stEl->execute([$desde, $hasta]);
-    $porCuenta = [];
-    foreach ($ingresos_por_cuenta as $r) {
-        $cid = (int) ($r['cuenta_id'] ?? 0);
-        if ($cid > 0) {
-            $porCuenta[$cid] = ['cuenta_id' => $cid, 'cuenta_nombre' => $r['cuenta_nombre'] ?? '', 'total' => (float) ($r['total'] ?? 0)];
-        }
+    $st->execute([$desde, $hasta]);
+    foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        $creditos[] = [
+            'fecha' => $r['fecha'],
+            'embarcacion' => (string) ($r['embarcacion'] ?? ''),
+            'tipo' => MARINA_COMB_TIPOS[$r['tipo_combustible'] ?? ''] ?? (string) ($r['tipo_combustible'] ?? ''),
+            'gls' => (float) ($r['gls'] ?? 0),
+            'monto' => (float) ($r['monto'] ?? 0),
+        ];
     }
-    while ($row = $stEl->fetch(PDO::FETCH_ASSOC)) {
-        $cid = (int) ($row['cuenta_id'] ?? 0);
-        if ($cid < 1) {
-            continue;
-        }
-        if (!isset($porCuenta[$cid])) {
-            $porCuenta[$cid] = ['cuenta_id' => $cid, 'cuenta_nombre' => $row['cuenta_nombre'] ?? '', 'total' => 0.0];
-        }
-        $porCuenta[$cid]['total'] += (float) ($row['total'] ?? 0);
-    }
-    $ingresos_por_cuenta = array_values($porCuenta);
 } catch (Throwable $e) {
-    // sin electricidad
+    // sin módulo combustible
 }
-$total_ingresos = array_sum(array_column($ingresos_por_cuenta, 'total'));
 
-// Gastos en el período
-$st = $pdo->prepare("
-    SELECT g.partida_id, p.nombre AS partida_nombre, SUM(gp.monto) AS total
-    FROM gasto_pagos gp
-    JOIN gastos g ON g.id = gp.gasto_id
-    JOIN partidas p ON g.partida_id = p.id
-    WHERE gp.fecha_pago BETWEEN ? AND ?
-    GROUP BY g.partida_id, p.nombre
-    ORDER BY total DESC
-");
-$st->execute([$desde, $hasta]);
-$gastos_por_partida = $st->fetchAll(PDO::FETCH_ASSOC);
-$total_gastos = array_sum(array_column($gastos_por_partida, 'total'));
+$debitos = [];
+if ($partida_combustible_id > 0) {
+    $st = $pdo->prepare("
+        SELECT gp.fecha_pago AS fecha,
+               gp.monto,
+               pr.nombre AS proveedor,
+               COALESCE(NULLIF(TRIM(g.observaciones), ''), CONCAT('Gasto #', g.id)) AS concepto
+        FROM gasto_pagos gp
+        JOIN gastos g ON g.id = gp.gasto_id
+        JOIN proveedores pr ON pr.id = g.proveedor_id
+        WHERE gp.fecha_pago BETWEEN ? AND ?
+          AND g.partida_id = ?
+        ORDER BY gp.fecha_pago, gp.id
+    ");
+    $st->execute([$desde, $hasta, $partida_combustible_id]);
+    foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        $debitos[] = [
+            'fecha' => $r['fecha'],
+            'proveedor' => (string) ($r['proveedor'] ?? ''),
+            'concepto' => (string) ($r['concepto'] ?? ''),
+            'monto' => (float) ($r['monto'] ?? 0),
+        ];
+    }
+}
 
-$diferencia = $total_ingresos - $total_gastos;
+$totCred = array_sum(array_column($creditos, 'monto'));
+$totDeb = array_sum(array_column($debitos, 'monto'));
+$neto = $totCred - $totDeb;
 
 if (obtener('export') === 'excel') {
     $rows = [];
-    foreach ($ingresos_por_cuenta as $r) {
-        $rows[] = ['Crédito por cuenta', $r['cuenta_nombre'] ?? '', (float) ($r['total'] ?? 0)];
+    foreach ($creditos as $r) {
+        $rows[] = [
+            $r['fecha'],
+            $r['embarcacion'],
+            $r['tipo'],
+            (float) $r['gls'],
+            (float) $r['monto'],
+        ];
     }
-    foreach ($gastos_por_partida as $r) {
-        $rows[] = ['Débito por partida', $r['partida_nombre'] ?? '', (float) ($r['total'] ?? 0)];
+    $rows[] = ['', '', '', '', ''];
+    foreach ($debitos as $r) {
+        $rows[] = [
+            $r['fecha'],
+            $r['proveedor'],
+            $r['concepto'],
+            '',
+            (float) $r['monto'],
+        ];
     }
     $pie = [
-        ['Total créditos', '', $total_ingresos],
-        ['Total débitos', '', $total_gastos],
-        ['Diferencia (créditos − débitos)', '', $diferencia],
+        ['Total créditos', '', '', '', $totCred],
+        ['Total débitos', '', '', '', $totDeb],
+        ['Neto', '', '', '', $neto],
     ];
-    exportarExcel('reporte_ingresos_costos', ['Seccion', 'Concepto', 'Total'], $rows, $pie, $titulo);
+    exportarExcel(
+        'reporte_combustible_ingresos_egresos',
+        ['Fecha', 'Embarcación / Proveedor', 'Tipo / Concepto', 'GLS', 'Monto'],
+        $rows,
+        $pie,
+        $titulo
+    );
 }
 
 require_once __DIR__ . '/../includes/layout.php';
 ?>
-<h1 class="h4 mb-2">Reporte de ingresos y egresos</h1>
-<p class="text-muted small mb-3">Resumen del período: totales de <strong>ingresos</strong> por cuenta (cuotas, despacho de combustible y electricidad) y de <strong>egresos</strong> por partida (abonos a gastos y pedidos de combustible recibidos). En el detalle numérico de abajo se usan las etiquetas <?= e(marina_ui_credito()) ?> y <?= e(marina_ui_debito()) ?>. <a href="<?= MARINA_URL ?>/index.php?p=reporte-combustible">Reporte detallado de combustible</a></p>
-<form method="get" class="toolbar" style="margin-bottom:1rem">
+<h1 class="h4 mb-2">Ingresos y egresos — Combustible</h1>
+<p class="text-muted small mb-3">Cobros de despacho (<?= e($labCred) ?>) y pagos de compras (<?= e($labDeb) ?>). <a href="<?= MARINA_URL ?>/index.php?p=reporte-combustible">Reporte operativo</a>.</p>
+<form method="get" class="toolbar mb-3">
     <input type="hidden" name="p" value="reportes">
     <div class="row g-2 align-items-end">
         <div class="col-12 col-md-3">
@@ -167,83 +128,95 @@ require_once __DIR__ . '/../includes/layout.php';
     </div>
 </form>
 
-<div class="reportes-ingresos-page w-100 mw-100">
 <div class="row g-3 mb-3">
-    <div class="col-12">
-        <div class="card p-4">
-            <h2 class="h5 mb-3">Resumen (<?= fechaFormato($desde) ?> – <?= fechaFormato($hasta) ?>)</h2>
-            <div class="row g-3">
-                <div class="col-12 col-sm-4">
-                    <div class="rounded-3 border bg-light p-3 h-100">
-                        <div class="small text-muted text-uppercase fw-semibold mb-1">Total créditos</div>
-                        <div class="fs-4 fw-bold text-success"><?= dinero($total_ingresos) ?></div>
-                    </div>
-                </div>
-                <div class="col-12 col-sm-4">
-                    <div class="rounded-3 border bg-light p-3 h-100">
-                        <div class="small text-muted text-uppercase fw-semibold mb-1">Total débitos</div>
-                        <div class="fs-4 fw-bold text-danger"><?= dinero($total_gastos) ?></div>
-                    </div>
-                </div>
-                <div class="col-12 col-sm-4">
-                    <div class="rounded-3 border bg-light p-3 h-100">
-                        <div class="small text-muted text-uppercase fw-semibold mb-1">Diferencia</div>
-                        <div class="fs-4 fw-bold <?= $diferencia >= 0 ? 'text-success' : 'text-danger' ?>"><?= dinero($diferencia) ?></div>
-                    </div>
-                </div>
+    <div class="col-12 col-lg-6">
+        <div class="card p-3 h-100">
+            <h2 class="h6 mb-3"><?= e($labCred) ?>s — cobros de despacho</h2>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0 no-datatable">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Embarcación</th>
+                            <th>Tipo</th>
+                            <th class="text-end">GLS</th>
+                            <th class="text-end">Monto</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($creditos as $r): ?>
+                        <tr>
+                            <td><?= fechaFormato($r['fecha']) ?></td>
+                            <td><?= e($r['embarcacion'] ?: '—') ?></td>
+                            <td><?= e($r['tipo'] ?: '—') ?></td>
+                            <td class="text-end"><?= number_format($r['gls'], 3, '.', ',') ?></td>
+                            <td class="text-end text-nowrap"><?= dinero($r['monto']) ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($creditos)): ?>
+                        <tr><td colspan="5" class="text-muted">No hay cobros en el período.</td></tr>
+                    <?php endif; ?>
+                    </tbody>
+                    <?php if (!empty($creditos)): ?>
+                    <tfoot class="table-light">
+                        <tr>
+                            <th colspan="4" class="text-end">Total</th>
+                            <th class="text-end text-success"><?= dinero($totCred) ?></th>
+                        </tr>
+                    </tfoot>
+                    <?php endif; ?>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-lg-6">
+        <div class="card p-3 h-100">
+            <h2 class="h6 mb-3"><?= e($labDeb) ?>s — pagos de compras</h2>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0 no-datatable">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Proveedor</th>
+                            <th>Concepto</th>
+                            <th class="text-end">Monto</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($debitos as $r): ?>
+                        <tr>
+                            <td><?= fechaFormato($r['fecha']) ?></td>
+                            <td><?= e($r['proveedor'] ?: '—') ?></td>
+                            <td><?= e($r['concepto']) ?></td>
+                            <td class="text-end text-nowrap"><?= dinero($r['monto']) ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($debitos)): ?>
+                        <tr><td colspan="4" class="text-muted">No hay pagos en el período.</td></tr>
+                    <?php endif; ?>
+                    </tbody>
+                    <?php if (!empty($debitos)): ?>
+                    <tfoot class="table-light">
+                        <tr>
+                            <th colspan="3" class="text-end">Total</th>
+                            <th class="text-end text-danger"><?= dinero($totDeb) ?></th>
+                        </tr>
+                    </tfoot>
+                    <?php endif; ?>
+                </table>
             </div>
         </div>
     </div>
 </div>
 
-<div class="row g-3 gx-lg-4 reportes-creditos-debitos-row mb-3">
-    <div class="col-12 col-lg-6 d-flex min-w-0">
-        <div class="card p-4 flex-fill w-100 min-w-0">
-            <h2 class="h5 mb-3">Créditos por cuenta (cuotas pagadas y despacho combustible)</h2>
-            <div class="table-responsive w-100">
-                <table class="table table-lg align-middle w-100 mb-0">
-                    <thead>
-                        <tr><th>Cuenta</th><th class="text-end">Total</th></tr>
-                    </thead>
-                    <tbody>
-                    <?php foreach ($ingresos_por_cuenta as $row): ?>
-                        <tr>
-                            <td><?= e($row['cuenta_nombre']) ?></td>
-                            <td class="text-end text-nowrap"><?= dinero($row['total']) ?></td>
-                        </tr>
-                    <?php endforeach; ?>
-                    <?php if (empty($ingresos_por_cuenta)): ?>
-                        <tr><td colspan="2" class="text-muted">No hay créditos en el período.</td></tr>
-                    <?php endif; ?>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-    <div class="col-12 col-lg-6 d-flex min-w-0">
-        <div class="card p-4 flex-fill w-100 min-w-0">
-            <h2 class="h5 mb-3">Débitos por partida</h2>
-            <div class="table-responsive w-100">
-                <table class="table table-lg align-middle w-100 mb-0">
-                    <thead>
-                        <tr><th>Partida</th><th class="text-end">Total</th></tr>
-                    </thead>
-                    <tbody>
-                    <?php foreach ($gastos_por_partida as $row): ?>
-                        <tr>
-                            <td><?= e($row['partida_nombre']) ?></td>
-                            <td class="text-end text-nowrap"><?= dinero($row['total']) ?></td>
-                        </tr>
-                    <?php endforeach; ?>
-                    <?php if (empty($gastos_por_partida)): ?>
-                        <tr><td colspan="2" class="text-muted">No hay gastos en el período.</td></tr>
-                    <?php endif; ?>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+<?php if (!empty($creditos) || !empty($debitos)): ?>
+<div class="card p-3">
+    <div class="row g-2 small">
+        <div class="col-md-4"><strong>Total créditos:</strong> <?= dinero($totCred) ?></div>
+        <div class="col-md-4"><strong>Total débitos:</strong> <?= dinero($totDeb) ?></div>
+        <div class="col-md-4"><strong>Neto:</strong> <span class="<?= $neto >= 0 ? 'text-success' : 'text-danger' ?>"><?= dinero($neto) ?></span></div>
     </div>
 </div>
-</div>
+<?php endif; ?>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

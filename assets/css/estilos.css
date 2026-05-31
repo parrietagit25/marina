@@ -1085,6 +1085,14 @@ body {
   padding-top: 0.15rem !important;
 }
 
+/* Combustible despacho: sin cuenta sugerida asignada */
+.combustible-despacho-sin-cuenta > td {
+  background-color: #fee2e2 !important;
+}
+.dataTables_wrapper table.dataTable tbody tr.combustible-despacho-sin-cuenta:hover > td {
+  background-color: #fecaca !important;
+}
+
 /* Reporte cobranzas: cabecera fija al hacer scroll */
 .reporte-cobranzas-table-wrap {
   overflow: visible;

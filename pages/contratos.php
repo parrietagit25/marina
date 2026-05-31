@@ -91,7 +91,7 @@ if (enviado() && ($accion === 'crear' || $accion === 'editar')) {
     $tieneUnidadMuelleSlip = ($muelle_id > 0 && $slip_id > 0);
     $tieneUnidadInmueble = ($grupo_id > 0 && $inmueble_id > 0);
     if ($cliente_id < 1 || $cuenta_id < 1 || $fecha_inicio === '' || $fecha_fin === '' || $monto_total <= 0 || (!$tieneUnidadMuelleSlip && !$tieneUnidadInmueble)) {
-        $mensaje = 'Complete campos obligatorios (cliente, cuenta, fechas, monto y al menos una unidad: muelle/slip o grupo/inmueble).';
+        $mensaje = 'Complete campos obligatorios (cliente, cuenta, fechas, monto y al menos una unidad: muelle/slip o alquiler/inmueble).';
     } elseif ($tarifa_pie_id > 0 && $cantidad_pies <= 0) {
         $mensaje = 'Indique la cantidad de pies cuando selecciona una tarifa por pie.';
     } else {
@@ -993,7 +993,7 @@ require_once __DIR__ . '/../includes/layout.php';
                                 <option value="">Seleccione un muelle primero</option>
                             </select>
                             <small class="text-muted d-block mt-1">Los slips con contrato activo aparecen como <strong>ocupados</strong> y no se pueden elegir.</small>
-                            <label class="mt-2">Grupo</label>
+                            <label class="mt-2">Alquiler</label>
                             <select class="form-select" id="contratoGrupoId" name="grupo_id">
                                 <option value="">Seleccione (opcional)</option>
                                 <?php foreach ($grupos as $gid => $gnom): ?>
@@ -1002,9 +1002,9 @@ require_once __DIR__ . '/../includes/layout.php';
                             </select>
                             <label class="mt-2">Inmueble</label>
                             <select class="form-select" id="contratoInmuebleId" name="inmueble_id" disabled>
-                                <option value="">Seleccione un grupo primero</option>
+                                <option value="">Seleccione un alquiler primero</option>
                             </select>
-                            <small class="text-muted d-block mt-1">Debe indicar al menos una unidad: muelle/slip o grupo/inmueble.</small>
+                            <small class="text-muted d-block mt-1">Debe indicar al menos una unidad: muelle/slip o alquiler/inmueble.</small>
                         </div>
                         <div class="col-md-6">
                             <label>Fecha inicio *</label>
