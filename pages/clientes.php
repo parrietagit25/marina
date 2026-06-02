@@ -231,7 +231,7 @@ try {
 <div class="toolbar d-flex gap-2"><button type="button" class="btn btn-primary" id="btnNuevoCliente">Nuevo cliente</button></div>
 
 <table id="tablaClientes" data-dt-restore-page="1">
-    <thead><tr><th>Id</th><th>Nombre</th><th>Tipo embarcación</th><th>Pies</th><th>Dueño / Capitán</th><th>Teléfono</th><th>Creado</th><th></th></tr></thead>
+    <thead><tr><th>Id</th><th>Nombre</th><th>Tipo embarcación</th><th>Pies</th><th>Dueño / Capitán</th><th>Teléfono</th><th>Email</th><th></th></tr></thead>
     <tbody>
     <?php
     $st = $pdo->query('SELECT c.* FROM clientes c ORDER BY c.nombre');
@@ -243,7 +243,7 @@ try {
             <td class="text-end"><?= isset($r['cantidad_pies']) && $r['cantidad_pies'] !== null && $r['cantidad_pies'] !== '' ? e(rtrim(rtrim(number_format((float) $r['cantidad_pies'], 2, '.', ''), '0'), '.')) : '—' ?></td>
             <td><?= e($r['dueno_capitan'] ?? '—') ?></td>
             <td><?= e($r['telefono'] ?? '—') ?></td>
-            <td><?= fechaHoraFormato($r['created_at']) ?></td>
+            <td><?= trim((string) ($r['email'] ?? '')) !== '' ? e((string) $r['email']) : '—' ?></td>
             <td class="acciones">
                 <button type="button" class="btn btn-danger btn-sm btn-eliminar-cliente" data-id="<?= (int)$r['id'] ?>" data-nombre="<?= e($r['nombre']) ?>">Eliminar</button>
                 <button type="button" class="btn btn-secondary btn-sm btn-editar-cliente" data-id="<?= (int)$r['id'] ?>" data-nombre="<?= e($r['nombre']) ?>" data-documento="<?= e($r['documento'] ?? '') ?>" data-telefono="<?= e($r['telefono'] ?? '') ?>" data-email="<?= e($r['email'] ?? '') ?>" data-direccion="<?= e($r['direccion'] ?? '') ?>" data-dueno-capitan="<?= e($r['dueno_capitan'] ?? '') ?>" data-tipo-embarcacion="<?= e($r['tipo_embarcacion'] ?? '') ?>" data-cantidad-pies="<?= e(isset($r['cantidad_pies']) && $r['cantidad_pies'] !== null ? (string) $r['cantidad_pies'] : '') ?>">Editar</button>
