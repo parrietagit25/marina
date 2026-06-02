@@ -55,7 +55,7 @@ CREATE TABLE clientes (
   email VARCHAR(100) NULL,
   direccion TEXT NULL,
   dueno_capitan VARCHAR(150) NULL COMMENT 'Dueño / Capitán',
-  tipo_embarcacion VARCHAR(10) NULL COMMENT 'CAT=Catamarán, MYT=Megayate, MT=A motor',
+  tipo_embarcacion VARCHAR(10) NULL COMMENT 'CAT=Catamarán, MYT=Megayate, MT=Motor',
   cantidad_pies DECIMAL(10,2) NULL COMMENT 'Pies del navío',
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
