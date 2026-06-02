@@ -686,7 +686,7 @@ $despTotalSaldo = max(0.0, $despTotalFacturado - $despTotalAbonado);
         </div>
         <div class="mb-2">
             <label class="form-label d-block">Tipo de embarcación <span class="text-danger">*</span></label>
-            <div class="d-flex flex-wrap gap-3" id="dTipoEmbarcacionGroup">
+            <div class="d-flex flex-wrap gap-3 marina-tipo-embarcacion-group" id="dTipoEmbarcacionGroup">
                 <?php foreach (marina_cliente_tipos_embarcacion() as $cod => $lab): ?>
                 <div class="form-check">
                     <input class="form-check-input" type="radio" name="tipo_embarcacion" id="dTipoEmbarcacion<?= e($cod) ?>" value="<?= e($cod) ?>" <?= $cod === 'CAT' ? 'required' : '' ?> <?= $tipoEmbModal === $cod ? 'checked' : '' ?>>

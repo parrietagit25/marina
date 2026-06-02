@@ -84,6 +84,15 @@ window.marinaFmtFecha = function(fecha) {
             }
           }
         });
+        if ($table.attr('data-dt-restore-page') === '1') {
+          var dtPageParam = new URLSearchParams(window.location.search).get('dt_page');
+          if (dtPageParam !== null && dtPageParam !== '') {
+            var pg = parseInt(dtPageParam, 10);
+            if (!isNaN(pg) && pg >= 0) {
+              $table.DataTable().page(pg).draw('page');
+            }
+          }
+        }
         $table.attr('data-dt-ready', '1');
       });
     } catch (e) {

@@ -1,5 +1,22 @@
 /* Marina - modales CRUD por módulo */
 document.addEventListener('DOMContentLoaded', function () {
+    function marinaBindDataTablePageOnSubmit(tableId) {
+        if (!document.getElementById(tableId)) return;
+        document.querySelectorAll('input.marina-dt-page').forEach(function(inp) {
+            var form = inp.closest('form');
+            if (!form || form.getAttribute('data-dt-page-bound') === '1') return;
+            form.setAttribute('data-dt-page-bound', '1');
+            form.addEventListener('submit', function() {
+                try {
+                    if (window.jQuery && window.jQuery.fn.dataTable && window.jQuery.fn.dataTable.isDataTable('#' + tableId)) {
+                        inp.value = String(window.jQuery('#' + tableId).DataTable().page());
+                    }
+                } catch (e) { /* noop */ }
+            });
+        });
+    }
+    window.marinaBindDataTablePageOnSubmit = marinaBindDataTablePageOnSubmit;
+
     document.querySelectorAll('form[data-confirm]').forEach(function(form) {
         form.addEventListener('submit', function(e) {
             if (!confirm('¿Está seguro?')) e.preventDefault();
@@ -486,6 +503,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Clientes (nombre, documento, telefono, email, direccion, duenoCapitan, tipoEmbarcacion)
     (function() {
+        if (document.getElementById('tablaClientes')) {
+            marinaBindDataTablePageOnSubmit('tablaClientes');
+        }
         var el = document.getElementById('clienteModal');
         if (!el) return;
         var title = document.getElementById('clienteModalTitle');

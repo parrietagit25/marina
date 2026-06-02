@@ -32,33 +32,33 @@ if ($accion === 'registrar_movimiento_cliente' && enviado()) {
     $stCli = $pdo->prepare('SELECT id FROM clientes WHERE id = ? LIMIT 1');
     $stCli->execute([$cliente_id_mov]);
     if (!$stCli->fetch()) {
-        redirigir(MARINA_URL . '/index.php?p=clientes&err=' . rawurlencode('Cliente no válido para registrar movimiento.'));
+        redirigir(marina_append_dt_page_to_url(MARINA_URL . '/index.php?p=clientes&err=' . rawurlencode('Cliente no válido para registrar movimiento.')));
     }
 
     $stCuenta = $pdo->prepare('SELECT id FROM cuentas WHERE id = ? LIMIT 1');
     $stCuenta->execute([$cuenta_id_mov]);
     if (!$stCuenta->fetch()) {
-        redirigir(MARINA_URL . '/index.php?p=clientes&err=' . rawurlencode('Debe seleccionar una cuenta válida.'));
+        redirigir(marina_append_dt_page_to_url(MARINA_URL . '/index.php?p=clientes&err=' . rawurlencode('Debe seleccionar una cuenta válida.')));
     }
 
     if (!in_array($tipo_mov, ['ingreso', 'costo'], true)) {
-        redirigir(MARINA_URL . '/index.php?p=clientes&err=' . rawurlencode('Tipo de movimiento no válido.'));
+        redirigir(marina_append_dt_page_to_url(MARINA_URL . '/index.php?p=clientes&err=' . rawurlencode('Tipo de movimiento no válido.')));
     }
     if ($monto_mov <= 0) {
-        redirigir(MARINA_URL . '/index.php?p=clientes&err=' . rawurlencode('El monto debe ser mayor a 0.'));
+        redirigir(marina_append_dt_page_to_url(MARINA_URL . '/index.php?p=clientes&err=' . rawurlencode('El monto debe ser mayor a 0.')));
     }
     if ($fecha_mov === '') {
-        redirigir(MARINA_URL . '/index.php?p=clientes&err=' . rawurlencode('La fecha del movimiento es obligatoria.'));
+        redirigir(marina_append_dt_page_to_url(MARINA_URL . '/index.php?p=clientes&err=' . rawurlencode('La fecha del movimiento es obligatoria.')));
     }
 
     $stForma = $pdo->prepare('SELECT id, tipo_movimiento FROM formas_pago WHERE id = ? LIMIT 1');
     $stForma->execute([$forma_pago_id_mov]);
     $formaRow = $stForma->fetch(PDO::FETCH_ASSOC);
     if (!$formaRow) {
-        redirigir(MARINA_URL . '/index.php?p=clientes&err=' . rawurlencode('Debe seleccionar un tipo de movimiento.'));
+        redirigir(marina_append_dt_page_to_url(MARINA_URL . '/index.php?p=clientes&err=' . rawurlencode('Debe seleccionar un tipo de movimiento.')));
     }
     if ((string) ($formaRow['tipo_movimiento'] ?? '') !== $tipo_mov) {
-        redirigir(MARINA_URL . '/index.php?p=clientes&err=' . rawurlencode('El tipo seleccionado no coincide con la clasificación del movimiento.'));
+        redirigir(marina_append_dt_page_to_url(MARINA_URL . '/index.php?p=clientes&err=' . rawurlencode('El tipo seleccionado no coincide con la clasificación del movimiento.')));
     }
 
     try {
@@ -78,9 +78,9 @@ if ($accion === 'registrar_movimiento_cliente' && enviado()) {
             usuarioId(),
             usuarioId(),
         ]);
-        redirigir(MARINA_URL . '/index.php?p=clientes&ok=' . rawurlencode('Movimiento bancario registrado para el cliente.'));
+        redirigir(marina_append_dt_page_to_url(MARINA_URL . '/index.php?p=clientes&ok=' . rawurlencode('Movimiento bancario registrado para el cliente.')));
     } catch (Throwable $e) {
-        redirigir(MARINA_URL . '/index.php?p=clientes&err=' . rawurlencode('No se pudo registrar el movimiento bancario.'));
+        redirigir(marina_append_dt_page_to_url(MARINA_URL . '/index.php?p=clientes&err=' . rawurlencode('No se pudo registrar el movimiento bancario.')));
     }
 }
 
@@ -88,33 +88,33 @@ if ($accion === 'eliminar_movimiento_cliente' && enviado()) {
     $cliente_id_mov = (int) ($_POST['cliente_id'] ?? 0);
     $movimiento_id = (int) ($_POST['movimiento_id'] ?? 0);
     if ($cliente_id_mov < 1 || $movimiento_id < 1) {
-        redirigir(MARINA_URL . '/index.php?p=clientes&err=' . rawurlencode('Movimiento no válido.'));
+        redirigir(marina_append_dt_page_to_url(MARINA_URL . '/index.php?p=clientes&err=' . rawurlencode('Movimiento no válido.')));
     }
 
     $stMov = $pdo->prepare('SELECT id FROM movimientos_bancarios WHERE id = ? AND cliente_id = ? LIMIT 1');
     $stMov->execute([$movimiento_id, $cliente_id_mov]);
     if (!$stMov->fetch()) {
-        redirigir(MARINA_URL . '/index.php?p=clientes&err=' . rawurlencode('El movimiento no pertenece al cliente seleccionado.'));
+        redirigir(marina_append_dt_page_to_url(MARINA_URL . '/index.php?p=clientes&err=' . rawurlencode('El movimiento no pertenece al cliente seleccionado.')));
     }
 
     try {
         $pdo->prepare('DELETE FROM movimientos_bancarios WHERE id = ? AND cliente_id = ?')->execute([$movimiento_id, $cliente_id_mov]);
-        redirigir(MARINA_URL . '/index.php?p=clientes&ok=' . rawurlencode('Movimiento bancario eliminado.'));
+        redirigir(marina_append_dt_page_to_url(MARINA_URL . '/index.php?p=clientes&ok=' . rawurlencode('Movimiento bancario eliminado.')));
     } catch (Throwable $e) {
-        redirigir(MARINA_URL . '/index.php?p=clientes&err=' . rawurlencode('No se pudo eliminar el movimiento.'));
+        redirigir(marina_append_dt_page_to_url(MARINA_URL . '/index.php?p=clientes&err=' . rawurlencode('No se pudo eliminar el movimiento.')));
     }
 }
 
 if ($accion === 'eliminar' && $id > 0 && enviado()) {
     $bloqueo = marinaBloqueoEliminarCliente($pdo, $id);
     if ($bloqueo !== null) {
-        redirigir(MARINA_URL . '/index.php?p=clientes&err=' . rawurlencode($bloqueo));
+        redirigir(marina_append_dt_page_to_url(MARINA_URL . '/index.php?p=clientes&err=' . rawurlencode($bloqueo)));
     }
     try {
         $pdo->prepare('DELETE FROM clientes WHERE id = ?')->execute([$id]);
-        redirigir(MARINA_URL . '/index.php?p=clientes&ok=' . rawurlencode('Cliente eliminado'));
+        redirigir(marina_append_dt_page_to_url(MARINA_URL . '/index.php?p=clientes&ok=' . rawurlencode('Cliente eliminado')));
     } catch (Throwable $e) {
-        redirigir(MARINA_URL . '/index.php?p=clientes&err=' . rawurlencode(marinaMensajeErrorIntegridad($e)));
+        redirigir(marina_append_dt_page_to_url(MARINA_URL . '/index.php?p=clientes&err=' . rawurlencode(marinaMensajeErrorIntegridad($e))));
     }
 }
 
@@ -151,11 +151,11 @@ if (enviado() && ($accion === 'crear' || $accion === 'editar')) {
             if ($accion === 'editar' && $id > 0) {
                 $pdo->prepare('UPDATE clientes SET nombre=?, documento=?, telefono=?, email=?, direccion=?, dueno_capitan=?, tipo_embarcacion=?, cantidad_pies=?, updated_by=? WHERE id=?')
                     ->execute([$nombre, $documento, $telefono, $email, $direccion, $dueno_capitan !== '' ? $dueno_capitan : null, $tipo_embarcacion, $cantidad_pies, $uid, $id]);
-                redirigir(MARINA_URL . '/index.php?p=clientes&ok=Actualizado');
+                redirigir(marina_append_dt_page_to_url(MARINA_URL . '/index.php?p=clientes&ok=Actualizado'));
             } else {
                 $pdo->prepare('INSERT INTO clientes (nombre, documento, telefono, email, direccion, dueno_capitan, tipo_embarcacion, cantidad_pies, created_by, updated_by) VALUES (?,?,?,?,?,?,?,?,?,?)')
                     ->execute([$nombre, $documento, $telefono, $email, $direccion, $dueno_capitan !== '' ? $dueno_capitan : null, $tipo_embarcacion, $cantidad_pies, $uid, $uid]);
-                redirigir(MARINA_URL . '/index.php?p=clientes&ok=Creado');
+                redirigir(marina_append_dt_page_to_url(MARINA_URL . '/index.php?p=clientes&ok=Creado'));
             }
         }
     }
@@ -230,7 +230,7 @@ try {
 
 <div class="toolbar d-flex gap-2"><button type="button" class="btn btn-primary" id="btnNuevoCliente">Nuevo cliente</button></div>
 
-<table>
+<table id="tablaClientes" data-dt-restore-page="1">
     <thead><tr><th>Id</th><th>Nombre</th><th>Tipo embarcación</th><th>Pies</th><th>Dueño / Capitán</th><th>Teléfono</th><th>Creado</th><th></th></tr></thead>
     <tbody>
     <?php
@@ -259,6 +259,7 @@ try {
             <form method="post" action="?p=clientes">
                 <input type="hidden" name="accion" id="clienteFormAccion" value="crear">
                 <input type="hidden" name="id" id="clienteFormId" value="">
+                <input type="hidden" name="dt_page" class="marina-dt-page" value="">
                 <div class="modal-header">
                     <h5 class="modal-title" id="clienteModalTitle">Nuevo cliente</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -278,7 +279,7 @@ try {
                     <label class="mt-2">Dueño / Capitán</label>
                     <input type="text" class="form-control" id="clienteDuenoCapitan" name="dueno_capitan" maxlength="150" placeholder="Nombre del dueño o capitán">
                     <label class="mt-2 d-block">Tipo de embarcación</label>
-                    <div class="d-flex flex-wrap gap-3" id="clienteTipoEmbarcacionGroup">
+                    <div class="d-flex flex-wrap gap-3 marina-tipo-embarcacion-group" id="clienteTipoEmbarcacionGroup">
                         <?php foreach (marina_cliente_tipos_embarcacion() as $cod => $lab): ?>
                         <div class="form-check">
                             <input class="form-check-input" type="radio" name="tipo_embarcacion" id="clienteTipoEmbarcacion<?= e($cod) ?>" value="<?= e($cod) ?>">
@@ -303,6 +304,7 @@ try {
         <div class="modal-content">
             <form method="post" action="?p=clientes&accion=eliminar">
                 <input type="hidden" name="id" id="clienteDeleteId" value="">
+                <input type="hidden" name="dt_page" class="marina-dt-page" value="">
                 <div class="modal-header"><h5 class="modal-title">Confirmar eliminación</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
                 <div class="modal-body">¿Eliminar cliente <span id="clienteDeleteNombre" class="fw-semibold"></span>?</div>
                 <div class="modal-footer">
@@ -319,6 +321,7 @@ try {
         <div class="modal-content">
             <form method="post" action="?p=clientes&accion=registrar_movimiento_cliente">
                 <input type="hidden" name="cliente_id" id="clienteMovClienteId" value="">
+                <input type="hidden" name="dt_page" class="marina-dt-page" value="">
                 <div class="modal-header">
                     <h5 class="modal-title">Registrar movimiento bancario</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -412,6 +415,7 @@ try {
             <form method="post" action="?p=clientes&accion=eliminar_movimiento_cliente">
                 <input type="hidden" name="cliente_id" id="clienteMovDeleteClienteId" value="">
                 <input type="hidden" name="movimiento_id" id="clienteMovDeleteMovId" value="">
+                <input type="hidden" name="dt_page" class="marina-dt-page" value="">
                 <div class="modal-header"><h5 class="modal-title">Eliminar movimiento</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
                 <div class="modal-body">
                     ¿Eliminar este movimiento bancario?

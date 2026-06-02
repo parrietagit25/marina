@@ -12,6 +12,18 @@ function redirigir(string $url, int $codigo = 302): void {
     exit;
 }
 
+/** Conserva la página del DataTable tras POST (campo oculto dt_page, índice 0-based). */
+function marina_append_dt_page_to_url(string $url): string
+{
+    if (!isset($_POST['dt_page']) || $_POST['dt_page'] === '') {
+        return $url;
+    }
+    $page = max(0, (int) $_POST['dt_page']);
+    $sep = str_contains($url, '?') ? '&' : '?';
+
+    return $url . $sep . 'dt_page=' . $page;
+}
+
 /** Formato de fecha en pantallas operativas (año con 2 dígitos: 16/05/26). */
 const MARINA_FMT_FECHA_PANTALLA = 'd/m/y';
 
