@@ -19,7 +19,7 @@ function marina_ensure_schema(PDO $pdo): void
         "ALTER TABLE contratos ADD COLUMN numero_recibo VARCHAR(100) NULL DEFAULT NULL COMMENT 'Número de recibo al cliente' AFTER observaciones",
         "ALTER TABLE cuotas_movimientos ADD COLUMN concepto VARCHAR(255) NULL DEFAULT NULL COMMENT 'Término / descripción del pago de cuota' AFTER referencia",
         "ALTER TABLE clientes ADD COLUMN dueno_capitan VARCHAR(150) NULL DEFAULT NULL COMMENT 'Dueño / Capitán' AFTER direccion",
-        "ALTER TABLE clientes ADD COLUMN tipo_embarcacion VARCHAR(10) NULL DEFAULT NULL COMMENT 'CAT|MYT|MT' AFTER dueno_capitan",
+        "ALTER TABLE clientes ADD COLUMN tipo_embarcacion VARCHAR(10) NULL DEFAULT NULL COMMENT 'CAT|MYT|MT|VL' AFTER dueno_capitan",
         "ALTER TABLE clientes ADD COLUMN cantidad_pies DECIMAL(10,2) NULL DEFAULT NULL COMMENT 'Pies del navío' AFTER tipo_embarcacion",
         "ALTER TABLE movimientos_bancarios ADD COLUMN cliente_id INT UNSIGNED NULL DEFAULT NULL AFTER id",
         "ALTER TABLE usuarios ADD COLUMN permisos_json TEXT NULL DEFAULT NULL COMMENT 'Permisos menú/editar/eliminar JSON' AFTER rol",
@@ -171,7 +171,7 @@ function marina_ensure_schema(PDO $pdo): void
           tipo_combustible VARCHAR(20) NOT NULL,
           fecha DATE NOT NULL,
           embarcacion VARCHAR(200) NOT NULL,
-          tipo_embarcacion VARCHAR(10) NULL COMMENT 'CAT|MYT|MT',
+          tipo_embarcacion VARCHAR(10) NULL COMMENT 'CAT|MYT|MT|VL',
           gls DECIMAL(14,3) NOT NULL,
           precio_venta_galon DECIMAL(12,4) NULL COMMENT 'Precio venta/galón al registrar despacho',
           monto_total DECIMAL(14,2) NOT NULL,
@@ -246,7 +246,7 @@ function marina_ensure_schema(PDO $pdo): void
         "ALTER TABLE combustible_pedidos ADD COLUMN gasto_id INT UNSIGNED NULL DEFAULT NULL COMMENT 'Gasto egreso costo al recibir' AFTER cuenta_id",
         "ALTER TABLE combustible_pedidos ADD CONSTRAINT fk_cp_gasto FOREIGN KEY (gasto_id) REFERENCES gastos(id) ON DELETE SET NULL",
         "ALTER TABLE combustible_despachos ADD COLUMN precio_venta_galon DECIMAL(12,4) NULL COMMENT 'Precio venta/galón al registrar despacho' AFTER gls",
-        "ALTER TABLE combustible_despachos ADD COLUMN tipo_embarcacion VARCHAR(10) NULL DEFAULT NULL COMMENT 'CAT|MYT|MT' AFTER embarcacion",
+        "ALTER TABLE combustible_despachos ADD COLUMN tipo_embarcacion VARCHAR(10) NULL DEFAULT NULL COMMENT 'CAT|MYT|MT|VL' AFTER embarcacion",
     ];
     foreach ($combustibleAlters as $sql) {
         try {

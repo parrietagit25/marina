@@ -356,7 +356,7 @@ if (enviado()) {
         $glsValido = $glsRaw !== '' && $gls > 0;
 
         if (!isset(MARINA_COMB_TIPOS[$tipo]) || !$fechaValida || $emb === '' || $tipoEmb === null || !$glsValido || $monto < 0 || $cuenta_id < 1) {
-            $mensaje = 'Complete tipo combustible, fecha, embarcación, tipo de embarcación (CAT/MYT/MT), GLS, monto y cuenta sugerida al cobrar.';
+            $mensaje = 'Complete tipo combustible, fecha, embarcación, tipo de embarcación, GLS, monto y cuenta sugerida al cobrar.';
         } else {
             $tieneCobros = false;
             if ($id > 0) {
@@ -785,7 +785,7 @@ $despTotalSaldo = max(0.0, $despTotalFacturado - $despTotalAbonado);
       const tipoEmb = document.querySelector('#modalDespacho input[name="tipo_embarcacion"]:checked');
       if (!tipo || !emb || !tipoEmb || glsRaw === '' || gls <= 0) {
         ev.preventDefault();
-        alert('Complete tipo combustible, embarcación, tipo de embarcación (CAT/MYT/MT) y GLS (mayor a cero).');
+        alert('Complete tipo combustible, embarcación, tipo de embarcación y GLS (mayor a cero).');
       }
     });
 

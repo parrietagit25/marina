@@ -494,6 +494,7 @@ function marina_cliente_tipos_embarcacion(): array
         'CAT' => 'Catamarán (CAT)',
         'MYT' => 'Megayate (MYT)',
         'MT' => 'A motor (MT)',
+        'VL' => 'Velero (VL)',
     ];
 }
 
