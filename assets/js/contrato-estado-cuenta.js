@@ -15,7 +15,9 @@ function marinaInitEstadoCuentaContrato() {
     var bodyEl = document.getElementById('ecContratoBody');
     var linkCuotas = document.getElementById('ecLinkCuotas');
     var linkEle = document.getElementById('ecLinkElectricidad');
+    var btnEnviarEmail = document.getElementById('ecBtnEnviarEmail');
     var baseUrl = (typeof window.MARINA_EC_BASE === 'string' && window.MARINA_EC_BASE) ? window.MARINA_EC_BASE : 'index.php';
+    var contratoEcActual = 0;
 
     function escEc(s) {
         if (s === null || s === undefined) return '';
@@ -145,6 +147,7 @@ function marinaInitEstadoCuentaContrato() {
         if (!btn) return;
         var id = btn.getAttribute('data-contrato-id') || '';
         if (!id) return;
+        contratoEcActual = parseInt(id, 10) || 0;
 
         if (titleEl) titleEl.textContent = 'Estado de cuenta — contrato #' + id;
         if (bodyEl) bodyEl.innerHTML = '<p class="text-muted mb-0">Cargando…</p>';
@@ -155,6 +158,11 @@ function marinaInitEstadoCuentaContrato() {
         if (linkEle) {
             linkEle.href = baseUrl + '?p=contratos-electricidad&id=' + encodeURIComponent(id);
             linkEle.classList.remove('d-none');
+        }
+        if (btnEnviarEmail) {
+            btnEnviarEmail.classList.remove('d-none');
+            btnEnviarEmail.disabled = false;
+            btnEnviarEmail.textContent = 'Enviar por correo';
         }
         bsModal.show();
 
@@ -181,7 +189,33 @@ function marinaInitEstadoCuentaContrato() {
         if (bodyEl) bodyEl.innerHTML = '<p class="text-muted mb-0">Cargando…</p>';
         if (linkCuotas) linkCuotas.classList.add('d-none');
         if (linkEle) linkEle.classList.add('d-none');
+        if (btnEnviarEmail) btnEnviarEmail.classList.add('d-none');
+        contratoEcActual = 0;
     });
+
+    if (btnEnviarEmail) {
+        btnEnviarEmail.addEventListener('click', function () {
+            if (!contratoEcActual) return;
+            if (!confirm('¿Enviar el estado de cuenta por correo al cliente?')) return;
+            btnEnviarEmail.disabled = true;
+            btnEnviarEmail.textContent = 'Enviando…';
+            var fd = new FormData();
+            fd.append('accion', 'enviar_email');
+            fd.append('contrato_id', String(contratoEcActual));
+            fetch(baseUrl + '?p=contrato-estado-cuenta&id=' + encodeURIComponent(contratoEcActual), {
+                method: 'POST',
+                body: fd,
+                credentials: 'same-origin'
+            }).then(function (r) { return r.json(); }).then(function (json) {
+                alert((json && json.ok) ? (json.mensaje || 'Enviado.') : ((json && json.error) || 'No se pudo enviar.'));
+            }).catch(function () {
+                alert('Error de conexión.');
+            }).finally(function () {
+                btnEnviarEmail.disabled = false;
+                btnEnviarEmail.textContent = 'Enviar por correo';
+            });
+        });
+    }
 }
 
 if (document.readyState === 'loading') {

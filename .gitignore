@@ -1,3 +1,5 @@
-# Local (no subir)
+# Local / hosting (no subir credenciales)
 .env
 config/config.local.php
+config/environment.php
+config/environments/production.php

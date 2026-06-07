@@ -241,6 +241,10 @@ $ok = obtener('ok');
                 </div>
             </div>
             <div class="modal-footer flex-column align-items-stretch gap-2">
+                <div class="d-flex flex-wrap gap-2 border-bottom pb-2 mb-0">
+                    <button type="button" class="btn btn-outline-dark btn-sm" id="mapaBtnEstadoCuenta">E. Cuentas</button>
+                    <button type="button" class="btn btn-outline-success btn-sm" id="mapaBtnEnviarEstadoCuenta">Enviar estado de cuenta</button>
+                </div>
                 <form method="post" action="?p=mapa-marina" class="d-flex flex-wrap justify-content-end gap-2 border-bottom pb-2 mb-0" id="formLiberarContratoMapaMarina">
                     <input type="hidden" name="accion" value="liberar_contrato_mapa">
                     <input type="hidden" name="contrato_id" id="mapaMarinaLiberarContratoId" value="">
@@ -295,6 +299,10 @@ window.addEventListener('load', function() {
     var elContratoInput = document.getElementById('cambiarSlipContratoId');
     var elLiberarInput = document.getElementById('mapaMarinaLiberarContratoId');
     var elSlipNuevo = document.getElementById('cambiarSlipNuevoId');
+    var btnEc = document.getElementById('mapaBtnEstadoCuenta');
+    var btnEnviarEc = document.getElementById('mapaBtnEnviarEstadoCuenta');
+    var contratoMapaActualId = 0;
+    var ecBase = (typeof window.MARINA_EC_BASE === 'string' && window.MARINA_EC_BASE) ? window.MARINA_EC_BASE : '<?= MARINA_URL ?>/index.php';
     var fmtFecha = typeof window.marinaFmtFecha === 'function' ? window.marinaFmtFecha : function(x) { return x || ''; };
 
     function money(n) {
@@ -316,6 +324,7 @@ window.addEventListener('load', function() {
     }
 
     function fillModal(d) {
+        contratoMapaActualId = parseInt(d.id, 10) || 0;
         elContratoId.textContent = d.id || '—';
         elCliente.textContent = d.cliente || '—';
         elCuenta.textContent = d.cuenta || '—';
@@ -357,8 +366,44 @@ window.addEventListener('load', function() {
         try { d = JSON.parse(raw); } catch (e) { d = {}; }
         fillModal(d);
     });
+
+    if (btnEc) {
+        btnEc.addEventListener('click', function() {
+            if (!contratoMapaActualId) return;
+            var hidden = document.createElement('button');
+            hidden.type = 'button';
+            hidden.className = 'btn-estado-cuenta-contrato d-none';
+            hidden.setAttribute('data-contrato-id', String(contratoMapaActualId));
+            document.body.appendChild(hidden);
+            hidden.click();
+            hidden.remove();
+        });
+    }
+    if (btnEnviarEc) {
+        btnEnviarEc.addEventListener('click', function() {
+            if (!contratoMapaActualId) return;
+            if (!confirm('¿Enviar el estado de cuenta por correo al cliente?')) return;
+            btnEnviarEc.disabled = true;
+            var fd = new FormData();
+            fd.append('accion', 'enviar_email');
+            fd.append('contrato_id', String(contratoMapaActualId));
+            fetch(ecBase + '?p=contrato-estado-cuenta&id=' + encodeURIComponent(contratoMapaActualId), {
+                method: 'POST',
+                body: fd,
+                credentials: 'same-origin'
+            }).then(function(r) { return r.json(); }).then(function(json) {
+                alert((json && json.ok) ? (json.mensaje || 'Enviado.') : ((json && json.error) || 'No se pudo enviar.'));
+            }).catch(function() {
+                alert('Error de conexión.');
+            }).finally(function() {
+                btnEnviarEc.disabled = false;
+            });
+        });
+    }
 });
 </script>
+
+<?php require_once __DIR__ . '/../includes/partials/modal_estado_cuenta_contrato.php'; ?>
 
 </div><!-- .mapa-marina-page -->
 

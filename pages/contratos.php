@@ -195,6 +195,13 @@ if (enviado() && ($accion === 'crear' || $accion === 'editar')) {
                     $okMsg = ($cuotasPlan !== null && $cuotasPlan !== [])
                         ? 'Contrato creado con ' . count($cuotasPlan) . ' cuotas'
                         : 'Contrato creado';
+                    require_once __DIR__ . '/../includes/alertas_helpers.php';
+                    $bienvenida = marina_alertas_enviar_bienvenida($pdo, $contrato_id);
+                    if ($bienvenida['ok']) {
+                        $okMsg .= '. Correo de bienvenida enviado';
+                    } elseif (marina_alertas_activa($pdo, 'bienvenida') && ($bienvenida['error'] ?? '') !== 'Esta alerta está deshabilitada.') {
+                        $okMsg .= '. Bienvenida no enviada: ' . ($bienvenida['error'] ?? '');
+                    }
                     redirigir(MARINA_URL . '/index.php?p=contratos&accion=cuotas&id=' . $contrato_id . '&ok=' . rawurlencode($okMsg));
                 } catch (Throwable $e) {
                     $pdo->rollBack();

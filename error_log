@@ -1,0 +1,30 @@
+[04-Jun-2026 06:16:30 UTC] PHP Warning:  require_once(/home/corowlwg/public_html/config/config.php): Failed to open stream: No such file or directory in /home/corowlwg/public_html/index.php on line 5
+[04-Jun-2026 06:16:30 UTC] PHP Fatal error:  Uncaught Error: Failed opening required '/home/corowlwg/public_html/config/config.php' (include_path='.:/opt/alt/php82/usr/share/pear:/opt/alt/php82/usr/share/php:/usr/share/pear:/usr/share/php') in /home/corowlwg/public_html/index.php:5
+Stack trace:
+#0 {main}
+  thrown in /home/corowlwg/public_html/index.php on line 5
+[04-Jun-2026 06:17:43 UTC] PHP Warning:  require_once(/home/corowlwg/public_html/config/config.php): Failed to open stream: No such file or directory in /home/corowlwg/public_html/index.php on line 5
+[04-Jun-2026 06:17:43 UTC] PHP Fatal error:  Uncaught Error: Failed opening required '/home/corowlwg/public_html/config/config.php' (include_path='.:/opt/alt/php82/usr/share/pear:/opt/alt/php82/usr/share/php:/usr/share/pear:/usr/share/php') in /home/corowlwg/public_html/index.php:5
+Stack trace:
+#0 {main}
+  thrown in /home/corowlwg/public_html/index.php on line 5
+[04-Jun-2026 06:19:05 UTC] PHP Warning:  require_once(/home/corowlwg/public_html/config/config.php): Failed to open stream: No such file or directory in /home/corowlwg/public_html/index.php on line 5
+[04-Jun-2026 06:19:05 UTC] PHP Fatal error:  Uncaught Error: Failed opening required '/home/corowlwg/public_html/config/config.php' (include_path='.:/opt/alt/php82/usr/share/pear:/opt/alt/php82/usr/share/php:/usr/share/pear:/usr/share/php') in /home/corowlwg/public_html/index.php:5
+Stack trace:
+#0 {main}
+  thrown in /home/corowlwg/public_html/index.php on line 5
+[04-Jun-2026 06:19:05 UTC] PHP Warning:  require_once(/home/corowlwg/public_html/config/config.php): Failed to open stream: No such file or directory in /home/corowlwg/public_html/index.php on line 5
+[04-Jun-2026 06:19:05 UTC] PHP Fatal error:  Uncaught Error: Failed opening required '/home/corowlwg/public_html/config/config.php' (include_path='.:/opt/alt/php82/usr/share/pear:/opt/alt/php82/usr/share/php:/usr/share/pear:/usr/share/php') in /home/corowlwg/public_html/index.php:5
+Stack trace:
+#0 {main}
+  thrown in /home/corowlwg/public_html/index.php on line 5
+[05-Jun-2026 22:52:23 America/Argentina/Buenos_Aires] PHP Fatal error:  Uncaught Error: Call to undefined function marina_cron_token() in /home/corowlwg/public_html/pages/alertas.php:60
+Stack trace:
+#0 /home/corowlwg/public_html/index.php(33): require()
+#1 {main}
+  thrown in /home/corowlwg/public_html/pages/alertas.php on line 60
+[05-Jun-2026 23:00:27 America/Argentina/Buenos_Aires] PHP Fatal error:  Uncaught Error: Call to undefined function marina_cron_token() in /home/corowlwg/public_html/pages/alertas.php:60
+Stack trace:
+#0 /home/corowlwg/public_html/index.php(33): require()
+#1 {main}
+  thrown in /home/corowlwg/public_html/pages/alertas.php on line 60

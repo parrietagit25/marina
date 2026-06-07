@@ -15,6 +15,7 @@
                 <p class="text-muted mb-0">Cargando…</p>
             </div>
             <div class="modal-footer flex-wrap gap-2">
+                <button type="button" class="btn btn-outline-success btn-sm d-none" id="ecBtnEnviarEmail">Enviar por correo</button>
                 <a href="#" class="btn btn-outline-primary btn-sm d-none" id="ecLinkCuotas" target="_self">Ir a cuotas</a>
                 <a href="#" class="btn btn-outline-info btn-sm text-white d-none" id="ecLinkElectricidad" target="_self">Ir a electricidad</a>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>

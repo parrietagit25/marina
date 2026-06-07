@@ -405,4 +405,97 @@ function marina_ensure_schema(PDO $pdo): void
     } catch (Throwable $e) {
         // sin tabla pagos
     }
+
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS marketing_plantillas (
+          id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+          nombre VARCHAR(200) NOT NULL,
+          asunto VARCHAR(500) NOT NULL,
+          cuerpo_html MEDIUMTEXT NOT NULL,
+          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          created_by INT UNSIGNED NULL,
+          updated_by INT UNSIGNED NULL,
+          KEY idx_mp_nombre (nombre),
+          CONSTRAINT fk_mp_created FOREIGN KEY (created_by) REFERENCES usuarios(id),
+          CONSTRAINT fk_mp_updated FOREIGN KEY (updated_by) REFERENCES usuarios(id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $pdo->exec("CREATE TABLE IF NOT EXISTS marketing_campanas (
+          id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+          plantilla_id INT UNSIGNED NOT NULL,
+          nombre VARCHAR(200) NOT NULL,
+          modo_destino VARCHAR(20) NOT NULL DEFAULT 'clientes' COMMENT 'clientes|manual|mixto',
+          tipos_embarcacion VARCHAR(100) NULL COMMENT 'CSV tipos CAT,MYT,...',
+          emails_manual TEXT NULL,
+          estado VARCHAR(20) NOT NULL DEFAULT 'pendiente' COMMENT 'pendiente|enviando|completada|error',
+          total_destinatarios INT UNSIGNED NOT NULL DEFAULT 0,
+          total_enviados INT UNSIGNED NOT NULL DEFAULT 0,
+          total_fallidos INT UNSIGNED NOT NULL DEFAULT 0,
+          iniciado_at DATETIME NULL,
+          finalizado_at DATETIME NULL,
+          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          created_by INT UNSIGNED NULL,
+          KEY idx_mc_plantilla (plantilla_id),
+          KEY idx_mc_estado (estado),
+          CONSTRAINT fk_mc_plantilla FOREIGN KEY (plantilla_id) REFERENCES marketing_plantillas(id) ON DELETE CASCADE,
+          CONSTRAINT fk_mc_created FOREIGN KEY (created_by) REFERENCES usuarios(id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $pdo->exec("CREATE TABLE IF NOT EXISTS marketing_envios (
+          id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+          campana_id INT UNSIGNED NOT NULL,
+          cliente_id INT UNSIGNED NULL,
+          email VARCHAR(200) NOT NULL,
+          nombre_dest VARCHAR(200) NULL,
+          estado VARCHAR(20) NOT NULL DEFAULT 'pendiente' COMMENT 'pendiente|enviado|fallido',
+          resend_id VARCHAR(120) NULL,
+          error_mensaje TEXT NULL,
+          enviado_at DATETIME NULL,
+          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          KEY idx_me_campana (campana_id),
+          KEY idx_me_estado (estado),
+          KEY idx_me_email (email),
+          CONSTRAINT fk_me_campana FOREIGN KEY (campana_id) REFERENCES marketing_campanas(id) ON DELETE CASCADE,
+          CONSTRAINT fk_me_cliente FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    } catch (Throwable $e) {
+        // motor o FK
+    }
+
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS alertas_config (
+          codigo VARCHAR(50) NOT NULL PRIMARY KEY,
+          etiqueta VARCHAR(150) NOT NULL,
+          programada TINYINT(1) NOT NULL DEFAULT 1,
+          activo TINYINT(1) NOT NULL DEFAULT 1,
+          updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $pdo->exec("CREATE TABLE IF NOT EXISTS alertas_excepciones (
+          id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+          email VARCHAR(200) NOT NULL,
+          codigo_alerta VARCHAR(50) NOT NULL,
+          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE KEY uq_alertas_exc (email, codigo_alerta),
+          KEY idx_alertas_exc_email (email)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $pdo->exec("CREATE TABLE IF NOT EXISTS alertas_envios_log (
+          id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+          codigo_alerta VARCHAR(50) NOT NULL,
+          clave_dedup VARCHAR(120) NOT NULL,
+          referencia_tipo VARCHAR(30) NULL,
+          referencia_id INT UNSIGNED NULL,
+          email VARCHAR(200) NOT NULL,
+          estado VARCHAR(20) NOT NULL DEFAULT 'enviado',
+          resend_id VARCHAR(120) NULL,
+          error_mensaje TEXT NULL,
+          enviado_at DATETIME NULL,
+          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE KEY uq_alertas_dedup (clave_dedup),
+          KEY idx_alertas_log_codigo (codigo_alerta),
+          KEY idx_alertas_log_fecha (enviado_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        require_once __DIR__ . '/alertas_helpers.php';
+        marina_alertas_seed_config($pdo);
+    } catch (Throwable $e) {
+        // motor o FK
+    }
 }

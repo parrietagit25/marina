@@ -23,8 +23,24 @@ Sistema para una marina: muelles, slips, contratos por cuotas, gastos por partid
    - Credenciales: **admin@marina.local** / **admin123**  
    - Conviene cambiar la contraseña tras el primer acceso.
 
-4. **Configuración**
-   - Revisar `config/config.php`: `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASS` y `MARINA_URL` (por defecto `/marina`).
+4. **Configuración (entorno)**
+   - En `config/environment.php` debe decir `return 'local';` (ya viene así en desarrollo).
+   - Los valores de XAMPP están en `config/environments/local.php` (`MARINA_URL` = `/marina`, BD `marina`, usuario `root`).
+
+### Subir a hosting compartido
+
+1. Suba todos los archivos al servidor (por ejemplo `public_html`).
+2. En el servidor, copie `config/environment.example.php` → `config/environment.php` y cambie a:
+   ```php
+   return 'production';
+   ```
+3. Copie `config/environments/production.php.example` → `config/environments/production.php` y complete:
+   - `MARINA_URL` → `''` si la app está en la raíz del dominio (`https://tudominio.com/`). Si está en una subcarpeta, use `'/subcarpeta'`.
+   - Datos de MySQL del panel del hosting (`DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASS`).
+4. Importe `sql/schema.sql` (o su respaldo) en la base del hosting.
+5. Pruebe `https://tudominio.com/index.php?p=login` — debe verse el diseño (CSS en `/assets/css/estilos.css`).
+
+Si el login se ve sin estilos, casi siempre `MARINA_URL` está mal: en local es `/marina`, en hosting en raíz debe ser `''`.
 
 ## Uso
 

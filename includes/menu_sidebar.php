@@ -16,6 +16,8 @@ function marina_render_sidebar_menu(string $p, string $accordionParentId, string
         'Costo o Gastos' => 'Costo',
         'Combustible' => 'Combustible',
         'Marina Ingresos' => 'Marina',
+        'Marketing' => 'Mkt',
+        'Alertas' => 'Alert',
         'Reportes' => 'Rep',
     ];
 

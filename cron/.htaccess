@@ -1,0 +1,2 @@
+# Los scripts validan token por PHP; evite listar el directorio.
+Options -Indexes

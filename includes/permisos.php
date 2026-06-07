@@ -15,6 +15,7 @@ function marina_permisos_alias_pagina(): array
 {
     return [
         'contratos-electricidad' => 'contratos',
+        'contrato-estado-cuenta' => 'contratos',
     ];
 }
 
@@ -85,6 +86,19 @@ function marina_menu_permisos_definicion(): array
                 ['pagina' => 'tarifas', 'etiqueta' => 'Tarifas', 'icono' => 'badge-dollar-sign'],
                 ['pagina' => 'contratos', 'etiqueta' => 'Contratos'],
                 ['pagina' => 'reporte-cuotas', 'etiqueta' => 'Reporte de cuotas', 'icono' => 'file-bar-chart'],
+            ],
+        ],
+        [
+            'seccion' => 'Marketing',
+            'items' => [
+                ['pagina' => 'marketing-plantillas', 'etiqueta' => 'Plantillas', 'icono' => 'mail'],
+                ['pagina' => 'marketing-campanas', 'etiqueta' => 'Campañas y envíos', 'icono' => 'send'],
+            ],
+        ],
+        [
+            'seccion' => 'Alertas',
+            'items' => [
+                ['pagina' => 'alertas', 'etiqueta' => 'Alertas', 'icono' => 'bell'],
             ],
         ],
         [

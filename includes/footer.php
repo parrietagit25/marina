@@ -149,6 +149,7 @@ if (window.lucide) {
   }
 })();
 </script>
+<?php if (!empty($marinaFooterExtra)) { echo $marinaFooterExtra; } ?>
 </body>
 </html>
 

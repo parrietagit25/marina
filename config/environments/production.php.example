@@ -1,0 +1,24 @@
+<?php
+/**
+ * Hosting compartido (dominio en la raíz, sin subcarpeta /marina).
+ *
+ * 1. Copie este archivo como production.php (misma carpeta).
+ * 2. En config/environment.php ponga: return 'production';
+ * 3. Ajuste MARINA_URL, base de datos y zona horaria si aplica.
+ *
+ * MARINA_URL:
+ *   ''           → app en https://tudominio.com/ (index.php en public_html)
+ *   '/carpeta'   → app en https://tudominio.com/carpeta/
+ */
+declare(strict_types=1);
+
+define('MARINA_ENV', 'production');
+define('MARINA_DEBUG', false);
+
+define('MARINA_URL', '');
+
+define('DB_HOST', 'localhost');
+define('DB_NAME', 'nombre_base_datos');
+define('DB_USER', 'usuario_mysql');
+define('DB_PASS', 'contraseña_mysql');
+define('DB_CHARSET', 'utf8mb4');
